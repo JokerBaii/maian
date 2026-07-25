@@ -1,0 +1,46 @@
+/**
+ * 全局主题色与样式变量
+ * uni-app 会自动将此文件注入到所有 SCSS 编译中，无需手动 import
+ */
+
+// 主色调 - 蓝色科技风
+$primary-color: #2B6FF0;
+$primary-light: #4A9BFF;
+$primary-dark: #1A5BD6;
+$danger-color: #F53F3F;
+$warning-color: #FF7D00;
+$success-color: #00B42A;
+$info-color: #722ED1;
+
+// 背景色
+$bg-color: #F5F7FA;
+$card-bg: #FFFFFF;
+
+// 文字色
+$text-primary: #1D2129;
+$text-regular: #4E5969;
+$text-secondary: #86909C;
+$text-placeholder: #C9CDD4;
+
+// 边框色
+$border-color: #E5E6EB;
+$divider-color: #F2F3F5;
+
+// 圆角
+$radius-sm: 8rpx;
+$radius-md: 16rpx;
+$radius-lg: 24rpx;
+$radius-xl: 32rpx;
+
+// 阴影
+$shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+$shadow-md: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+$shadow-lg: 0 8rpx 32rpx rgba(0, 0, 0, 0.12);
+
+// 覆盖 uni-app 默认变量
+$uni-color-primary: #2B6FF0;
+$uni-color-success: #00B42A;
+$uni-color-warning: #FF7D00;
+$uni-color-error: #F53F3F;
+$uni-text-color: #1D2129;
+$uni-bg-color: #F5F7FA;

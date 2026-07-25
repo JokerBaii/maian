@@ -1,0 +1,191 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "脉安驰援"
+      }
+    },
+    {
+      "path": "pages/map/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "急救地图"
+      }
+    },
+    {
+      "path": "pages/health/index",
+      "style": {
+        "navigationBarTitleText": "健康监测"
+      }
+    },
+    {
+      "path": "pages/mine/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "我的"
+      }
+    },
+    {
+      "path": "pages/rescue/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "紧急呼救"
+      }
+    },
+    {
+      "path": "pages/rescue/detail",
+      "style": {
+        "navigationBarTitleText": "救援详情"
+      }
+    },
+    {
+      "path": "pages/device/add",
+      "style": {
+        "navigationBarTitleText": "设备录入"
+      }
+    },
+    {
+      "path": "pages/device/manage",
+      "style": {
+        "navigationBarTitleText": "设备管理"
+      }
+    },
+    {
+      "path": "pages/health/bind",
+      "style": {
+        "navigationBarTitleText": "设备绑定"
+      }
+    },
+    {
+      "path": "pages/health/detail",
+      "style": {
+        "navigationBarTitleText": "心率详情"
+      }
+    },
+    {
+      "path": "pages/health/alert",
+      "style": {
+        "navigationBarTitleText": "异常预警"
+      }
+    },
+    {
+      "path": "pages/checkup/upload",
+      "style": {
+        "navigationBarTitleText": "体检报告上传"
+      }
+    },
+    {
+      "path": "pages/checkup/report",
+      "style": {
+        "navigationBarTitleText": "健康分析报告"
+      }
+    },
+    {
+      "path": "pages/checkup/archive",
+      "style": {
+        "navigationBarTitleText": "健康档案"
+      }
+    },
+    {
+      "path": "pages/science/detail",
+      "style": {
+        "navigationBarTitleText": "科普详情"
+      }
+    },
+    {
+      "path": "pages/science/quiz",
+      "style": {
+        "navigationBarTitleText": "知识自测"
+      }
+    },
+    {
+      "path": "pages/science/contribute",
+      "style": {
+        "navigationBarTitleText": "内容投稿"
+      }
+    },
+    {
+      "path": "pages/science/index",
+      "style": {
+        "navigationBarTitleText": "急救与健康科普",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/auth",
+      "style": {
+        "navigationBarTitleText": "实名认证"
+      }
+    },
+    {
+      "path": "pages/mine/contacts",
+      "style": {
+        "navigationBarTitleText": "紧急联系人"
+      }
+    },
+    {
+      "path": "pages/mine/devices",
+      "style": {
+        "navigationBarTitleText": "我的设备"
+      }
+    },
+    {
+      "path": "pages/mine/records",
+      "style": {
+        "navigationBarTitleText": "救援记录"
+      }
+    },
+    {
+      "path": "pages/mine/settings",
+      "style": {
+        "navigationBarTitleText": "设置"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "脉安驰援",
+    "navigationBarBackgroundColor": "#2B6FF0",
+    "backgroundColor": "#F5F7FA",
+    "app-plus": {
+      "titleNView": {
+        "titleColor": "#ffffff",
+        "backgroundColor": "#2B6FF0"
+      }
+    }
+  },
+  "tabBar": {
+    "color": "#86909C",
+    "selectedColor": "#2B6FF0",
+    "borderStyle": "black",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "static/icons/tab-home.png",
+        "selectedIconPath": "static/icons/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/map/index",
+        "text": "急救地图",
+        "iconPath": "static/icons/tab-map.png",
+        "selectedIconPath": "static/icons/tab-map-active.png"
+      },
+      {
+        "pagePath": "pages/health/index",
+        "text": "健康",
+        "iconPath": "static/icons/tab-health.png",
+        "selectedIconPath": "static/icons/tab-health-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "static/icons/tab-mine.png",
+        "selectedIconPath": "static/icons/tab-mine-active.png"
+      }
+    ]
+  }
+}
