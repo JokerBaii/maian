@@ -1,22 +1,6 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <text class="back-arrow">&#x2190;</text>
-        </view>
-        <text class="nav-title">设备绑定</text>
-        <view class="nav-placeholder"></view>
-      </view>
-    </view>
-
-    <scroll-view
-      class="scroll-content"
-      scroll-y
-      :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
-    >
-      <!-- 已绑定设备 -->
+    <scroll-view class="scroll-content" scroll-y>
       <view v-if="boundDevice" class="card bound-card">
         <view class="card-header">
           <view class="card-title-wrap">
@@ -31,14 +15,14 @@
         <view class="bound-info">
           <view class="bound-left">
             <view class="device-avatar">
-              <text class="device-avatar-icon">&#x231A;</text>
+              <app-icon class="device-avatar-icon" name="heart-filled" :size="26" color="#1F63D5" />
             </view>
             <view class="bound-detail">
               <text class="bound-name">{{ boundDevice.name }}</text>
               <view class="bound-meta">
-                <text class="bound-type">手环</text>
+                <text class="bound-type">蓝牙设备</text>
                 <text class="bound-divider">|</text>
-                <view class="battery-mini">
+                <view v-if="boundDevice.battery !== null" class="battery-mini">
                   <view class="battery-body-mini">
                     <view class="battery-level-mini" :style="{ width: boundDevice.battery + '%' }"></view>
                   </view>
@@ -53,16 +37,14 @@
         </view>
       </view>
 
-      <!-- 未绑定提示 -->
       <view v-if="!boundDevice" class="empty-bound">
         <view class="empty-icon">
-          <text class="empty-icon-text">&#x231A;</text>
+          <app-icon class="empty-icon-text" name="heart-filled" :size="30" color="#7E8DA6" />
         </view>
         <text class="empty-title">暂无绑定设备</text>
         <text class="empty-desc">请扫描并绑定可穿戴设备以开始健康监测</text>
       </view>
 
-      <!-- 扫描按钮 -->
       <view class="scan-section">
         <view class="scan-btn" :class="{ 'scanning': isScanning }" @tap="toggleScan">
           <view v-if="isScanning" class="scan-animation">
@@ -71,14 +53,19 @@
             <view class="scan-ring scan-ring-3"></view>
           </view>
           <view class="scan-icon-wrap">
-            <text class="scan-icon-text">{{ isScanning ? '' : '🔍' }}</text>
+            <app-icon
+              v-if="!isScanning"
+              class="scan-icon-text"
+              name="search"
+              :size="22"
+              color="#1F63D5"
+            />
             <view v-if="isScanning" class="scan-spinner"></view>
           </view>
           <text class="scan-label">{{ isScanning ? '扫描中...' : '扫描设备' }}</text>
         </view>
       </view>
 
-      <!-- 发现的设备列表 -->
       <view v-if="discoveredDevices.length" class="card devices-card">
         <view class="card-header">
           <view class="card-title-wrap">
@@ -121,12 +108,11 @@
         </view>
       </view>
 
-      <!-- 绑定成功动画 -->
       <view v-if="showBindSuccess" class="success-overlay">
         <view class="success-card">
           <view class="success-icon-wrap">
             <view class="success-check">
-              <text class="check-mark">&#x2713;</text>
+              <app-icon class="check-mark" name="checkmarkempty" :size="30" color="#FFFFFF" />
             </view>
           </view>
           <text class="success-title">绑定成功</text>
@@ -135,35 +121,31 @@
         </view>
       </view>
 
-      <!-- 底部安全区 -->
       <view class="bottom-safe"></view>
     </scroll-view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { mockUser, mockBLEDevices } from '@/mock/data'
+import { onUnmounted, reactive, ref } from 'vue'
+import AppIcon from '@/components/AppIcon.vue'
+import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 
-// 系统信息
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
+const { updateWearable } = useHealthMonitoring()
 
-// 已绑定设备
-const boundDevice = ref<{ name: string; type: string; connected: boolean; battery: number } | null>({
-  name: mockUser.bindDevice.name,
-  type: mockUser.bindDevice.type,
-  connected: mockUser.bindDevice.connected,
-  battery: mockUser.bindDevice.battery
-})
+const boundDevice = ref<{
+  name: string
+  type: string
+  connected: boolean
+  battery: number | null
+} | null>(null)
+const connectedDeviceId = ref('')
+let scanTimer: ReturnType<typeof setTimeout> | null = null
 
-// 扫描状态
 const isScanning = ref(false)
 const showBindSuccess = ref(false)
 const boundDeviceName = ref('')
 
-// 发现设备列表
 interface DiscoveredDevice {
   id: string
   name: string
@@ -176,54 +158,95 @@ interface DiscoveredDevice {
 
 const discoveredDevices = reactive<DiscoveredDevice[]>([])
 
-// mock设备数据 - 从mockBLEDevices生成
-const mockDevices: Omit<DiscoveredDevice, 'binding' | 'bound'>[] = mockBLEDevices.map(d => {
-  const iconMap: Record<string, string> = {
-    '华为手环 Band 8': 'H',
-    '小米手环 7': 'M',
-    'Apple Watch S9': 'A',
-    'OPPO Watch 3': 'O',
-    '华为Watch GT4': 'G',
-    '荣耀手环 7': 'R'
-  }
-  const bgMap: Record<string, string> = {
-    band: 'linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%)',
-    watch: 'linear-gradient(135deg, #1D2129 0%, #4E5969 100%)'
-  }
-  return {
-    id: d.id,
-    name: d.name,
-    icon: iconMap[d.name] || d.name.charAt(0),
-    avatarBg: bgMap[d.type] || 'linear-gradient(135deg, #00B42A 0%, #4DC580 100%)',
-    signal: d.signal
-  }
-})
-
 function toggleScan() {
   if (isScanning.value) {
-    isScanning.value = false
+    stopScan()
     return
   }
-  isScanning.value = true
-  discoveredDevices.length = 0
 
-  // 模拟逐个发现设备
-  mockDevices.forEach((device, idx) => {
-    setTimeout(() => {
-      if (!isScanning.value) return
-      discoveredDevices.push({
-        ...device,
-        binding: false,
-        bound: false
-      })
-      // 最后一个设备发现后停止扫描
-      if (idx === mockDevices.length - 1) {
-        setTimeout(() => {
-          isScanning.value = false
-        }, 500)
-      }
-    }, (idx + 1) * 800)
+  // #ifdef APP-PLUS
+  startBluetoothScan()
+  // #endif
+  // #ifndef APP-PLUS
+  uni.showModal({
+    title: '请使用移动端',
+    content: '浏览器无法稳定访问低功耗蓝牙设备，请在 iOS App 中完成扫描和绑定。',
+    showCancel: false,
+    confirmText: '知道了'
   })
+  // #endif
+}
+
+// #ifdef APP-PLUS
+function startBluetoothScan() {
+  discoveredDevices.length = 0
+  uni.openBluetoothAdapter({
+    success: () => {
+      uni.onBluetoothDeviceFound(handleBluetoothDevicesFound)
+      uni.startBluetoothDevicesDiscovery({
+        allowDuplicatesKey: false,
+        interval: 500,
+        success: () => {
+          isScanning.value = true
+          scanTimer = setTimeout(stopScan, 10000)
+        },
+        fail: showBluetoothError
+      })
+    },
+    fail: showBluetoothError
+  })
+}
+
+function handleBluetoothDevicesFound(result: any) {
+  const devices = Array.isArray(result.devices) ? result.devices : []
+  devices.forEach((rawDevice: any) => {
+    const name = (rawDevice.name || rawDevice.localName || '').trim()
+    if (!name || !rawDevice.deviceId) return
+
+    const existing = discoveredDevices.find(device => device.id === rawDevice.deviceId)
+    const signal = signalLevel(Number(rawDevice.RSSI))
+    if (existing) {
+      existing.signal = signal
+      return
+    }
+
+    discoveredDevices.push({
+      id: rawDevice.deviceId,
+      name,
+      icon: name.charAt(0).toUpperCase(),
+      avatarBg: 'linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%)',
+      signal,
+      binding: false,
+      bound: false
+    })
+  })
+}
+
+function signalLevel(rssi: number) {
+  if (rssi >= -55) return 4
+  if (rssi >= -70) return 3
+  if (rssi >= -85) return 2
+  return 1
+}
+
+function showBluetoothError(error: any) {
+  stopScan()
+  const message = error?.errCode === 10001
+    ? '请先开启手机蓝牙'
+    : '蓝牙扫描失败，请检查系统权限'
+  uni.showToast({ title: message, icon: 'none' })
+}
+// #endif
+
+function stopScan() {
+  if (scanTimer) {
+    clearTimeout(scanTimer)
+    scanTimer = null
+  }
+  isScanning.value = false
+  // #ifdef APP-PLUS
+  uni.stopBluetoothDevicesDiscovery({})
+  // #endif
 }
 
 function signalLabel(level: number) {
@@ -243,23 +266,43 @@ function handleBind(device: DiscoveredDevice) {
   if (device.bound || device.binding) return
   device.binding = true
 
-  setTimeout(() => {
-    device.binding = false
-    device.bound = true
-    boundDeviceName.value = device.name
-    boundDevice.value = {
-      name: device.name,
-      type: 'band',
-      connected: true,
-      battery: 85
+  // #ifdef APP-PLUS
+  stopScan()
+  uni.createBLEConnection({
+    deviceId: device.id,
+    timeout: 10000,
+    success: () => {
+      device.binding = false
+      device.bound = true
+      connectedDeviceId.value = device.id
+      boundDeviceName.value = device.name
+      boundDevice.value = {
+        name: device.name,
+        type: 'bluetooth',
+        connected: true,
+        battery: null
+      }
+      updateWearable({
+        name: device.name,
+        type: 'bluetooth',
+        connected: true,
+        battery: 0
+      })
+      showBindSuccess.value = true
+      setTimeout(() => {
+        showBindSuccess.value = false
+      }, 1800)
+    },
+    fail: () => {
+      device.binding = false
+      uni.showToast({ title: '连接失败，请靠近设备后重试', icon: 'none' })
     }
-
-    // 显示绑定成功动画
-    showBindSuccess.value = true
-    setTimeout(() => {
-      showBindSuccess.value = false
-    }, 2000)
-  }, 1500)
+  })
+  // #endif
+  // #ifndef APP-PLUS
+  device.binding = false
+  uni.showToast({ title: '请在 iOS App 中绑定设备', icon: 'none' })
+  // #endif
 }
 
 function handleDisconnect() {
@@ -269,15 +312,40 @@ function handleDisconnect() {
     confirmColor: '#F53F3F',
     success: (res) => {
       if (res.confirm) {
-        boundDevice.value = null
+        const clearDevice = () => {
+          discoveredDevices.forEach(device => {
+            device.bound = false
+            device.binding = false
+          })
+          connectedDeviceId.value = ''
+          boundDevice.value = null
+          updateWearable({
+            name: '未绑定设备',
+            type: 'none',
+            connected: false,
+            battery: 0
+          })
+        }
+        // #ifdef APP-PLUS
+        if (connectedDeviceId.value) {
+          uni.closeBLEConnection({
+            deviceId: connectedDeviceId.value,
+            complete: clearDevice
+          })
+        } else {
+          clearDevice()
+        }
+        // #endif
+        // #ifndef APP-PLUS
+        clearDevice()
+        // #endif
       }
     }
   })
 }
 
-function goBack() {
-  uni.navigateBack()
-}
+onUnmounted(stopScan)
+
 </script>
 
 <style lang="scss" scoped>
@@ -286,50 +354,11 @@ function goBack() {
   background: #F0F4FA;
 }
 
-/* 导航栏 */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.nav-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.back-arrow {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-placeholder {
-  width: 64rpx;
-}
-
-/* 滚动内容 */
 .scroll-content {
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-/* 通用卡片 */
 .card {
   margin: 24rpx 24rpx 0;
   background: #FFFFFF;
@@ -360,7 +389,6 @@ function goBack() {
   color: #1D2129;
 }
 
-/* 已绑定设备 */
 .connected-badge {
   display: flex;
   align-items: center;
@@ -462,7 +490,6 @@ function goBack() {
   font-weight: 600;
 }
 
-/* 未绑定提示 */
 .empty-bound {
   display: flex;
   flex-direction: column;
@@ -495,7 +522,6 @@ function goBack() {
   text-align: center;
 }
 
-/* 扫描按钮 */
 .scan-section {
   display: flex;
   justify-content: center;
@@ -589,7 +615,6 @@ function goBack() {
   letter-spacing: 2rpx;
 }
 
-/* 设备列表 */
 .device-count {
   font-size: 22rpx;
   color: #86909C;
@@ -687,7 +712,6 @@ function goBack() {
   color: #00B42A;
 }
 
-/* 绑定成功动画 */
 .success-overlay {
   position: fixed;
   top: 0;
@@ -770,7 +794,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 底部安全区 */
 .bottom-safe {
   height: 60rpx;
 }

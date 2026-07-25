@@ -1,24 +1,21 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
     <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="nav-bar-content">
         <text class="nav-title">我的</text>
         <view class="nav-right">
           <view class="nav-icon-btn" @tap="goSettings">
-            <text class="nav-icon-text">&#x2699;</text>
+            <app-icon class="nav-icon-text" name="settings-filled" :size="21" color="#FFFFFF" />
           </view>
         </view>
       </view>
     </view>
 
-    <!-- 可滚动内容区 -->
     <scroll-view
       class="scroll-content"
       scroll-y
       :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
     >
-      <!-- 个人信息卡片 -->
       <view class="profile-section">
         <view class="profile-bg"></view>
         <view class="profile-card">
@@ -39,129 +36,130 @@
             <text class="phone">{{ user.phone }}</text>
             <view class="verify-row">
               <view class="verify-badge">
-                <text class="verify-icon">&#x2713;</text>
-                <text class="verify-text">已认证</text>
+                <app-icon class="verify-icon" name="checkmarkempty" :size="12" color="#FFFFFF" />
+                <text class="verify-text">已校验</text>
               </view>
             </view>
           </view>
         </view>
       </view>
 
-      <!-- 统计数据 -->
       <view class="stats-row">
         <view class="stat-item" @tap="goRecords">
-          <text class="stat-value">2</text>
+          <text class="stat-value">{{ rescueCount }}</text>
           <text class="stat-label">救援次数</text>
         </view>
         <view class="stat-divider"></view>
         <view class="stat-item" @tap="goDevices">
-          <text class="stat-value">1</text>
+          <text class="stat-value">{{ deviceCount }}</text>
           <text class="stat-label">我的设备</text>
         </view>
         <view class="stat-divider"></view>
         <view class="stat-item">
-          <text class="stat-value">0</text>
+          <text class="stat-value">{{ contributionCount }}</text>
           <text class="stat-label">科普投稿</text>
         </view>
       </view>
 
-      <!-- 菜单列表 -->
-      <!-- 急救服务 -->
       <view class="menu-section">
         <text class="menu-section-title">急救服务</text>
         <view class="menu-list">
           <view class="menu-item" @tap="goDevices">
             <view class="menu-icon-wrap menu-icon-blue">
-              <text class="menu-icon-text">&#x231A;</text>
+              <app-icon class="menu-icon-text" name="heart-filled" :size="20" color="#FFFFFF" />
             </view>
             <text class="menu-label">我的设备</text>
-            <text class="menu-arrow">&#x2038;</text>
+            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
           </view>
           <view class="menu-item" @tap="goRecords">
             <view class="menu-icon-wrap menu-icon-red">
-              <text class="menu-icon-text">&#x26A1;</text>
+              <app-icon class="menu-icon-text" name="notification-filled" :size="20" color="#FFFFFF" />
             </view>
             <text class="menu-label">救援记录</text>
-            <text class="menu-arrow">&#x2038;</text>
+            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
           </view>
           <view class="menu-item menu-item-last" @tap="goContacts">
             <view class="menu-icon-wrap menu-icon-orange">
-              <text class="menu-icon-text">&#x260E;</text>
+              <app-icon class="menu-icon-text" name="phone-filled" :size="20" color="#FFFFFF" />
             </view>
             <text class="menu-label">紧急联系人</text>
-            <text class="menu-arrow">&#x2038;</text>
+            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
           </view>
         </view>
       </view>
 
-      <!-- 健康管理 -->
       <view class="menu-section">
         <text class="menu-section-title">健康管理</text>
         <view class="menu-list">
           <view class="menu-item" @tap="goArchive">
             <view class="menu-icon-wrap menu-icon-green">
-              <text class="menu-icon-text">📁</text>
+              <app-icon class="menu-icon-text" name="folder-add-filled" :size="21" color="#FFFFFF" />
             </view>
             <text class="menu-label">健康档案</text>
-            <text class="menu-arrow">&#x2038;</text>
+            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
           </view>
           <view class="menu-item menu-item-last" @tap="goCheckup">
             <view class="menu-icon-wrap menu-icon-purple">
-              <text class="menu-icon-text">📋</text>
+              <app-icon class="menu-icon-text" name="list" :size="21" color="#FFFFFF" />
             </view>
             <text class="menu-label">体检报告</text>
-            <text class="menu-arrow">&#x2038;</text>
+            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
           </view>
         </view>
       </view>
 
-      <!-- 其他 -->
       <view class="menu-section">
         <text class="menu-section-title">其他</text>
         <view class="menu-list">
           <view class="menu-item" @tap="goAuth">
             <view class="menu-icon-wrap menu-icon-cyan">
-              <text class="menu-icon-text">🛡️</text>
+              <app-icon class="menu-icon-text" name="auth-filled" :size="21" color="#FFFFFF" />
             </view>
-            <text class="menu-label">实名认证</text>
+            <text class="menu-label">身份信息</text>
             <view class="menu-extra">
-              <text class="menu-extra-text" v-if="user.isVerified">已认证</text>
+              <text class="menu-extra-text" v-if="user.isVerified">已校验</text>
             </view>
-            <text class="menu-arrow">&#x2038;</text>
+            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
           </view>
           <view class="menu-item menu-item-last" @tap="goSettings">
             <view class="menu-icon-wrap menu-icon-grey">
-              <text class="menu-icon-text">&#x2699;</text>
+              <app-icon class="menu-icon-text" name="settings-filled" :size="20" color="#FFFFFF" />
             </view>
             <text class="menu-label">设置</text>
-            <text class="menu-arrow">&#x2038;</text>
+            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
           </view>
         </view>
       </view>
 
-      <!-- 退出登录 -->
-      <view class="logout-btn" @tap="handleLogout">
-        <text class="logout-text">退出登录</text>
-      </view>
-
-      <!-- 底部安全区 -->
       <view class="bottom-safe"></view>
     </scroll-view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { mockUser } from '@/mock/data'
+import { ref, reactive } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import AppIcon from '@/components/AppIcon.vue'
+import { listEmergencyDevices } from '@/api/devices'
+import { listRescueCalls } from '@/api/rescue'
+import { getCurrentProfile } from '@/api/user'
+import { getScienceSubmissionCount } from '@/api/science'
 
-const user = computed(() => mockUser)
+const user = reactive({
+  nickname: '用户',
+  phone: '',
+  isVerified: false
+})
+const rescueCount = ref(0)
+const deviceCount = ref(0)
+const contributionCount = ref(0)
 
 const statusBarHeight = ref(0)
 const systemInfo = uni.getSystemInfoSync()
 statusBarHeight.value = systemInfo.statusBarHeight || 20
 
 function goDevices() {
-  uni.navigateTo({ url: '/pages/mine/devices' })
+  uni.navigateTo({ url: '/pages/device/manage' })
 }
 function goRecords() {
   uni.navigateTo({ url: '/pages/mine/records' })
@@ -181,18 +179,24 @@ function goArchive() {
 function goCheckup() {
   uni.navigateTo({ url: '/pages/checkup/upload' })
 }
-function handleLogout() {
-  uni.showModal({
-    title: '提示',
-    content: '确定要退出登录吗？',
-    confirmColor: '#2B6FF0',
-    success: (res) => {
-      if (res.confirm) {
-        uni.showToast({ title: '已退出登录', icon: 'none' })
-      }
-    }
-  })
+async function loadStats() {
+  const [rescues, devices, profile, submissions] = await Promise.allSettled([
+    listRescueCalls(),
+    listEmergencyDevices(),
+    getCurrentProfile(),
+    getScienceSubmissionCount()
+  ])
+  if (rescues.status === 'fulfilled') rescueCount.value = rescues.value.totalElements
+  if (devices.status === 'fulfilled') deviceCount.value = devices.value.totalElements
+  if (profile.status === 'fulfilled') {
+    user.nickname = profile.value.nickname
+    user.phone = profile.value.phone
+    user.isVerified = profile.value.verified
+  }
+  if (submissions.status === 'fulfilled') contributionCount.value = submissions.value.count
 }
+
+onShow(loadStats)
 </script>
 
 <style lang="scss" scoped>
@@ -201,7 +205,6 @@ function handleLogout() {
   background: #F0F4FA;
 }
 
-/* 导航栏 */
 .nav-bar {
   position: fixed;
   top: 0;
@@ -240,13 +243,11 @@ function handleLogout() {
   color: #FFFFFF;
 }
 
-/* 滚动内容 */
 .scroll-content {
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-/* 个人信息区 */
 .profile-section {
   position: relative;
   padding: 24rpx 32rpx 0;
@@ -347,7 +348,6 @@ function handleLogout() {
   font-weight: 600;
 }
 
-/* 统计数据 */
 .stats-row {
   display: flex;
   align-items: center;
@@ -381,7 +381,6 @@ function handleLogout() {
   background: #E5E6EB;
 }
 
-/* 菜单分区 */
 .menu-section {
   margin-top: 32rpx;
   padding: 0 32rpx;
@@ -474,25 +473,6 @@ function handleLogout() {
   font-weight: 300;
 }
 
-/* 退出登录 */
-.logout-btn {
-  margin: 48rpx 32rpx 0;
-  background: #FFFFFF;
-  border-radius: 20rpx;
-  padding: 28rpx 0;
-  text-align: center;
-  box-shadow: 0 4rpx 16rpx rgba(43, 111, 240, 0.06);
-}
-.logout-btn:active {
-  background: #F7F8FA;
-}
-.logout-text {
-  font-size: 30rpx;
-  color: #F53F3F;
-  font-weight: 600;
-}
-
-/* 底部安全区 */
 .bottom-safe {
   height: 200rpx;
 }

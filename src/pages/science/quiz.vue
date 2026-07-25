@@ -1,19 +1,6 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <text class="back-arrow">&#x2190;</text>
-        </view>
-        <text class="nav-title">知识自测</text>
-        <view class="nav-placeholder"></view>
-      </view>
-    </view>
-
-    <!-- 答题页面 -->
-    <view v-if="!showResult" class="quiz-content" :style="{ paddingTop: (statusBarHeight + 44) + 'px' }">
-      <!-- 进度条 -->
+    <view v-if="!showResult" class="quiz-content">
       <view class="progress-section">
         <view class="progress-info">
           <text class="progress-current">{{ currentIndex + 1 }}</text>
@@ -30,7 +17,6 @@
         </view>
       </view>
 
-      <!-- 题目卡片 -->
       <view class="question-card">
         <view class="question-number">
           <text class="question-number-text">第{{ currentIndex + 1 }}题</text>
@@ -38,7 +24,6 @@
         <text class="question-text">{{ currentQuestion.question }}</text>
       </view>
 
-      <!-- 选项列表 -->
       <view class="options-list">
         <view
           v-for="(option, idx) in currentQuestion.options"
@@ -63,38 +48,39 @@
             'option-text-wrong': answered && selectedIndex === idx && idx !== currentQuestion.answer
           }">{{ option }}</text>
           <view v-if="answered && idx === currentQuestion.answer" class="option-feedback feedback-correct">
-            <text class="feedback-icon">&#x2713;</text>
+            <app-icon class="feedback-icon" name="checkmarkempty" :size="15" color="#FFFFFF" />
           </view>
           <view v-if="answered && selectedIndex === idx && idx !== currentQuestion.answer" class="option-feedback feedback-wrong">
-            <text class="feedback-icon">&#x2717;</text>
+            <app-icon class="feedback-icon" name="closeempty" :size="15" color="#FFFFFF" />
           </view>
         </view>
       </view>
 
-      <!-- 解析区域 -->
       <view v-if="answered" class="explanation-card">
         <view class="explanation-header">
           <view class="explanation-icon-wrap">
-            <text class="explanation-icon">{{ isCurrentCorrect ? '&#x2713;' : '&#x2717;' }}</text>
+            <app-icon
+              class="explanation-icon"
+              :name="isCurrentCorrect ? 'checkmarkempty' : 'closeempty'"
+              :size="17"
+              color="#FFFFFF"
+            />
           </view>
           <text class="explanation-title">{{ isCurrentCorrect ? '回答正确' : '回答错误' }}</text>
         </view>
         <text class="explanation-text">{{ currentQuestion.explanation }}</text>
       </view>
 
-      <!-- 下一题按钮 -->
       <view v-if="answered" class="next-btn-wrap">
         <view class="next-btn" @tap="nextQuestion">
           <text class="next-btn-text">{{ isLastQuestion ? '查看结果' : '下一题' }}</text>
-          <text class="next-btn-arrow">&#x2192;</text>
+          <app-icon class="next-btn-arrow" name="right" :size="18" color="#FFFFFF" />
         </view>
       </view>
     </view>
 
-    <!-- 结果页面 -->
-    <view v-if="showResult" class="result-content" :style="{ paddingTop: (statusBarHeight + 44) + 'px' }">
+    <view v-if="showResult" class="result-content">
       <view class="result-card">
-        <!-- 分数环 -->
         <view class="score-ring-wrap">
           <view class="score-ring">
             <view class="score-ring-bg"></view>
@@ -106,7 +92,6 @@
           </view>
         </view>
 
-        <!-- 结果统计 -->
         <view class="result-stats">
           <view class="result-stat-item">
             <text class="result-stat-value result-stat-correct">{{ correctCount }}</text>
@@ -124,14 +109,17 @@
           </view>
         </view>
 
-        <!-- 鼓励语 -->
         <view class="encourage-section">
-          <text class="encourage-emoji">{{ encourageEmoji }}</text>
+          <app-icon
+            class="encourage-emoji"
+            :name="encourageIcon"
+            :size="46"
+            color="#1F63D5"
+          />
           <text class="encourage-text">{{ encourageMessage }}</text>
         </view>
       </view>
 
-      <!-- 答题详情 -->
       <view class="detail-card">
         <view class="detail-header">
           <view class="detail-title-bar"></view>
@@ -144,14 +132,18 @@
             class="detail-item"
           >
             <view class="detail-item-icon" :class="item.userCorrect ? 'detail-icon-correct' : 'detail-icon-wrong'">
-              <text class="detail-item-icon-text">{{ item.userCorrect ? '&#x2713;' : '&#x2717;' }}</text>
+              <app-icon
+                class="detail-item-icon-text"
+                :name="item.userCorrect ? 'checkmarkempty' : 'closeempty'"
+                :size="14"
+                color="#FFFFFF"
+              />
             </view>
             <text class="detail-item-text">第{{ idx + 1 }}题</text>
           </view>
         </view>
       </view>
 
-      <!-- 操作按钮 -->
       <view class="result-actions">
         <view class="result-btn result-btn-retry" @tap="retryQuiz">
           <text class="result-btn-text result-btn-text-retry">再试一次</text>
@@ -166,49 +158,35 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { mockQuizData } from '@/mock/data'
+import AppIcon from '@/components/AppIcon.vue'
+import { scienceQuizQuestions } from '@/data/editorial'
 
-// 系统信息
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
-
-// 选项标签
 const optionLabels = ['A', 'B', 'C', 'D']
 
-// 题目数据
-const quizData = ref(mockQuizData.map(q => ({ ...q, userCorrect: false })))
+const quizData = ref(scienceQuizQuestions.map(q => ({ ...q, userCorrect: false })))
 
-// 当前状态
 const currentIndex = ref(0)
 const selectedIndex = ref(-1)
 const answered = ref(false)
 const showResult = ref(false)
 
-// 当前题目
 const currentQuestion = computed(() => quizData.value[currentIndex.value])
 
-// 是否最后一题
-const isLastQuestion = computed(() => currentIndex.value === quizData.value - 1)
+const isLastQuestion = computed(() => currentIndex.value === quizData.value.length - 1)
 
-// 当前题是否答对
 const isCurrentCorrect = computed(() => selectedIndex.value === currentQuestion.value.answer)
 
-// 正确数
 const correctCount = computed(() => quizData.value.filter(q => q.userCorrect).length)
 
-// 分数
 const score = computed(() => Math.round((correctCount.value / quizData.value.length) * 100))
 
-// 分数环角度
 const scoreDeg = computed(() => (score.value / 100) * 360)
 
-// 鼓励语
-const encourageEmoji = computed(() => {
-  if (score.value >= 90) return '🎉'
-  if (score.value >= 70) return '👍'
-  if (score.value >= 50) return '💪'
-  return '📚'
+const encourageIcon = computed(() => {
+  if (score.value >= 90) return 'medal-filled'
+  if (score.value >= 70) return 'hand-up-filled'
+  if (score.value >= 50) return 'flag-filled'
+  return 'compose'
 })
 
 const encourageMessage = computed(() => {
@@ -218,7 +196,6 @@ const encourageMessage = computed(() => {
   return '别灰心，急救知识值得认真学习！'
 })
 
-// 选择选项
 function selectOption(idx: number) {
   if (answered.value) return
   selectedIndex.value = idx
@@ -226,7 +203,6 @@ function selectOption(idx: number) {
   quizData.value[currentIndex.value].userCorrect = idx === currentQuestion.value.answer
 }
 
-// 下一题
 function nextQuestion() {
   if (isLastQuestion.value) {
     showResult.value = true
@@ -237,19 +213,18 @@ function nextQuestion() {
   answered.value = false
 }
 
-// 重新测试
 function retryQuiz() {
   currentIndex.value = 0
   selectedIndex.value = -1
   answered.value = false
   showResult.value = false
-  quizData.value = mockQuizData.map(q => ({ ...q, userCorrect: false }))
+  quizData.value = scienceQuizQuestions.map(q => ({ ...q, userCorrect: false }))
 }
 
-// 返回
 function goBack() {
   uni.navigateBack()
 }
+
 </script>
 
 <style lang="scss" scoped>
@@ -258,51 +233,12 @@ function goBack() {
   background: #F0F4FA;
 }
 
-/* 导航栏 */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.nav-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.back-arrow {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-placeholder {
-  width: 64rpx;
-}
-
-/* 答题内容 */
 .quiz-content {
   min-height: 100vh;
   padding: 0 32rpx;
   box-sizing: border-box;
 }
 
-/* 进度条 */
 .progress-section {
   padding: 32rpx 0 24rpx;
 }
@@ -345,7 +281,6 @@ function goBack() {
   box-shadow: 0 2rpx 8rpx rgba(43, 111, 240, 0.3);
 }
 
-/* 题目卡片 */
 .question-card {
   background: #FFFFFF;
   border-radius: 24rpx;
@@ -372,7 +307,6 @@ function goBack() {
   line-height: 1.6;
 }
 
-/* 选项列表 */
 .options-list {
   display: flex;
   flex-direction: column;
@@ -482,7 +416,6 @@ function goBack() {
   color: #F53F3F;
 }
 
-/* 解析区域 */
 .explanation-card {
   background: #FFFFFF;
   border-radius: 20rpx;
@@ -524,7 +457,6 @@ function goBack() {
   line-height: 1.7;
 }
 
-/* 下一题按钮 */
 .next-btn-wrap {
   padding: 16rpx 0 60rpx;
 }
@@ -554,14 +486,12 @@ function goBack() {
   font-weight: 700;
 }
 
-/* 结果页面 */
 .result-content {
   min-height: 100vh;
   padding: 0 32rpx;
   box-sizing: border-box;
 }
 
-/* 结果卡片 */
 .result-card {
   background: #FFFFFF;
   border-radius: 32rpx;
@@ -573,7 +503,6 @@ function goBack() {
   align-items: center;
 }
 
-/* 分数环 */
 .score-ring-wrap {
   margin-bottom: 40rpx;
 }
@@ -602,7 +531,6 @@ function goBack() {
   border-right-color: #2B6FF0;
   transform: rotate(-45deg);
   clip-path: polygon(50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 50%);
-  /* Simplified visual - use conic gradient approach */
 }
 .score-ring-inner {
   position: relative;
@@ -624,7 +552,6 @@ function goBack() {
   margin-left: 4rpx;
 }
 
-/* 结果统计 */
 .result-stats {
   display: flex;
   align-items: center;
@@ -667,7 +594,6 @@ function goBack() {
   background: #E5E6EB;
 }
 
-/* 鼓励语 */
 .encourage-section {
   display: flex;
   flex-direction: column;
@@ -684,7 +610,6 @@ function goBack() {
   text-align: center;
 }
 
-/* 答题详情卡片 */
 .detail-card {
   background: #FFFFFF;
   border-radius: 24rpx;
@@ -752,7 +677,6 @@ function goBack() {
   font-weight: 500;
 }
 
-/* 操作按钮 */
 .result-actions {
   display: flex;
   gap: 24rpx;

@@ -1,22 +1,11 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <text class="back-arrow">&#x2190;</text>
-        </view>
-        <text class="nav-title">异常预警</text>
-        <view class="nav-placeholder"></view>
+    <scroll-view class="scroll-content" scroll-y>
+      <view v-if="!heartRateData.wearable.connected" class="sample-note">
+        <app-icon name="info-filled" :size="15" color="#1F63D5" />
+        <text>示例数据 · 连接设备后显示真实预警</text>
       </view>
-    </view>
 
-    <scroll-view
-      class="scroll-content"
-      scroll-y
-      :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
-    >
-      <!-- 预警概览卡片 -->
       <view class="summary-card">
         <view class="summary-bg"></view>
         <view class="summary-content">
@@ -33,7 +22,7 @@
           <view class="summary-divider"></view>
           <view class="summary-latest">
             <view class="latest-icon">
-              <text class="latest-icon-text">!</text>
+              <app-icon class="latest-icon-text" name="notification-filled" :size="20" color="#FFFFFF" />
             </view>
             <view class="latest-info">
               <text class="latest-label">最近预警</text>
@@ -44,7 +33,6 @@
         </view>
       </view>
 
-      <!-- 预警列表 -->
       <view class="card list-card">
         <view class="card-header">
           <view class="card-title-wrap">
@@ -90,41 +78,35 @@
         </view>
       </view>
 
-      <!-- 预警设置入口 -->
       <view class="card settings-card" @tap="goSettings">
         <view class="settings-left">
           <view class="settings-icon">
-            <text class="settings-icon-text">&#x2699;</text>
+            <app-icon class="settings-icon-text" name="settings-filled" :size="21" color="#1F63D5" />
           </view>
           <view class="settings-info">
             <text class="settings-title">预警阈值设置</text>
             <text class="settings-desc">自定义心率预警上下限</text>
           </view>
         </view>
-        <text class="settings-arrow">></text>
+        <app-icon class="settings-arrow" name="right" :size="17" color="#96A1B3" />
       </view>
 
-      <!-- 底部安全区 -->
       <view class="bottom-safe"></view>
     </scroll-view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { mockHeartRateData } from '@/mock/data'
+import { computed, onMounted } from 'vue'
+import AppIcon from '@/components/AppIcon.vue'
+import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 
-// 系统信息
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
-
-// 预警数据
-const alertList = computed(() => mockHeartRateData.alerts)
-const totalAlerts = computed(() => mockHeartRateData.alerts.length)
+const { monitoring: heartRateData, loadMonitoring } = useHealthMonitoring()
+const alertList = computed(() => heartRateData.value.alerts)
+const totalAlerts = computed(() => heartRateData.value.alerts.length)
 const latestAlert = computed(() => {
-  if (mockHeartRateData.alerts.length > 0) {
-    return mockHeartRateData.alerts[0]
+  if (heartRateData.value.alerts.length > 0) {
+    return heartRateData.value.alerts[0]
   }
   return { message: '暂无预警', time: '--' }
 })
@@ -135,15 +117,17 @@ const currentMonth = computed(() => {
 })
 
 function goSettings() {
-  uni.showToast({
-    title: '预警设置功能开发中',
-    icon: 'none'
-  })
+  uni.navigateTo({ url: '/pages/mine/settings' })
 }
 
-function goBack() {
-  uni.navigateBack()
-}
+onMounted(async () => {
+  try {
+    await loadMonitoring()
+  } catch {
+    uni.showToast({ title: '预警数据加载失败', icon: 'none' })
+  }
+})
+
 </script>
 
 <style lang="scss" scoped>
@@ -152,50 +136,23 @@ function goBack() {
   background: #F0F4FA;
 }
 
-/* 导航栏 */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.nav-bar-content {
+.sample-note {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.back-arrow {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-placeholder {
-  width: 64rpx;
+  gap: 10rpx;
+  margin: 20rpx 24rpx 0;
+  padding: 14rpx 18rpx;
+  border-radius: 14rpx;
+  background: #EDF4FF;
+  color: #41658F;
+  font-size: 21rpx;
 }
 
-/* 滚动内容 */
 .scroll-content {
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-/* 概览卡片 */
 .summary-card {
   position: relative;
   margin: 24rpx 24rpx 0;
@@ -299,7 +256,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 通用卡片 */
 .card {
   margin: 24rpx 24rpx 0;
   background: #FFFFFF;
@@ -330,7 +286,6 @@ function goBack() {
   color: #1D2129;
 }
 
-/* 时间线 */
 .timeline {
   padding-left: 4rpx;
 }
@@ -374,7 +329,6 @@ function goBack() {
   margin-top: 8rpx;
 }
 
-/* 时间线卡片 */
 .timeline-card {
   flex: 1;
   background: #F7F8FA;
@@ -464,7 +418,6 @@ function goBack() {
   font-weight: 600;
 }
 
-/* 设置入口 */
 .settings-card {
   display: flex;
   align-items: center;
@@ -509,7 +462,6 @@ function goBack() {
   font-weight: 300;
 }
 
-/* 底部安全区 */
 .bottom-safe {
   height: 60rpx;
 }

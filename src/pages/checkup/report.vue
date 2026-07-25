@@ -1,969 +1,587 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <text class="back-arrow">&#x2190;</text>
-        </view>
-        <text class="nav-title">AI健康分析报告</text>
-        <view class="nav-placeholder"></view>
-      </view>
-    </view>
-
-    <scroll-view
-      class="scroll-content"
-      scroll-y
-      :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
-    >
-      <!-- AI分析加载动画 -->
-      <view v-if="aiLoading" class="ai-loading-section">
-        <view class="ai-loading-card">
-          <view class="ai-brain-wrap">
-            <view class="ai-brain">
-              <text class="brain-icon">🧠</text>
-            </view>
-            <view class="brain-ring ring-1"></view>
-            <view class="brain-ring ring-2"></view>
-            <view class="brain-ring ring-3"></view>
-          </view>
-          <text class="ai-loading-title">AI智能体分析中...</text>
-          <text class="ai-loading-desc">正在深度解读您的体检数据</text>
-          <view class="ai-loading-steps">
-            <view class="loading-step" :class="{ 'step-active': loadingStep >= 1 }">
-              <view class="step-dot"></view>
-              <text class="step-label">数据解析</text>
-            </view>
-            <view class="loading-step-line" :class="{ 'line-active': loadingStep >= 2 }"></view>
-            <view class="loading-step" :class="{ 'step-active': loadingStep >= 2 }">
-              <view class="step-dot"></view>
-              <text class="step-label">风险评估</text>
-            </view>
-            <view class="loading-step-line" :class="{ 'line-active': loadingStep >= 3 }"></view>
-            <view class="loading-step" :class="{ 'step-active': loadingStep >= 3 }">
-              <view class="step-dot"></view>
-              <text class="step-label">生成建议</text>
-            </view>
-          </view>
-        </view>
+    <scroll-view class="page-scroll" scroll-y>
+      <view v-if="loading" class="state-card">
+        <view class="loading-ring"></view>
+        <text class="state-title">正在加载健康分析</text>
       </view>
 
-      <!-- 分析结果内容 -->
-      <view v-if="!aiLoading" class="result-content">
-        <!-- 顶部风险概览卡片 -->
-        <view class="risk-header-card">
-          <view class="risk-header-bg"></view>
-          <view class="risk-header-content">
-            <view class="risk-top-row">
-              <view class="risk-badge-wrap">
-                <view class="risk-badge" :class="'risk-badge-' + analysis.riskLevel">
-                  <view class="risk-badge-dot"></view>
-                  <text class="risk-badge-text">{{ riskLevelLabel }}</text>
-                </view>
-              </view>
-              <view class="risk-date">
-                <text class="risk-date-text">{{ report.checkupDate }}</text>
-              </view>
+      <view v-else-if="!report" class="state-card">
+        <view class="state-icon">
+          <app-icon name="info-filled" :size="28" color="#65758D" />
+        </view>
+        <text class="state-title">{{ errorMessage || '暂无体检报告' }}</text>
+        <view class="state-button" @tap="goUpload">录入报告</view>
+      </view>
+
+      <template v-else>
+        <view class="risk-card" :class="`risk-${report.riskLevel.toLowerCase()}`">
+          <view class="risk-top">
+            <view>
+              <text class="risk-kicker">HEALTH ANALYSIS</text>
+              <text class="risk-title">{{ riskLabel }}</text>
             </view>
-            <text class="risk-summary">{{ analysis.summary }}</text>
-            <view class="risk-stats-row">
-              <view class="risk-stat">
-                <text class="risk-stat-num">{{ analysis.abnormalItems.length }}</text>
-                <text class="risk-stat-label">异常指标</text>
-              </view>
-              <view class="risk-stat-divider"></view>
-              <view class="risk-stat">
-                <text class="risk-stat-num">{{ report.ocrResult.items.length }}</text>
-                <text class="risk-stat-label">检测项目</text>
-              </view>
-              <view class="risk-stat-divider"></view>
-              <view class="risk-stat">
-                <text class="risk-stat-num risk-stat-num-green">{{ normalCount }}</text>
-                <text class="risk-stat-label">正常项目</text>
-              </view>
+            <view class="source-chip">
+              <view class="source-dot"></view>
+              <text>{{ report.analysisSource === 'SPRING_AI' ? 'Spring AI' : '规则分析' }}</text>
+            </view>
+          </view>
+          <text class="risk-summary">{{ report.summary }}</text>
+          <view class="risk-stats">
+            <view class="risk-stat">
+              <text class="stat-value">{{ abnormalIndicators.length }}</text>
+              <text class="stat-label">异常指标</text>
+            </view>
+            <view class="stat-line"></view>
+            <view class="risk-stat">
+              <text class="stat-value">{{ report.indicators.length }}</text>
+              <text class="stat-label">检测项目</text>
+            </view>
+            <view class="stat-line"></view>
+            <view class="risk-stat">
+              <text class="stat-value">{{ normalCount }}</text>
+              <text class="stat-label">正常项目</text>
             </view>
           </view>
         </view>
 
-        <!-- 异常指标分析 -->
-        <view class="section-card">
-          <view class="section-header">
-            <view class="section-title-wrap">
-              <view class="section-icon-wrap section-icon-warning">
-                <text class="section-icon">&#x26A0;</text>
-              </view>
-              <text class="section-title">异常指标分析</text>
+        <view class="report-card">
+          <view class="section-head">
+            <view>
+              <text class="section-kicker">REPORT INFO</text>
+              <text class="section-title">报告信息</text>
             </view>
-            <text class="section-count">{{ analysis.abnormalItems.length }}项</text>
+            <text class="report-date">{{ report.checkupDate }}</text>
           </view>
-
-          <view
-            v-for="(item, idx) in analysis.abnormalItems"
-            :key="idx"
-            class="abnormal-card"
-            :class="'abnormal-card-' + item.riskLevel"
-          >
-            <!-- 折叠头部 -->
-            <view class="abnormal-header" @tap="toggleItem(idx)">
-              <view class="abnormal-left">
-                <view class="abnormal-name-row">
-                  <view class="risk-level-dot" :class="'dot-' + item.riskLevel"></view>
-                  <text class="abnormal-name">{{ item.name }}</text>
-                </view>
-                <view class="abnormal-value-row">
-                  <text class="abnormal-value" :class="'value-' + item.riskLevel">{{ item.value }}</text>
-                  <text class="abnormal-vs">vs</text>
-                  <text class="abnormal-ref">{{ item.refRange }}</text>
-                </view>
-              </view>
-              <view class="abnormal-right">
-                <view class="risk-tag" :class="'risk-tag-' + item.riskLevel">
-                  <text class="risk-tag-text">{{ riskLevelMap[item.riskLevel] }}</text>
-                </view>
-                <text class="expand-arrow" :class="{ 'arrow-expanded': expandedItems[idx] }">&#x25B6;</text>
-              </view>
+          <view class="hospital-row">
+            <view class="hospital-icon">
+              <app-icon name="staff-filled" :size="20" color="#1F63D5" />
             </view>
-
-            <!-- 展开内容 -->
-            <view v-if="expandedItems[idx]" class="abnormal-body">
-              <view class="analysis-block">
-                <view class="analysis-label-row">
-                  <view class="analysis-label-icon">
-                    <text class="analysis-label-icon-text">🧠</text>
-                  </view>
-                  <text class="analysis-label">AI分析</text>
-                </view>
-                <text class="analysis-text">{{ item.analysis }}</text>
-              </view>
-              <view class="suggestions-block">
-                <view class="suggestions-label-row">
-                  <view class="suggestions-label-icon">
-                    <text class="suggestions-label-icon-text">💡</text>
-                  </view>
-                  <text class="suggestions-label">改善建议</text>
-                </view>
-                <view
-                  v-for="(suggestion, sIdx) in item.suggestions"
-                  :key="sIdx"
-                  class="suggestion-item"
-                >
-                  <view class="suggestion-bullet" :class="'bullet-' + item.riskLevel"></view>
-                  <text class="suggestion-text">{{ suggestion }}</text>
-                </view>
-              </view>
-            </view>
+            <text>{{ report.hospital }}</text>
           </view>
+          <image
+            v-if="report.sourceImageUrl"
+            class="source-image"
+            :src="resolveApiUrl(report.sourceImageUrl)"
+            mode="aspectFill"
+            @tap="previewSourceImage"
+          />
         </view>
 
-        <!-- 综合建议 -->
-        <view class="section-card">
-          <view class="section-header">
-            <view class="section-title-wrap">
-              <view class="section-icon-wrap section-icon-suggest">
-                <text class="section-icon">📋</text>
-              </view>
-              <text class="section-title">综合建议</text>
+        <view class="report-card">
+          <view class="section-head">
+            <view>
+              <text class="section-kicker">INDICATORS</text>
+              <text class="section-title">体检指标</text>
             </view>
+            <text class="section-meta">{{ report.indicators.length }} 项</text>
           </view>
-
-          <view class="overall-suggestions">
+          <view class="indicator-list">
             <view
-              v-for="(suggestion, idx) in analysis.overallSuggestions"
-              :key="idx"
-              class="overall-item"
+              v-for="indicator in report.indicators"
+              :key="`${indicator.name}-${indicator.value}`"
+              class="indicator-row"
+              :class="{ abnormal: indicator.abnormal }"
             >
-              <view class="overall-num-wrap">
-                <text class="overall-num">{{ idx + 1 }}</text>
+              <view class="indicator-main">
+                <text class="indicator-name">{{ indicator.name }}</text>
+                <text v-if="indicator.referenceRange" class="indicator-range">
+                  参考 {{ indicator.referenceRange }}
+                </text>
               </view>
-              <view class="overall-content">
-                <text class="overall-text">{{ suggestion }}</text>
+              <view class="indicator-value-wrap">
+                <text class="indicator-value">{{ indicator.value }}</text>
+                <text v-if="indicator.unit" class="indicator-unit">{{ indicator.unit }}</text>
+              </view>
+              <view class="indicator-status" :class="{ abnormal: indicator.abnormal }">
+                <app-icon
+                  :name="indicator.abnormal ? 'notification-filled' : 'checkmarkempty'"
+                  :size="13"
+                  :color="indicator.abnormal ? '#CF3F4A' : '#19845A'"
+                />
+                <text>{{ indicator.abnormal ? '异常' : '正常' }}</text>
               </view>
             </view>
           </view>
         </view>
 
-        <!-- AI分析说明 -->
+        <view class="report-card">
+          <view class="section-head">
+            <view>
+              <text class="section-kicker">RECOMMENDATIONS</text>
+              <text class="section-title">健康建议</text>
+            </view>
+          </view>
+          <view class="recommendation-list">
+            <view
+              v-for="(recommendation, index) in report.recommendations"
+              :key="index"
+              class="recommendation"
+            >
+              <text class="recommendation-index">{{ index + 1 }}</text>
+              <text class="recommendation-text">{{ recommendation }}</text>
+            </view>
+          </view>
+        </view>
+
         <view class="disclaimer-card">
-          <view class="disclaimer-icon-wrap">
-            <text class="disclaimer-icon">&#x2139;</text>
-          </view>
-          <view class="disclaimer-content">
-            <text class="disclaimer-title">AI分析说明</text>
-            <text class="disclaimer-text">本分析结果由AI智能体基于体检数据生成，仅供参考，不构成医疗诊断建议。如有健康问题，请及时咨询专业医生。</text>
-          </view>
+          <app-icon name="info-filled" :size="19" color="#2A67CB" />
+          <text>{{ report.disclaimer }}</text>
         </view>
 
-        <!-- 底部操作 -->
         <view class="bottom-actions">
-          <view class="btn-share" @tap="handleShare">
-            <text class="btn-share-text">分享报告</text>
-          </view>
-          <view class="btn-archive" @tap="goArchive">
-            <text class="btn-archive-text">查看健康档案</text>
-          </view>
+          <view class="secondary-button" @tap="handleShare">复制摘要</view>
+          <view class="primary-button" @tap="goArchive">查看健康档案</view>
         </view>
-
-        <!-- 底部安全区 -->
-        <view class="bottom-safe"></view>
-      </view>
+        <view class="bottom-space"></view>
+      </template>
     </scroll-view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted } from 'vue'
-import { mockCheckupReport } from '@/mock/data'
+import { computed, ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+import AppIcon from '@/components/AppIcon.vue'
+import { resolveApiUrl } from '@/api/http'
+import {
+  getHealthReport,
+  listHealthReports,
+  type HealthReportResponse
+} from '@/api/reports'
 
-// 系统信息
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
+const report = ref<HealthReportResponse | null>(null)
+const loading = ref(true)
+const errorMessage = ref('')
 
-// 数据
-const report = computed(() => mockCheckupReport)
-const analysis = computed(() => mockCheckupReport.aiAnalysis)
-const normalCount = computed(() => report.value.ocrResult.items.filter(i => i.status === 'normal').length)
-
-// 风险等级映射
-const riskLevelLabel = computed(() => {
-  const map: Record<string, string> = {
-    low: '低风险',
-    medium: '中风险',
-    high: '高风险'
-  }
-  return map[analysis.value.riskLevel] || '低风险'
+const abnormalIndicators = computed(() => report.value?.indicators.filter(item => item.abnormal) || [])
+const normalCount = computed(() => (report.value?.indicators.length || 0) - abnormalIndicators.value.length)
+const riskLabel = computed(() => {
+  const labels = { LOW: '低风险', MEDIUM: '中风险', HIGH: '高风险' }
+  return labels[report.value?.riskLevel || 'LOW']
 })
 
-const riskLevelMap: Record<string, string> = {
-  low: '低',
-  medium: '中',
-  high: '高'
-}
-
-// 展开状态
-const expandedItems = reactive<Record<number, boolean>>({})
-
-function toggleItem(idx: number) {
-  expandedItems[idx] = !expandedItems[idx]
-}
-
-// AI加载动画
-const aiLoading = ref(true)
-const loadingStep = ref(0)
-
-onMounted(() => {
-  // 模拟AI分析过程
-  const step1 = setTimeout(() => { loadingStep.value = 1 }, 600)
-  const step2 = setTimeout(() => { loadingStep.value = 2 }, 1500)
-  const step3 = setTimeout(() => { loadingStep.value = 3 }, 2200)
-  const done = setTimeout(() => { aiLoading.value = false }, 2800)
-
-  return () => {
-    clearTimeout(step1)
-    clearTimeout(step2)
-    clearTimeout(step3)
-    clearTimeout(done)
+onLoad(async (query) => {
+  const id = typeof query?.id === 'string' ? query.id : ''
+  try {
+    if (id) {
+      report.value = await getHealthReport(id)
+    } else {
+      const reports = await listHealthReports()
+      report.value = reports[0] || null
+    }
+  } catch (error: any) {
+    errorMessage.value = error?.message || '报告加载失败'
+  } finally {
+    loading.value = false
   }
 })
 
-// 操作
+function previewSourceImage() {
+  if (!report.value?.sourceImageUrl) return
+  const url = resolveApiUrl(report.value.sourceImageUrl)
+  uni.previewImage({ current: url, urls: [url] })
+}
+
 function handleShare() {
-  uni.showToast({ title: '分享功能开发中', icon: 'none' })
+  if (!report.value) return
+  uni.setClipboardData({
+    data: `脉安驰援健康分析：${riskLabel.value}，发现 ${abnormalIndicators.value.length} 项异常指标。${report.value.summary}`,
+    success: () => uni.showToast({ title: '报告摘要已复制', icon: 'none' })
+  })
 }
 
 function goArchive() {
   uni.navigateTo({ url: '/pages/checkup/archive' })
 }
 
-function goBack() {
-  uni.navigateBack()
+function goUpload() {
+  uni.redirectTo({ url: '/pages/checkup/upload' })
 }
 </script>
 
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F1F5FA;
+  color: #18253A;
 }
 
-/* 导航栏 */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+.page-scroll {
+  height: 100vh;
 }
-.nav-bar-content {
+
+.state-card {
+  min-height: 72vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+}
+
+.loading-ring {
+  width: 54rpx;
+  height: 54rpx;
+  border: 6rpx solid #DDE7F5;
+  border-top-color: #2B70E3;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.state-icon {
+  width: 88rpx;
   height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.back-arrow {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-placeholder {
-  width: 64rpx;
-}
-
-/* 滚动内容 */
-.scroll-content {
-  min-height: 100vh;
-  box-sizing: border-box;
-}
-
-/* AI加载动画 */
-.ai-loading-section {
-  display: flex;
-  justify-content: center;
-  padding-top: 120rpx;
-}
-.ai-loading-card {
-  width: 600rpx;
+  border-radius: 25rpx;
   background: #FFFFFF;
-  border-radius: 32rpx;
-  padding: 60rpx 40rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  box-shadow: 0 8rpx 40rpx rgba(43, 111, 240, 0.1);
-}
-.ai-brain-wrap {
-  position: relative;
-  width: 160rpx;
-  height: 160rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 32rpx;
-}
-.ai-brain {
-  width: 100rpx;
-  height: 100rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2B6FF0 0%, #722ED1 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3;
-  box-shadow: 0 8rpx 32rpx rgba(43, 111, 240, 0.4);
-}
-.brain-icon {
-  font-size: 52rpx;
-}
-.brain-ring {
-  position: absolute;
-  border-radius: 50%;
-  border: 2rpx solid rgba(43, 111, 240, 0.2);
-  animation: ringPulse 2.5s ease-out infinite;
-}
-.ring-1 {
-  width: 120rpx;
-  height: 120rpx;
-  animation-delay: 0s;
-}
-.ring-2 {
-  width: 140rpx;
-  height: 140rpx;
-  animation-delay: 0.5s;
-}
-.ring-3 {
-  width: 160rpx;
-  height: 160rpx;
-  animation-delay: 1s;
-}
-@keyframes ringPulse {
-  0% {
-    transform: scale(0.8);
-    opacity: 0.6;
-    border-color: rgba(43, 111, 240, 0.4);
-  }
-  100% {
-    transform: scale(1.4);
-    opacity: 0;
-    border-color: rgba(43, 111, 240, 0);
-  }
-}
-.ai-loading-title {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #2B6FF0;
-  margin-bottom: 8rpx;
-}
-.ai-loading-desc {
-  font-size: 24rpx;
-  color: #86909C;
-  margin-bottom: 40rpx;
-}
-.ai-loading-steps {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  width: 100%;
-}
-.loading-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12rpx;
-}
-.step-dot {
-  width: 24rpx;
-  height: 24rpx;
-  border-radius: 50%;
-  background: #E5E6EB;
-  transition: all 0.4s ease;
-}
-.step-active .step-dot {
-  background: #2B6FF0;
-  box-shadow: 0 0 16rpx rgba(43, 111, 240, 0.5);
-}
-.step-label {
-  font-size: 22rpx;
-  color: #C9CDD4;
-  font-weight: 500;
-  transition: color 0.4s ease;
-}
-.step-active .step-label {
-  color: #2B6FF0;
-  font-weight: 600;
-}
-.loading-step-line {
-  flex: 1;
-  height: 2rpx;
-  background: #E5E6EB;
-  margin: 0 8rpx;
-  margin-bottom: 32rpx;
-  transition: background 0.4s ease;
-}
-.line-active {
-  background: linear-gradient(90deg, #2B6FF0, #5B8DEF);
+  box-shadow: 0 10rpx 30rpx rgba(37, 62, 101, 0.09);
 }
 
-/* 风险概览卡片 */
-.risk-header-card {
-  position: relative;
-  margin: 24rpx 24rpx 0;
-  border-radius: 24rpx;
-  overflow: hidden;
-  box-shadow: 0 8rpx 40rpx rgba(43, 111, 240, 0.12);
-}
-.risk-header-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, #2B6FF0 0%, #1A4FD0 40%, #0D3AAF 100%);
-}
-.risk-header-content {
-  position: relative;
-  padding: 32rpx;
-  z-index: 2;
-}
-.risk-top-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20rpx;
-}
-.risk-badge-wrap {
-  display: flex;
-}
-.risk-badge {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  padding: 10rpx 24rpx;
-  border-radius: 24rpx;
-  backdrop-filter: blur(8px);
-}
-.risk-badge-low {
-  background: rgba(0, 180, 42, 0.25);
-}
-.risk-badge-medium {
-  background: rgba(255, 154, 46, 0.25);
-}
-.risk-badge-high {
-  background: rgba(245, 63, 63, 0.25);
-}
-.risk-badge-dot {
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
-}
-.risk-badge-low .risk-badge-dot {
-  background: #4DC580;
-  box-shadow: 0 0 12rpx rgba(0, 180, 42, 0.6);
-}
-.risk-badge-medium .risk-badge-dot {
-  background: #FFCF8B;
-  box-shadow: 0 0 12rpx rgba(255, 154, 46, 0.6);
-}
-.risk-badge-high .risk-badge-dot {
-  background: #FF7D7D;
-  box-shadow: 0 0 12rpx rgba(245, 63, 63, 0.6);
-}
-.risk-badge-text {
-  font-size: 26rpx;
-  color: #FFFFFF;
-  font-weight: 700;
-}
-.risk-date {
-  padding: 6rpx 16rpx;
-  border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1rpx solid rgba(255, 255, 255, 0.2);
-}
-.risk-date-text {
-  font-size: 22rpx;
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
-}
-.risk-summary {
+.state-title {
+  margin-top: 25rpx;
   font-size: 28rpx;
-  color: rgba(255, 255, 255, 0.95);
-  line-height: 1.6;
-  margin-bottom: 24rpx;
-  font-weight: 500;
-}
-.risk-stats-row {
-  display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 16rpx;
-  padding: 20rpx 0;
-  backdrop-filter: blur(4px);
-}
-.risk-stat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6rpx;
-}
-.risk-stat-num {
-  font-size: 44rpx;
-  font-weight: 800;
-  color: #FFFFFF;
-  line-height: 1;
-}
-.risk-stat-num-green {
-  color: #4DC580;
-}
-.risk-stat-label {
-  font-size: 22rpx;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 500;
-}
-.risk-stat-divider {
-  width: 1rpx;
-  height: 48rpx;
-  background: rgba(255, 255, 255, 0.15);
-}
-
-/* 通用section卡片 */
-.section-card {
-  margin: 24rpx 24rpx 0;
-  background: #FFFFFF;
-  border-radius: 24rpx;
-  padding: 28rpx;
-  box-shadow: 0 4rpx 24rpx rgba(43, 111, 240, 0.06);
-}
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24rpx;
-}
-.section-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-.section-icon-wrap {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 14rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.section-icon-warning {
-  background: rgba(255, 154, 46, 0.1);
-}
-.section-icon-suggest {
-  background: rgba(43, 111, 240, 0.1);
-}
-.section-icon {
-  font-size: 28rpx;
-}
-.section-title {
-  font-size: 30rpx;
   font-weight: 700;
-  color: #1D2129;
-}
-.section-count {
-  font-size: 24rpx;
-  color: #86909C;
-  font-weight: 500;
-  padding: 4rpx 16rpx;
-  border-radius: 12rpx;
-  background: #F7F8FA;
 }
 
-/* 异常指标卡片 */
-.abnormal-card {
-  margin-bottom: 16rpx;
-  border-radius: 20rpx;
-  overflow: hidden;
-  background: #FFFFFF;
-  border: 1rpx solid #F2F3F5;
-  border-left: 6rpx solid #E5E6EB;
-  transition: all 0.3s ease;
-}
-.abnormal-card:last-child {
-  margin-bottom: 0;
-}
-.abnormal-card-low {
-  border-left-color: #00B42A;
-}
-.abnormal-card-medium {
-  border-left-color: #FF9A2E;
-}
-.abnormal-card-high {
-  border-left-color: #F53F3F;
-}
-.abnormal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20rpx 20rpx 20rpx 16rpx;
-}
-.abnormal-left {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-.abnormal-name-row {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-}
-.risk-level-dot {
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dot-low {
-  background: #00B42A;
-  box-shadow: 0 0 8rpx rgba(0, 180, 42, 0.4);
-}
-.dot-medium {
-  background: #FF9A2E;
-  box-shadow: 0 0 8rpx rgba(255, 154, 46, 0.4);
-}
-.dot-high {
-  background: #F53F3F;
-  box-shadow: 0 0 8rpx rgba(245, 63, 63, 0.4);
-}
-.abnormal-name {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #1D2129;
-}
-.abnormal-value-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8rpx;
-  padding-left: 24rpx;
-}
-.abnormal-value {
-  font-size: 30rpx;
-  font-weight: 800;
-}
-.value-low { color: #2B6FF0; }
-.value-medium { color: #FF9A2E; }
-.value-high { color: #F53F3F; }
-.abnormal-vs {
-  font-size: 20rpx;
-  color: #C9CDD4;
-  font-weight: 500;
-}
-.abnormal-ref {
-  font-size: 22rpx;
-  color: #86909C;
-}
-.abnormal-right {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  flex-shrink: 0;
-}
-.risk-tag {
-  padding: 6rpx 16rpx;
-  border-radius: 12rpx;
-}
-.risk-tag-low {
-  background: rgba(0, 180, 42, 0.08);
-}
-.risk-tag-medium {
-  background: rgba(255, 154, 46, 0.08);
-}
-.risk-tag-high {
-  background: rgba(245, 63, 63, 0.08);
-}
-.risk-tag-text {
-  font-size: 22rpx;
-  font-weight: 600;
-}
-.risk-tag-low .risk-tag-text { color: #00B42A; }
-.risk-tag-medium .risk-tag-text { color: #FF9A2E; }
-.risk-tag-high .risk-tag-text { color: #F53F3F; }
-.expand-arrow {
-  font-size: 20rpx;
-  color: #C9CDD4;
-  transition: transform 0.3s ease;
-}
-.arrow-expanded {
-  transform: rotate(90deg);
-}
-
-/* 展开内容 */
-.abnormal-body {
-  padding: 0 20rpx 20rpx 16rpx;
-  border-top: 1rpx solid #F2F3F5;
-}
-.analysis-block {
-  padding: 16rpx 0;
-}
-.analysis-label-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-bottom: 10rpx;
-}
-.analysis-label-icon {
-  width: 36rpx;
-  height: 36rpx;
-  border-radius: 10rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #722ED1 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.analysis-label-icon-text {
-  font-size: 20rpx;
-}
-.analysis-label {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: #2B6FF0;
-}
-.analysis-text {
-  font-size: 26rpx;
-  color: #4E5969;
-  line-height: 1.7;
-  padding-left: 44rpx;
-}
-.suggestions-block {
-  padding: 16rpx 0 0;
-  border-top: 1rpx dashed #E5E6EB;
-}
-.suggestions-label-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-bottom: 12rpx;
-}
-.suggestions-label-icon {
-  width: 36rpx;
-  height: 36rpx;
-  border-radius: 10rpx;
-  background: rgba(255, 154, 46, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.suggestions-label-icon-text {
-  font-size: 20rpx;
-}
-.suggestions-label {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: #FF9A2E;
-}
-.suggestion-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12rpx;
-  margin-bottom: 12rpx;
-  padding-left: 44rpx;
-}
-.suggestion-item:last-child {
-  margin-bottom: 0;
-}
-.suggestion-bullet {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-  margin-top: 10rpx;
-  flex-shrink: 0;
-}
-.bullet-low { background: #00B42A; }
-.bullet-medium { background: #FF9A2E; }
-.bullet-high { background: #F53F3F; }
-.suggestion-text {
-  font-size: 26rpx;
-  color: #4E5969;
-  line-height: 1.6;
-  flex: 1;
-}
-
-/* 综合建议 */
-.overall-suggestions {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-.overall-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 16rpx;
-  padding: 20rpx;
-  background: #F7F8FA;
+.state-button {
+  margin-top: 24rpx;
+  padding: 17rpx 30rpx;
   border-radius: 16rpx;
-}
-.overall-num-wrap {
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 4rpx 12rpx rgba(43, 111, 240, 0.2);
-}
-.overall-num {
+  background: #2B70E3;
+  color: #FFFFFF;
   font-size: 24rpx;
   font-weight: 700;
-  color: #FFFFFF;
-}
-.overall-content {
-  flex: 1;
-  display: flex;
-  align-items: center;
-}
-.overall-text {
-  font-size: 26rpx;
-  color: #4E5969;
-  line-height: 1.6;
-  font-weight: 500;
 }
 
-/* AI分析说明 */
+.risk-card,
+.report-card,
 .disclaimer-card {
   margin: 24rpx 24rpx 0;
-  background: #FFFBE8;
-  border-radius: 20rpx;
-  padding: 20rpx 24rpx;
-  display: flex;
-  align-items: flex-start;
-  gap: 16rpx;
-  border: 1rpx solid rgba(255, 196, 46, 0.15);
+  border-radius: 26rpx;
 }
-.disclaimer-icon-wrap {
-  width: 40rpx;
-  height: 40rpx;
+
+.risk-card {
+  padding: 32rpx 30rpx 28rpx;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 91% 8%, rgba(255, 255, 255, 0.18), transparent 34%),
+    linear-gradient(135deg, #186F57 0%, #27A477 100%);
+  color: #FFFFFF;
+  box-shadow: 0 16rpx 42rpx rgba(28, 128, 93, 0.22);
+}
+
+.risk-medium {
+  background:
+    radial-gradient(circle at 91% 8%, rgba(255, 255, 255, 0.18), transparent 34%),
+    linear-gradient(135deg, #B85F17 0%, #E28D34 100%);
+  box-shadow: 0 16rpx 42rpx rgba(195, 105, 28, 0.22);
+}
+
+.risk-high {
+  background:
+    radial-gradient(circle at 91% 8%, rgba(255, 255, 255, 0.18), transparent 34%),
+    linear-gradient(135deg, #A92836 0%, #D84B56 100%);
+  box-shadow: 0 16rpx 42rpx rgba(184, 48, 61, 0.22);
+}
+
+.risk-top,
+.section-head,
+.hospital-row,
+.indicator-row,
+.recommendation,
+.bottom-actions {
+  display: flex;
+  align-items: center;
+}
+
+.risk-top,
+.section-head {
+  justify-content: space-between;
+}
+
+.risk-kicker,
+.section-kicker {
+  display: block;
+  font-size: 19rpx;
+  font-weight: 800;
+  letter-spacing: 3rpx;
+}
+
+.risk-kicker {
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.risk-title {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 40rpx;
+  font-weight: 850;
+}
+
+.source-chip {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 9rpx 14rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 20rpx;
+}
+
+.source-dot {
+  width: 10rpx;
+  height: 10rpx;
   border-radius: 50%;
-  background: rgba(255, 154, 46, 0.1);
+  background: #D4FFE9;
+}
+
+.risk-summary {
+  display: block;
+  margin-top: 22rpx;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 25rpx;
+  line-height: 1.65;
+}
+
+.risk-stats {
+  display: flex;
+  align-items: center;
+  margin-top: 27rpx;
+  padding: 19rpx 0;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.risk-stat {
+  flex: 1;
+  text-align: center;
+}
+
+.stat-value,
+.stat-label {
+  display: block;
+}
+
+.stat-value {
+  font-size: 31rpx;
+  font-weight: 850;
+}
+
+.stat-label {
+  margin-top: 5rpx;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 19rpx;
+}
+
+.stat-line {
+  width: 1rpx;
+  height: 42rpx;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.report-card {
+  padding: 28rpx;
+  background: #FFFFFF;
+  box-shadow: 0 8rpx 26rpx rgba(38, 63, 103, 0.06);
+}
+
+.section-kicker {
+  color: #8190A7;
+}
+
+.section-title {
+  display: block;
+  margin-top: 5rpx;
+  font-size: 31rpx;
+  font-weight: 800;
+}
+
+.section-meta,
+.report-date {
+  color: #77869D;
+  font-size: 22rpx;
+}
+
+.hospital-row {
+  gap: 15rpx;
+  margin-top: 24rpx;
+  font-size: 25rpx;
+  font-weight: 700;
+}
+
+.hospital-icon {
+  width: 58rpx;
+  height: 58rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  border-radius: 17rpx;
+  background: #EAF2FF;
 }
-.disclaimer-icon {
-  font-size: 24rpx;
-  color: #FF9A2E;
+
+.source-image {
+  width: 100%;
+  height: 260rpx;
+  margin-top: 21rpx;
+  border-radius: 18rpx;
+  background: #EDF2F8;
+}
+
+.indicator-list {
+  margin-top: 18rpx;
+}
+
+.indicator-row {
+  gap: 14rpx;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid #E8EDF4;
+}
+
+.indicator-row:last-child {
+  border-bottom: 0;
+}
+
+.indicator-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.indicator-name,
+.indicator-range {
+  display: block;
+}
+
+.indicator-name {
+  font-size: 25rpx;
+  font-weight: 750;
+}
+
+.indicator-range {
+  margin-top: 5rpx;
+  color: #94A0B2;
+  font-size: 19rpx;
+}
+
+.indicator-value-wrap {
+  flex: none;
+  text-align: right;
+}
+
+.indicator-value {
+  font-size: 28rpx;
+  font-weight: 850;
+}
+
+.indicator-unit {
+  margin-left: 5rpx;
+  color: #7C899D;
+  font-size: 18rpx;
+}
+
+.indicator-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 7rpx 10rpx;
+  border-radius: 10rpx;
+  background: #EAF8F2;
+  color: #19845A;
+  font-size: 19rpx;
   font-weight: 700;
 }
-.disclaimer-content {
-  flex: 1;
+
+.indicator-status.abnormal {
+  background: #FFF0F1;
+  color: #CF3F4A;
+}
+
+.recommendation-list {
+  margin-top: 22rpx;
+}
+
+.recommendation {
+  align-items: flex-start;
+  gap: 16rpx;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: #F5F8FD;
+}
+
+.recommendation + .recommendation {
+  margin-top: 13rpx;
+}
+
+.recommendation-index {
+  flex: none;
+  width: 42rpx;
+  height: 42rpx;
   display: flex;
-  flex-direction: column;
-  gap: 6rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13rpx;
+  background: #DFEAFC;
+  color: #1F63D5;
+  font-size: 20rpx;
+  font-weight: 800;
 }
-.disclaimer-title {
+
+.recommendation-text {
+  flex: 1;
   font-size: 24rpx;
-  font-weight: 600;
-  color: #7D6600;
+  line-height: 1.65;
 }
-.disclaimer-text {
-  font-size: 22rpx;
-  color: #A69B50;
+
+.disclaimer-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14rpx;
+  padding: 22rpx;
+  border: 1rpx solid #D9E5F7;
+  background: #EEF5FF;
+  color: #65758D;
+  font-size: 21rpx;
   line-height: 1.6;
 }
 
-/* 底部操作 */
 .bottom-actions {
-  display: flex;
-  gap: 20rpx;
-  margin: 32rpx 24rpx 0;
-}
-.btn-share {
-  flex: 1;
-  height: 88rpx;
-  border-radius: 44rpx;
-  background: #FFFFFF;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2rpx solid #2B6FF0;
-  box-shadow: 0 4rpx 16rpx rgba(43, 111, 240, 0.1);
-}
-.btn-share-text {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #2B6FF0;
-}
-.btn-archive {
-  flex: 1;
-  height: 88rpx;
-  border-radius: 44rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 32rpx rgba(43, 111, 240, 0.3);
-}
-.btn-archive-text {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #FFFFFF;
+  gap: 16rpx;
+  margin: 28rpx 24rpx 0;
 }
 
-/* 底部安全区 */
-.bottom-safe {
-  height: 60rpx;
+.secondary-button,
+.primary-button {
+  height: 86rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.secondary-button {
+  width: 220rpx;
+  border: 1rpx solid #C9D5E6;
+  background: #FFFFFF;
+  color: #47617F;
+}
+
+.primary-button {
+  flex: 1;
+  background: linear-gradient(135deg, #245FC6 0%, #377BE9 100%);
+  color: #FFFFFF;
+  box-shadow: 0 10rpx 25rpx rgba(37, 101, 207, 0.22);
+}
+
+.bottom-space {
+  height: calc(42rpx + env(safe-area-inset-bottom));
 }
 </style>

@@ -116,19 +116,13 @@
     {
       "path": "pages/mine/auth",
       "style": {
-        "navigationBarTitleText": "实名认证"
+        "navigationBarTitleText": "身份信息校验"
       }
     },
     {
       "path": "pages/mine/contacts",
       "style": {
         "navigationBarTitleText": "紧急联系人"
-      }
-    },
-    {
-      "path": "pages/mine/devices",
-      "style": {
-        "navigationBarTitleText": "我的设备"
       }
     },
     {

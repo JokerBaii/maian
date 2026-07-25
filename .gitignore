@@ -1,21 +1,52 @@
-# Logs
-logs
+# Dependencies and build output
+node_modules/
+dist/
+unpackage/
+target/
+server/target/
+
+# Logs and runtime diagnostics
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.pid
+*.pid.lock
+*.hprof
+hs_err_pid*
 
-node_modules
-.DS_Store
-dist
+# Local environment and data
+.env
+.env.*
+!.env.example
 *.local
+server/data/
+*.db
+*.sqlite
+*.sqlite3
 
-# Editor directories and files
-.idea
+# Test and tool caches
+coverage/
+.cache/
+.vite/
+.sass-cache/
+
+# Editors
+.idea/
+.vscode/
+.fleet/
+.settings/
+.project
+.classpath
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Operating systems
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>用于连接用户主动绑定的心率监测设备并读取设备状态。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>用于拍摄急救现场、急救设备和体检报告图片。</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>用于展示附近急救设备、提交救援位置并提供导航。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>用于选择急救现场、急救设备和体检报告图片。</string>
+</dict>
+</plist>

@@ -1,6 +1,5 @@
 <template>
   <view class="page">
-    <!-- Tab 切换 -->
     <view class="tab-bar">
       <view
         class="tab-item"
@@ -20,7 +19,6 @@
       </view>
     </view>
 
-    <!-- 我发起的 -->
     <scroll-view v-if="currentTab === 'initiated'" class="record-scroll" scroll-y>
       <view v-if="initiatedRecords.length > 0" class="record-list">
         <view
@@ -39,35 +37,36 @@
           <view class="record-body">
             <text class="record-desc">{{ record.description }}</text>
             <view class="record-info-row">
-              <text class="record-info-icon">📍</text>
+              <app-icon class="record-info-icon" name="location-filled" :size="14" color="#8994A8" />
               <text class="record-info-text">{{ record.address }}</text>
             </view>
             <view class="record-info-row">
-              <text class="record-info-icon">🕒</text>
+              <app-icon class="record-info-icon" name="calendar" :size="14" color="#8994A8" />
               <text class="record-info-text">{{ record.createTime }}</text>
             </view>
           </view>
           <view v-if="record.status === 'completed' && record.rating" class="record-footer">
             <text class="rating-label">救援评分</text>
             <view class="rating-stars">
-              <text
+              <app-icon
                 v-for="i in 5"
                 :key="i"
                 class="star"
-                :class="i <= record.rating ? 'star-filled' : 'star-empty'"
-              >&#x2605;</text>
+                :name="i <= record.rating ? 'star-filled' : 'star'"
+                :size="15"
+                :color="i <= record.rating ? '#D99A2B' : '#CDD3DE'"
+              />
             </view>
           </view>
         </view>
       </view>
       <view v-else class="empty-state">
-        <text class="empty-icon">🛑</text>
+        <app-icon class="empty-icon" name="close" :size="42" color="#8994A8" />
         <text class="empty-text">暂无发起的救援记录</text>
         <text class="empty-hint">遇到紧急情况可一键呼救</text>
       </view>
     </scroll-view>
 
-    <!-- 我参与的 -->
     <scroll-view v-if="currentTab === 'participated'" class="record-scroll" scroll-y>
       <view v-if="participatedRecords.length > 0" class="record-list">
         <view
@@ -86,29 +85,31 @@
           <view class="record-body">
             <text class="record-desc">{{ record.description }}</text>
             <view class="record-info-row">
-              <text class="record-info-icon">📍</text>
+              <app-icon class="record-info-icon" name="location-filled" :size="14" color="#8994A8" />
               <text class="record-info-text">{{ record.address }}</text>
             </view>
             <view class="record-info-row">
-              <text class="record-info-icon">🕒</text>
+              <app-icon class="record-info-icon" name="calendar" :size="14" color="#8994A8" />
               <text class="record-info-text">{{ record.createTime }}</text>
             </view>
           </view>
           <view v-if="record.status === 'completed' && record.rating" class="record-footer">
             <text class="rating-label">救援评分</text>
             <view class="rating-stars">
-              <text
+              <app-icon
                 v-for="i in 5"
                 :key="i"
                 class="star"
-                :class="i <= record.rating ? 'star-filled' : 'star-empty'"
-              >&#x2605;</text>
+                :name="i <= record.rating ? 'star-filled' : 'star'"
+                :size="15"
+                :color="i <= record.rating ? '#D99A2B' : '#CDD3DE'"
+              />
             </view>
           </view>
         </view>
       </view>
       <view v-else class="empty-state">
-        <text class="empty-icon">🤝</text>
+        <app-icon class="empty-icon" name="staff" :size="42" color="#8994A8" />
         <text class="empty-text">暂无参与的救援记录</text>
         <text class="empty-hint">参与救援可积累志愿时长</text>
       </view>
@@ -117,17 +118,51 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { mockMyRescues } from '@/mock/data'
+import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import AppIcon from '@/components/AppIcon.vue'
+import { listRescueCalls, type RescueCallResponse } from '@/api/rescue'
 
 const currentTab = ref<'initiated' | 'participated'>('initiated')
 
-const initiatedRecords = computed(() =>
-  mockMyRescues.filter(r => r.type === 'caller')
-)
-const participatedRecords = computed(() =>
-  mockMyRescues.filter(r => r.type === 'volunteer')
-)
+interface RescueRecordView {
+  id: string
+  address: string
+  description: string
+  urgency: string
+  status: string
+  createTime: string
+  rating?: number
+}
+
+const initiatedRecords = ref<RescueRecordView[]>([])
+const participatedRecords = ref<RescueRecordView[]>([])
+
+function formatTime(value: string) {
+  const date = new Date(value)
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function toRecord(call: RescueCallResponse): RescueRecordView {
+  return {
+    id: call.id,
+    address: call.address,
+    description: call.description || call.symptoms.join('、') || '紧急救援请求',
+    urgency: call.urgency.toLowerCase(),
+    status: call.status.toLowerCase(),
+    createTime: formatTime(call.createdAt)
+  }
+}
+
+async function loadRecords() {
+  try {
+    const page = await listRescueCalls()
+    initiatedRecords.value = page.content.map(toRecord)
+  } catch {
+    uni.showToast({ title: '救援记录加载失败', icon: 'none' })
+  }
+}
 
 function urgencyLabel(urgency: string) {
   const map: Record<string, string> = {
@@ -143,12 +178,15 @@ function statusLabel(status: string) {
   const map: Record<string, string> = {
     pending: '等待中',
     matching: '匹配中',
+    accepted: '已接单',
     rescuing: '救援中',
     completed: '已完成',
     cancelled: '已取消'
   }
   return map[status] || status
 }
+
+onShow(loadRecords)
 </script>
 
 <style lang="scss" scoped>
@@ -157,7 +195,6 @@ function statusLabel(status: string) {
   background: #F0F4FA;
 }
 
-/* Tab 切换 */
 .tab-bar {
   display: flex;
   background: #FFFFFF;
@@ -194,7 +231,6 @@ function statusLabel(status: string) {
   background: linear-gradient(90deg, #2B6FF0 0%, #5B8DEF 100%);
 }
 
-/* 记录列表 */
 .record-scroll {
   height: calc(100vh - 120rpx);
   box-sizing: border-box;
@@ -212,7 +248,6 @@ function statusLabel(status: string) {
   box-shadow: 0 4rpx 16rpx rgba(43, 111, 240, 0.06);
 }
 
-/* 记录头部 */
 .record-header {
   display: flex;
   align-items: center;
@@ -284,7 +319,6 @@ function statusLabel(status: string) {
   color: #86909C;
 }
 
-/* 记录内容 */
 .record-body {
   display: flex;
   flex-direction: column;
@@ -314,7 +348,6 @@ function statusLabel(status: string) {
   white-space: nowrap;
 }
 
-/* 记录底部评分 */
 .record-footer {
   display: flex;
   align-items: center;
@@ -343,7 +376,6 @@ function statusLabel(status: string) {
   color: #E5E6EB;
 }
 
-/* 空状态 */
 .empty-state {
   display: flex;
   flex-direction: column;

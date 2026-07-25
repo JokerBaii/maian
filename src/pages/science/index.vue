@@ -1,22 +1,20 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
     <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="nav-bar-content">
         <view class="nav-back" @tap="goBack">
-          <text class="back-icon">&#x2190;</text>
+          <app-icon class="back-icon" name="back" :size="22" color="#FFFFFF" />
         </view>
         <text class="nav-title">急救与健康科普</text>
         <view class="nav-right" @tap="goContribute">
-          <text class="nav-action">&#x270F;</text>
+          <app-icon class="nav-action" name="compose" :size="21" color="#FFFFFF" />
         </view>
       </view>
     </view>
 
-    <!-- 搜索栏 -->
     <view class="search-section">
       <view class="search-bar">
-        <text class="search-icon">🔍</text>
+        <app-icon class="search-icon" name="search" :size="18" color="#56627A" />
         <input
           class="search-input"
           v-model="searchText"
@@ -26,7 +24,6 @@
       </view>
     </view>
 
-    <!-- 分类筛选 -->
     <scroll-view scroll-x class="category-scroll">
       <view class="category-list">
         <view
@@ -41,7 +38,6 @@
       </view>
     </scroll-view>
 
-    <!-- 内容列表 -->
     <scroll-view scroll-y class="content-list" :style="{ height: listHeight + 'px' }">
       <view
         v-for="item in filteredContents"
@@ -49,8 +45,8 @@
         class="content-card"
         @tap="goDetail(item)"
       >
-        <view class="card-cover" :class="'cover-' + item.category">
-          <text class="cover-icon">{{ categoryIcon(item.category) }}</text>
+        <view class="card-cover">
+          <image class="card-cover-image" :src="item.cover" mode="aspectFill" />
         </view>
         <view class="card-body">
           <text class="card-title">{{ item.title }}</text>
@@ -58,27 +54,32 @@
           <view class="card-meta">
             <view class="meta-left">
               <text class="meta-author">{{ item.author }}</text>
-              <text class="meta-dot">&#x00B7;</text>
+              <text class="meta-dot">·</text>
               <text class="meta-tag" :class="'tag-' + item.category">{{ item.categoryLabel }}</text>
             </view>
             <view class="meta-right">
-              <text class="meta-stat">👍 {{ formatCount(item.likeCount) }}</text>
-              <text class="meta-stat">👀 {{ formatCount(item.viewCount) }}</text>
+              <view class="meta-stat">
+                <app-icon name="hand-up" :size="13" color="#8994A8" />
+                <text>{{ formatCount(item.likeCount) }}</text>
+              </view>
+              <view class="meta-stat">
+                <app-icon name="eye" :size="13" color="#8994A8" />
+                <text>{{ formatCount(item.viewCount) }}</text>
+              </view>
             </view>
           </view>
         </view>
       </view>
 
-      <!-- 知识自测入口 -->
       <view class="quiz-entry" @tap="goQuiz">
         <view class="quiz-icon-wrap">
-          <text class="quiz-icon-text">📝</text>
+          <app-icon class="quiz-icon-text" name="compose" :size="26" color="#1F63D5" />
         </view>
         <view class="quiz-info">
           <text class="quiz-title">急救知识自测</text>
           <text class="quiz-desc">检验你的急救知识水平</text>
         </view>
-        <text class="quiz-arrow">›</text>
+        <app-icon class="quiz-arrow" name="right" :size="18" color="#8C98AC" />
       </view>
 
       <view class="list-bottom">
@@ -90,7 +91,8 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { mockScienceContents, mockScienceCategories } from '@/mock/data'
+import AppIcon from '@/components/AppIcon.vue'
+import { scienceArticles, scienceCategories } from '@/data/editorial'
 
 const statusBarHeight = ref(0)
 const listHeight = ref(600)
@@ -100,10 +102,10 @@ listHeight.value = systemInfo.windowHeight - statusBarHeight.value - 44 - 52 - 4
 
 const searchText = ref('')
 const activeCategory = ref('all')
-const categories = mockScienceCategories
+const categories = scienceCategories
 
 const filteredContents = computed(() => {
-  let list = mockScienceContents
+  let list = scienceArticles
   if (activeCategory.value !== 'all') {
     list = list.filter(c => c.category === activeCategory.value)
   }
@@ -116,16 +118,6 @@ const filteredContents = computed(() => {
   }
   return list
 })
-
-function categoryIcon(cat: string) {
-  const map: Record<string, string> = {
-    device: '📍',
-    emergency: '🆘',
-    health: '❤️',
-    exercise: '🏃'
-  }
-  return map[cat] || '📖'
-}
 
 function formatCount(count: number) {
   if (count >= 10000) return (count / 10000).toFixed(1) + 'w'
@@ -228,6 +220,8 @@ function goContribute() {
 }
 
 .category-scroll {
+  width: 100%;
+  box-sizing: border-box;
   white-space: nowrap;
   background: #fff;
   padding: 0 24rpx 20rpx;
@@ -258,6 +252,8 @@ function goContribute() {
 }
 
 .content-list {
+  width: 100%;
+  box-sizing: border-box;
   padding: 20rpx 24rpx;
 }
 
@@ -274,24 +270,20 @@ function goContribute() {
   width: 160rpx;
   height: 160rpx;
   border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
   margin-right: 24rpx;
   flex-shrink: 0;
+  background: #EDF3FA;
 }
 
-.cover-device { background: linear-gradient(135deg, #E8F3FF, #BEDAFF); }
-.cover-emergency { background: linear-gradient(135deg, #FFECE8, #FDDBC5); }
-.cover-health { background: linear-gradient(135deg, #E8FFEA, #C9FDBD); }
-.cover-exercise { background: linear-gradient(135deg, #FFF7E8, #FDDEC5); }
-
-.cover-icon {
-  font-size: 56rpx;
+.card-cover-image {
+  width: 100%;
+  height: 100%;
 }
 
 .card-body {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;

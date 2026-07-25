@@ -1,10 +1,9 @@
 <template>
   <view class="map-page">
-    <!-- 顶部搜索与筛选区域 -->
     <view class="top-overlay" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="search-bar">
         <view class="search-icon-wrap">
-          <text class="search-icon">🔍</text>
+          <app-icon class="search-icon" name="search" :size="18" color="#56627A" />
         </view>
         <input
           class="search-input"
@@ -15,7 +14,7 @@
           @confirm="handleSearch"
         />
         <view v-if="searchText" class="search-clear" @tap="searchText = ''">
-          <text class="clear-icon">&#x2715;</text>
+          <app-icon name="closeempty" :size="17" color="#FFFFFF" />
         </view>
       </view>
       <view class="filter-tabs">
@@ -32,11 +31,61 @@
       </view>
     </view>
 
-    <!-- 地图容器 -->
+    <!-- #ifdef H5 -->
     <view id="map-container" class="map-container"></view>
+    <view v-if="mapUnavailable" class="map-fallback">
+      <view class="map-grid"></view>
+      <view class="radar-caption">
+        <view class="radar-caption-state">
+          <view class="radar-caption-dot"></view>
+          <text>救援资源持续在线</text>
+        </view>
+        <text class="radar-caption-title">附近生命网络</text>
+        <text class="radar-caption-desc">急救设备数据已连接 · 可使用系统地图导航</text>
+      </view>
+      <view class="rescue-radar">
+        <view class="radar-ring radar-ring-one"></view>
+        <view class="radar-ring radar-ring-two"></view>
+        <view class="radar-ring radar-ring-three"></view>
+        <view class="radar-cross radar-cross-horizontal"></view>
+        <view class="radar-cross radar-cross-vertical"></view>
+        <view class="radar-sweep"></view>
+        <view
+          v-for="node in radarNodes"
+          :key="node.label"
+          class="radar-node"
+          :class="'radar-node-' + node.type"
+          :style="{ left: node.left, top: node.top }"
+        >
+          <view class="radar-node-core">
+            <app-icon :name="node.icon" :size="15" color="#FFFFFF" />
+          </view>
+          <text class="radar-node-label">{{ node.label }}</text>
+        </view>
+        <view class="radar-self">
+          <view class="radar-self-ring"></view>
+          <view class="radar-self-core">
+            <app-icon name="navigate-filled" :size="18" color="#FFFFFF" />
+          </view>
+        </view>
+      </view>
+    </view>
+    <!-- #endif -->
+    <!-- #ifndef H5 -->
+    <map
+      id="native-rescue-map"
+      class="map-container"
+      :longitude="myLocation[0]"
+      :latitude="myLocation[1]"
+      :markers="nativeMarkers"
+      :scale="13"
+      show-location
+      enable-3D
+      @markertap="handleNativeMarkerTap"
+    />
+    <!-- #endif -->
 
-    <!-- 设备详情弹窗 -->
-    <view v-if="selectedDevice && !isNavigating" class="device-popup" :class="{ 'device-popup-show': popupVisible }">
+    <view v-if="selectedDevice" class="device-popup" :class="{ 'device-popup-show': popupVisible }">
       <view class="popup-header">
         <view class="popup-type-tag" :class="'popup-type-' + selectedDevice.type">
           <text class="popup-type-text">{{ selectedDevice.type === 'fixed' ? '固定' : '移动' }}</text>
@@ -45,7 +94,7 @@
           <text class="popup-category-text">{{ selectedDevice.category }}</text>
         </view>
         <view class="popup-close" @tap="closePopup">
-          <text class="popup-close-icon">&#x2715;</text>
+          <app-icon name="closeempty" :size="17" color="#748198" />
         </view>
       </view>
       <view class="popup-body">
@@ -56,7 +105,7 @@
             <view class="popup-status-dot"></view>
             <text class="popup-status-text">{{ deviceStatusLabel(selectedDevice) }}</text>
           </view>
-          <text class="popup-distance">{{ selectedDevice._distance || '0.8km' }}</text>
+          <text class="popup-distance">{{ selectedDevice._distance || '--' }}</text>
         </view>
         <view v-if="selectedDevice.type === 'mobile' && (selectedDevice as any).vehicleInfo" class="popup-vehicle">
           <text class="popup-vehicle-label">车辆信息</text>
@@ -69,19 +118,17 @@
       </view>
       <view class="popup-footer">
         <view class="popup-btn popup-btn-call" @tap="handleCallDevice">
-          <text class="popup-btn-icon">📞</text>
+          <app-icon class="popup-btn-icon" name="phone-filled" :size="17" color="#FFFFFF" />
           <text class="popup-btn-text">联系</text>
         </view>
         <view class="popup-btn popup-btn-nav" @tap="handleNavigate(selectedDevice)">
-          <text class="popup-btn-icon">🧭</text>
+          <app-icon class="popup-btn-icon" name="navigate-filled" :size="17" color="#FFFFFF" />
           <text class="popup-btn-text">导航</text>
         </view>
       </view>
     </view>
 
-    <!-- 底部设备列表抽屉 -->
     <view
-      v-if="!isNavigating"
       class="bottom-drawer"
       :style="{ transform: 'translateY(' + drawerOffset + 'rpx)' }"
       @touchstart="onDrawerTouchStart"
@@ -104,7 +151,13 @@
         >
           <view class="device-card-left">
             <view class="device-icon-wrap" :class="'device-icon-' + device.type">
-              <text class="device-icon-text">{{ device.category === 'AED' ? 'AED' : '急救' }}</text>
+              <app-icon
+                :name="device.category === 'AED' ? 'heart-filled' : 'plus-filled'"
+                :size="20"
+                :color="deviceStatusClass(device) === 'online'
+                  ? (device.type === 'mobile' ? '#16855D' : '#2367D8')
+                  : '#7B8796'"
+              />
             </view>
           </view>
           <view class="device-card-center">
@@ -118,7 +171,7 @@
               <view class="device-card-category">
                 <text class="category-text">{{ device.category }}</text>
               </view>
-              <text class="device-card-dot">&#xB7;</text>
+              <text class="device-card-dot">·</text>
               <text class="device-card-addr">{{ device.address }}</text>
             </view>
             <view class="device-card-bottom">
@@ -126,115 +179,123 @@
                 <view class="card-status-dot"></view>
                 <text class="card-status-text">{{ deviceStatusLabel(device) }}</text>
               </view>
-              <text class="device-card-distance">{{ device._distance || '0.8km' }}</text>
+              <text class="device-card-distance">{{ device._distance || '--' }}</text>
             </view>
           </view>
           <view class="device-card-right">
             <view class="nav-btn" @tap.stop="handleNavigate(device)">
-              <text class="nav-btn-icon">🧭</text>
+              <app-icon class="nav-btn-icon" name="navigate-filled" :size="18" color="#FFFFFF" />
             </view>
           </view>
         </view>
         <view v-if="filteredDevices.length === 0" class="empty-state">
-          <text class="empty-icon">🔍</text>
+          <app-icon class="empty-icon" name="search" :size="38" color="#8994A8" />
           <text class="empty-text">附近暂无设备</text>
         </view>
-        <!-- 底部安全区 -->
         <view class="drawer-bottom-safe"></view>
       </scroll-view>
     </view>
 
-    <!-- 导航面板 -->
-    <view v-if="isNavigating" class="nav-panel" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-panel-header">
-        <view class="nav-panel-back" @tap="cancelNavigation">
-          <text class="nav-back-icon">&#x2190;</text>
-        </view>
-        <text class="nav-panel-title">导航中</text>
-        <view class="nav-panel-placeholder"></view>
-      </view>
-      <view class="nav-route-info">
-        <view class="nav-route-left">
-          <text class="nav-route-dest">{{ navTargetName }}</text>
-          <text class="nav-route-detail">距离 {{ navDistance }} · 预计 {{ navDuration }}</text>
-        </view>
-        <view class="nav-route-right" @tap="cancelNavigation">
-          <text class="nav-cancel-text">结束导航</text>
-        </view>
-      </view>
-    </view>
-
-    <!-- 导航步骤面板 -->
-    <view v-if="isNavigating && currentStep" class="nav-step-panel">
-      <view class="nav-step-content">
-        <text class="nav-step-action">{{ currentStep.action }}</text>
-        <text class="nav-step-desc">{{ currentStep.instruction }}</text>
-      </view>
-      <view class="nav-step-distance">
-        <text class="nav-step-dist-text">{{ currentStep.distance }}</text>
-      </view>
-    </view>
-
-    <!-- 我的位置按钮 -->
-    <view class="locate-btn" :class="{ 'locate-btn-nav': isNavigating }" @tap="locateMe">
-      <text class="locate-icon">📍</text>
+    <view class="locate-btn" @tap="locateMe">
+      <app-icon class="locate-icon" name="location-filled" :size="24" color="#1F63D5" />
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { mockFixedDevices, mockMobileDevices } from '@/mock/data'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+// #ifdef H5
+import 'leaflet/dist/leaflet.css'
+// #endif
+import AppIcon from '@/components/AppIcon.vue'
+import { loadAMap } from '@/common/amap'
+import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
 
-// 系统信息
 const statusBarHeight = ref(0)
 const systemInfo = uni.getSystemInfoSync()
 statusBarHeight.value = systemInfo.statusBarHeight || 20
 
-// 搜索与筛选
 const searchText = ref('')
 const activeFilter = ref('all')
+const mapUnavailable = ref(false)
 const filterTabs = [
   { key: 'all', label: '全部' },
   { key: 'fixed', label: '固定设备' },
   { key: 'mobile', label: '移动设备' }
 ]
+const radarNodes = [
+  { label: 'AED', icon: 'heart-filled', type: 'device', left: '18%', top: '58%' },
+  { label: '急救箱', icon: 'plus-filled', type: 'kit', left: '70%', top: '24%' },
+  { label: '志愿者', icon: 'staff-filled', type: 'volunteer', left: '75%', top: '70%' },
+  { label: 'AED', icon: 'heart-filled', type: 'device', left: '30%', top: '19%' }
+]
 
-// 地图实例
 let mapInstance: any = null
+let mapProvider: 'amap' | 'leaflet' | null = null
+let leafletApi: any = null
 let markerMap: Record<string, any> = {}
-let drivingRoute: any = null // 路线规划实例
-let routePolyline: any = null // 路线折线
-let startMarker: any = null // 起点标记
-let endMarker: any = null // 终点标记
-let navTimer: any = null // 导航模拟定时器
 
-// 导航状态
-const isNavigating = ref(false)
-const navTargetName = ref('')
-const navDistance = ref('')
-const navDuration = ref('')
-const currentStep = ref<any>(null)
-const navSteps = ref<any[]>([])
-const currentStepIndex = ref(0)
-
-// 模拟当前位置（杭州中心）
 const myLocation = ref([120.15, 30.28])
+const locationReady = ref(false)
+const remoteDevices = ref<any[] | null>(null)
 
-// 设备数据 - 添加模拟距离
+function calculateDistance(longitude: number, latitude: number) {
+  const [myLongitude, myLatitude] = myLocation.value
+  const toRadians = (value: number) => value * Math.PI / 180
+  const latDelta = toRadians(latitude - myLatitude)
+  const lngDelta = toRadians(longitude - myLongitude)
+  const a = Math.sin(latDelta / 2) ** 2
+    + Math.cos(toRadians(myLatitude)) * Math.cos(toRadians(latitude))
+    * Math.sin(lngDelta / 2) ** 2
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function formatDistance(distance: number) {
+  return distance < 1 ? `${Math.max(50, Math.round(distance * 1000))}m` : `${distance.toFixed(1)}km`
+}
+
+function mapRemoteDevice(device: EmergencyDeviceResponse) {
+  const type = device.type.toLowerCase()
+  const online = device.status === 'AVAILABLE'
+  return {
+    ...device,
+    type,
+    status: type === 'mobile' ? (online ? 'online' : 'offline') : device.status.toLowerCase(),
+    online
+  }
+}
+
 const allDevices = computed(() => {
-  const fixed = mockFixedDevices.map(d => ({
-    ...d,
-    _distance: (Math.random() * 3 + 0.3).toFixed(1) + 'km'
-  }))
-  const mobile = mockMobileDevices.map(d => ({
-    ...d,
-    _distance: (Math.random() * 5 + 0.5).toFixed(1) + 'km'
-  }))
-  return [...fixed, ...mobile]
+  const source = remoteDevices.value || []
+  if (!locationReady.value) {
+    return source.map(device => ({
+      ...device,
+      _distance: '',
+      _distanceValue: null
+    }))
+  }
+  return source
+    .map(device => {
+      const distance = calculateDistance(device.longitude, device.latitude)
+      return {
+        ...device,
+        _distance: formatDistance(distance),
+        _distanceValue: distance
+      }
+    })
+    .sort((left, right) => left._distanceValue - right._distanceValue)
 })
 
-// 筛选后的设备
+async function loadDevices() {
+  try {
+    const result = await listEmergencyDevices()
+    remoteDevices.value = result.content.map(mapRemoteDevice)
+  } catch {
+    remoteDevices.value = []
+    uni.showToast({ title: '急救设备数据加载失败', icon: 'none' })
+  }
+}
+
 const filteredDevices = computed(() => {
   let list = allDevices.value
   if (activeFilter.value === 'fixed') {
@@ -253,17 +314,48 @@ const filteredDevices = computed(() => {
   return list
 })
 
-// 选中设备与弹窗
+const nativeMarkers = computed(() => filteredDevices.value.map((device, index) => ({
+  id: index + 1,
+  longitude: device.longitude,
+  latitude: device.latitude,
+  iconPath: markerAsset(device, true),
+  width: 32,
+  height: 40,
+  callout: {
+    content: device.category,
+    color: '#1C2B45',
+    fontSize: 12,
+    borderRadius: 8,
+    bgColor: '#FFFFFF',
+    padding: 6,
+    display: 'BYCLICK'
+  }
+})))
+
+function markerAsset(device: any, png = false) {
+  const extension = png ? 'png' : 'svg'
+  const filename = deviceStatusClass(device) !== 'online'
+    ? `marker-offline.${extension}`
+    : device.type === 'mobile'
+      ? `marker-mobile.${extension}`
+      : `marker-fixed.${extension}`
+  // #ifdef H5
+  const baseUrl = ((import.meta as any).env?.BASE_URL || '/').replace(/\/?$/, '/')
+  return `${baseUrl}static/map/${filename}`
+  // #endif
+  // #ifndef H5
+  return `/static/map/${filename}`
+  // #endif
+}
+
 const selectedDevice = ref<any>(null)
 const popupVisible = ref(false)
 
-// 抽屉
 const drawerExpanded = ref(false)
 const drawerOffset = ref(420)
 const touchStartY = ref(0)
 const touchCurrentY = ref(0)
 
-// 设备状态
 function deviceStatusClass(device: any) {
   if (device.type === 'fixed') {
     return device.status === 'available' ? 'online' : 'offline'
@@ -278,21 +370,15 @@ function deviceStatusLabel(device: any) {
   return device.online ? '在线' : '离线'
 }
 
-// 加载高德地图
-const loadAMap = () => {
-  return new Promise((resolve) => {
-    if ((window as any).AMap) { resolve(true); return }
-    ;(window as any)._AMapSecurityConfig = { securityJsCode: '2b1374475410bd35525b1e1770ad69d1' }
-    const script = document.createElement('script')
-    script.src = 'https://webapi.amap.com/maps?v=2.0&key=d8ce027a3ead033d535a5a99bb81490f'
-    script.onload = () => resolve(true)
-    document.head.appendChild(script)
-  })
-}
-
-// 初始化地图
+// #ifdef H5
 async function initMap() {
-  await loadAMap()
+  const loaded = await loadAMap()
+  if (!loaded) {
+    await initLeafletMap()
+    return
+  }
+  mapUnavailable.value = false
+  mapProvider = 'amap'
   const AMap = (window as any).AMap
 
   mapInstance = new AMap.Map('map-container', {
@@ -305,61 +391,70 @@ async function initMap() {
   addMarkers()
 }
 
-// 添加设备标记
+async function initLeafletMap() {
+  try {
+    const module = await import('leaflet')
+    leafletApi = module.default || module
+    mapProvider = 'leaflet'
+    mapUnavailable.value = false
+    mapInstance = leafletApi.map('map-container', {
+      zoomControl: false,
+      attributionControl: true
+    }).setView([myLocation.value[1], myLocation.value[0]], 13)
+    leafletApi.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(mapInstance)
+    leafletApi.control.zoom({ position: 'bottomright' }).addTo(mapInstance)
+    addMarkers()
+  } catch {
+    mapProvider = null
+    mapUnavailable.value = true
+    uni.showToast({ title: '地图底图加载失败', icon: 'none', duration: 2000 })
+  }
+}
+// #endif
+
 function addMarkers() {
-  if (!mapInstance || !(window as any).AMap) return
+  if (!mapInstance || typeof window === 'undefined') return
+  if (mapProvider === 'leaflet') {
+    Object.values(markerMap).forEach((marker: any) => marker.remove())
+    markerMap = {}
+    filteredDevices.value.forEach(device => {
+      const icon = leafletApi.divIcon({
+        className: 'rescue-leaflet-marker',
+        html: `<img src="${markerAsset(device)}" alt="">`,
+        iconSize: [36, 44],
+        iconAnchor: [18, 42]
+      })
+      const marker = leafletApi.marker([device.latitude, device.longitude], { icon })
+        .addTo(mapInstance)
+        .on('click', () => selectDevice(device))
+      markerMap[device.id] = marker
+    })
+    return
+  }
+  if (mapProvider !== 'amap' || !(window as any).AMap) return
   const AMap = (window as any).AMap
 
-  // 清除旧标记
   Object.values(markerMap).forEach((m: any) => mapInstance.remove(m))
   markerMap = {}
 
   const devices = filteredDevices.value
   devices.forEach(device => {
-    const statusCls = deviceStatusClass(device)
-    let color = '#2B6FF0' // 固定-蓝色
-    if (device.type === 'mobile') {
-      color = statusCls === 'online' ? '#00B42A' : '#C9CDD4' // 移动-绿色/灰色
-    } else {
-      color = statusCls === 'online' ? '#2B6FF0' : '#C9CDD4' // 固定-蓝色/灰色
-    }
-
     const markerContent = document.createElement('div')
-    markerContent.innerHTML = `
-      <div style="
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        cursor: pointer;
-      ">
-        <div style="
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          background: ${color};
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-          border: 2px solid #fff;
-        ">
-          <span style="color: #fff; font-size: 12px; font-weight: 700;">${device.category === 'AED' ? 'AED' : '急救'}</span>
-        </div>
-        <div style="
-          width: 0;
-          height: 0;
-          border-left: 6px solid transparent;
-          border-right: 6px solid transparent;
-          border-top: 8px solid ${color};
-          margin-top: -2px;
-        "></div>
-      </div>
-    `
+    const markerImage = document.createElement('img')
+    markerImage.src = markerAsset(device)
+    markerImage.alt = ''
+    markerImage.width = 36
+    markerImage.height = 44
+    markerImage.style.display = 'block'
+    markerContent.appendChild(markerImage)
 
     const marker = new AMap.Marker({
       position: new AMap.LngLat(device.longitude, device.latitude),
       content: markerContent,
-      offset: new AMap.Pixel(-20, -52),
+      offset: new AMap.Pixel(-18, -42),
       title: device.name
     })
 
@@ -372,18 +467,25 @@ function addMarkers() {
   })
 }
 
-// 选中设备
 function selectDevice(device: any) {
   selectedDevice.value = device
   popupVisible.value = true
 
-  // 移动地图到设备位置
   if (mapInstance) {
-    mapInstance.setCenter([device.longitude, device.latitude])
+    if (mapProvider === 'leaflet') {
+      mapInstance.panTo([device.latitude, device.longitude])
+    } else {
+      mapInstance.setCenter([device.longitude, device.latitude])
+    }
   }
 }
 
-// 关闭弹窗
+function handleNativeMarkerTap(event: any) {
+  const markerId = Number(event.detail?.markerId)
+  const device = filteredDevices.value[markerId - 1]
+  if (device) selectDevice(device)
+}
+
 function closePopup() {
   popupVisible.value = false
   setTimeout(() => {
@@ -391,263 +493,66 @@ function closePopup() {
   }, 300)
 }
 
-// 联系设备
 function handleCallDevice() {
-  if (selectedDevice.value) {
-    uni.makePhoneCall({
-      phoneNumber: selectedDevice.value.ownerPhone || '0571-120'
-    })
+  const phoneNumber = selectedDevice.value?.ownerPhone?.trim()
+  if (!phoneNumber) {
+    uni.showToast({ title: '该设备未登记联系电话', icon: 'none' })
+    return
   }
+  uni.makePhoneCall({ phoneNumber })
 }
 
-// 导航 - 使用高德地图路线规划
-async function handleNavigate(device: any) {
-  if (!mapInstance || !(window as any).AMap) return
-  const AMap = (window as any).AMap
-
-  // 关闭弹窗
+function handleNavigate(device: any) {
   closePopup()
-
-  // 清除之前的路线
-  clearNavigation()
-
-  uni.showLoading({ title: '正在规划路线...' })
-
-  try {
-    // 加载 Driving 插件
-    await new Promise((resolve, reject) => {
-      AMap.plugin(['AMap.Driving'], () => {
-        resolve(true)
-      })
-      setTimeout(() => reject(new Error('插件加载超时')), 10000)
-    })
-
-    const origin = new AMap.LngLat(myLocation.value[0], myLocation.value[1])
-    const destination = new AMap.LngLat(device.longitude, device.latitude)
-
-    // 创建起点标记
-    const startContent = document.createElement('div')
-    startContent.innerHTML = `
-      <div style="
-        width: 32px; height: 32px; border-radius: 50%;
-        background: #2B6FF0; display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 2px 8px rgba(43,111,240,0.4); border: 2px solid #fff;
-      ">
-        <span style="color: #fff; font-size: 14px; font-weight: 700;">起</span>
-      </div>
-    `
-    startMarker = new AMap.Marker({
-      position: origin,
-      content: startContent,
-      offset: new AMap.Pixel(-16, -16),
-      zIndex: 120
-    })
-    mapInstance.add(startMarker)
-
-    // 创建终点标记
-    const endContent = document.createElement('div')
-    endContent.innerHTML = `
-      <div style="
-        width: 32px; height: 32px; border-radius: 50%;
-        background: #F53F3F; display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 2px 8px rgba(245,63,63,0.4); border: 2px solid #fff;
-      ">
-        <span style="color: #fff; font-size: 14px; font-weight: 700;">终</span>
-      </div>
-    `
-    endMarker = new AMap.Marker({
-      position: destination,
-      content: endContent,
-      offset: new AMap.Pixel(-16, -16),
-      zIndex: 120
-    })
-    mapInstance.add(endMarker)
-
-    // 路线规划
-    drivingRoute = new AMap.Driving({
-      map: mapInstance,
-      policy: AMap.DrivingPolicy?.LEAST_TIME || 0,
-      hideMarkers: true, // 隐藏默认标记，使用自定义标记
-      showTraffic: true
-    })
-
-    drivingRoute.search(origin, destination, (status: string, result: any) => {
-      uni.hideLoading()
-
-      if (status === 'complete' && result.routes && result.routes.length > 0) {
-        const route = result.routes[0]
-        const distanceMeters = route.distance || 0
-        const durationSeconds = route.time || 0
-
-        // 格式化距离和时间
-        navDistance.value = distanceMeters >= 1000
-          ? (distanceMeters / 1000).toFixed(1) + '公里'
-          : distanceMeters + '米'
-        navDuration.value = durationSeconds >= 3600
-          ? Math.floor(durationSeconds / 3600) + '小时' + Math.floor((durationSeconds % 3600) / 60) + '分钟'
-          : Math.ceil(durationSeconds / 60) + '分钟'
-        navTargetName.value = device.name
-
-        // 解析导航步骤
-        const steps: any[] = []
-        if (route.steps && route.steps.length > 0) {
-          route.steps.forEach((step: any, idx: number) => {
-            const stepDist = step.distance || 0
-            let action = '直行'
-            if (idx === 0) action = '出发'
-            else if (step.action === '左转') action = '左转'
-            else if (step.action === '右转') action = '右转'
-            else if (step.action === '调头') action = '调头'
-            else if (step.action === '左前方向') action = '左前方行驶'
-            else if (step.action === '右前方向') action = '右前方行驶'
-            else if (step.action === '左后方向') action = '左后方行驶'
-            else if (step.action === '右后方向') action = '右后方行驶'
-            else if (step.action === '到达终点' || idx === route.steps.length - 1) action = '到达目的地'
-
-            steps.push({
-              action,
-              instruction: step.instruction || step.action || '继续行驶',
-              distance: stepDist >= 1000 ? (stepDist / 1000).toFixed(1) + 'km' : stepDist + 'm',
-              road: step.road || '',
-              lnglat: step.start_location ? [step.start_location.lng, step.start_location.lat] : null
-            })
-          })
-        }
-        navSteps.value = steps
-        currentStepIndex.value = 0
-        if (steps.length > 0) {
-          currentStep.value = steps[0]
-        }
-
-        // 进入导航模式
-        isNavigating.value = true
-
-        // 调整视野包含整条路线
-        if (route.bounds) {
-          mapInstance.setBounds(route.bounds, false, [80, 80, 80, 280])
-        }
-
-        // 启动导航模拟
-        startNavSimulation(steps)
-
-        uni.showToast({
-          title: '路线规划成功',
-          icon: 'success'
-        })
-      } else {
-        uni.showToast({
-          title: '路线规划失败，请重试',
-          icon: 'none'
-        })
-        clearNavigation()
-      }
-    })
-  } catch (e) {
-    uni.hideLoading()
-    uni.showToast({
-      title: '导航插件加载失败',
-      icon: 'none'
-    })
-  }
-}
-
-// 导航模拟 - 逐步推进
-function startNavSimulation(steps: any[]) {
-  if (navTimer) clearInterval(navTimer)
-
-  let stepIdx = 0
-  navTimer = setInterval(() => {
-    stepIdx++
-    if (stepIdx >= steps.length) {
-      // 到达目的地
-      clearInterval(navTimer)
-      navTimer = null
-      currentStep.value = {
-        action: '到达目的地',
-        instruction: '您已到达目的地附近',
-        distance: '0m'
-      }
-      uni.showToast({
-        title: '已到达目的地附近',
-        icon: 'success',
-        duration: 3000
-      })
-      setTimeout(() => {
-        cancelNavigation()
-      }, 3000)
-      return
+  uni.openLocation({
+    longitude: Number(device.longitude),
+    latitude: Number(device.latitude),
+    name: device.name,
+    address: device.address,
+    scale: 16,
+    fail: () => {
+      uni.showToast({ title: '无法打开系统地图', icon: 'none' })
     }
-
-    currentStepIndex.value = stepIdx
-    currentStep.value = steps[stepIdx]
-
-    // 移动地图中心到当前步骤位置
-    if (steps[stepIdx].lnglat && mapInstance) {
-      mapInstance.setCenter(steps[stepIdx].lnglat)
-    }
-  }, 5000)
+  })
 }
 
-// 取消导航
-function cancelNavigation() {
-  clearNavigation()
-  isNavigating.value = false
-  navTargetName.value = ''
-  navDistance.value = ''
-  navDuration.value = ''
-  currentStep.value = null
-  navSteps.value = []
-  currentStepIndex.value = 0
-
-  // 恢复地图视角
-  if (mapInstance) {
-    mapInstance.setCenter([120.15, 30.28])
-    mapInstance.setZoom(13)
-  }
-}
-
-// 清除导航路线和标记
-function clearNavigation() {
-  if (navTimer) {
-    clearInterval(navTimer)
-    navTimer = null
-  }
-  if (drivingRoute) {
-    drivingRoute.clear()
-    drivingRoute = null
-  }
-  if (routePolyline) {
-    mapInstance && mapInstance.remove(routePolyline)
-    routePolyline = null
-  }
-  if (startMarker) {
-    mapInstance && mapInstance.remove(startMarker)
-    startMarker = null
-  }
-  if (endMarker) {
-    mapInstance && mapInstance.remove(endMarker)
-    endMarker = null
-  }
-}
-
-// 搜索
 function handleSearch() {
   addMarkers()
 }
 
-// 定位
-function locateMe() {
-  if (mapInstance) {
-    mapInstance.setCenter([120.15, 30.28])
-    mapInstance.setZoom(14)
+function locateMe(showResult = true) {
+  const applyLocation = (longitude: number, latitude: number) => {
+    myLocation.value = [longitude, latitude]
+    locationReady.value = true
+    if (mapInstance) {
+      if (mapProvider === 'leaflet') {
+        mapInstance.setView([latitude, longitude], 14)
+      } else {
+        mapInstance.setCenter(myLocation.value)
+        mapInstance.setZoom(14)
+      }
+    }
+    // #ifndef H5
+    uni.createMapContext('native-rescue-map').moveToLocation({ longitude, latitude })
+    // #endif
+    if (showResult) uni.showToast({ title: '定位已更新', icon: 'success' })
   }
-  uni.showToast({
-    title: '已定位到当前位置',
-    icon: 'none'
+
+  uni.getLocation({
+    type: 'gcj02',
+    isHighAccuracy: true,
+    success: (result) => {
+      applyLocation(result.longitude, result.latitude)
+    },
+    fail: () => {
+      locationReady.value = false
+      if (showResult) {
+        uni.showToast({ title: '请授权使用位置信息', icon: 'none' })
+      }
+    }
   })
 }
 
-// 抽屉拖拽
 function onDrawerTouchStart(e: any) {
   touchStartY.value = e.touches[0].clientY
   touchCurrentY.value = e.touches[0].clientY
@@ -666,7 +571,6 @@ function onDrawerTouchMove(e: any) {
 function onDrawerTouchEnd() {
   const diff = touchCurrentY.value - touchStartY.value
   if (drawerExpanded.value) {
-    // 已展开，向上滑收起
     if (diff > 60) {
       drawerExpanded.value = false
       drawerOffset.value = 420
@@ -674,7 +578,6 @@ function onDrawerTouchEnd() {
       drawerOffset.value = 0
     }
   } else {
-    // 已收起，向下滑展开
     if (diff < -60) {
       drawerExpanded.value = true
       drawerOffset.value = 0
@@ -685,41 +588,73 @@ function onDrawerTouchEnd() {
 }
 
 onMounted(() => {
-  nextTick(() => {
+  nextTick(async () => {
+    await loadDevices()
+    // #ifdef H5
     initMap()
+    // #endif
+    locateMe(false)
   })
 })
 
+watch([activeFilter, searchText, remoteDevices, myLocation], () => {
+  addMarkers()
+})
+
 onUnmounted(() => {
-  clearNavigation()
+  if (mapProvider === 'leaflet' && mapInstance) {
+    mapInstance.remove()
+    mapInstance = null
+  }
 })
 </script>
+
+<style>
+/* #ifdef H5 */
+.rescue-leaflet-marker {
+  background: transparent;
+  border: 0;
+}
+.rescue-leaflet-marker img {
+  display: block;
+  width: 36px;
+  height: 44px;
+  filter: drop-shadow(0 4px 7px rgba(28, 54, 82, 0.22));
+}
+.leaflet-control-attribution {
+  font-size: 9px;
+}
+/* #endif */
+</style>
 
 <style lang="scss" scoped>
 .map-page {
   position: relative;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   overflow: hidden;
+  background: #EDF5FB;
 }
 
-/* 顶部搜索与筛选 */
 .top-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 100;
-  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.95) 80%, rgba(255,255,255,0) 100%);
-  padding-bottom: 16rpx;
+  padding-bottom: 18rpx;
+  border-bottom: 1rpx solid rgba(143, 169, 191, 0.18);
+  background: rgba(247, 251, 254, 0.9);
+  backdrop-filter: blur(16px);
 }
 .search-bar {
   display: flex;
   align-items: center;
   margin: 0 24rpx;
   height: 80rpx;
-  background: #F2F3F5;
-  border-radius: 40rpx;
+  border: 1rpx solid #D7E4EF;
+  border-radius: 16rpx;
+  background: #FFFFFF;
   padding: 0 24rpx;
 }
 .search-icon-wrap {
@@ -759,12 +694,14 @@ onUnmounted(() => {
 .filter-tab {
   position: relative;
   padding: 12rpx 32rpx;
-  border-radius: 32rpx;
-  background: rgba(255,255,255,0.8);
-  transition: all 0.3s ease;
+  border: 1rpx solid #D9E5EF;
+  border-radius: 12rpx;
+  background: rgba(255,255,255,0.72);
+  transition: background 150ms ease, border-color 150ms ease;
 }
 .filter-tab-active {
-  background: #2B6FF0;
+  border-color: #2E6DD1;
+  background: #E8F1FD;
 }
 .filter-tab-text {
   font-size: 26rpx;
@@ -772,21 +709,13 @@ onUnmounted(() => {
   font-weight: 500;
 }
 .filter-tab-active .filter-tab-text {
-  color: #FFFFFF;
+  color: #245FAF;
   font-weight: 600;
 }
 .filter-tab-indicator {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 32rpx;
-  height: 4rpx;
-  border-radius: 2rpx;
-  background: #FFFFFF;
+  display: none;
 }
 
-/* 地图容器 */
 .map-container {
   position: fixed;
   top: 0;
@@ -796,9 +725,187 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   z-index: 1;
+  background: #EDF5FB;
 }
 
-/* 设备详情弹窗 */
+.map-fallback {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(86, 166, 226, 0.12), transparent 42%),
+    linear-gradient(180deg, #F6FBFF 0%, #EAF4FA 100%);
+}
+
+.map-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgba(79, 130, 171, 0.09) 1rpx, transparent 1rpx),
+    linear-gradient(90deg, rgba(79, 130, 171, 0.09) 1rpx, transparent 1rpx);
+  background-size: 58rpx 58rpx;
+  transform: perspective(700px) rotateX(52deg) scale(1.35);
+  transform-origin: center 45%;
+}
+
+.radar-caption {
+  position: absolute;
+  top: 245rpx;
+  left: 30rpx;
+  z-index: 3;
+}
+
+.radar-caption-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 9rpx;
+  padding: 8rpx 14rpx;
+  border: 1rpx solid rgba(42, 154, 104, 0.16);
+  border-radius: 20rpx;
+  background: rgba(235, 249, 242, 0.88);
+  color: #287654;
+  font-size: 18rpx;
+}
+
+.radar-caption-dot {
+  width: 9rpx;
+  height: 9rpx;
+  border-radius: 50%;
+  background: #2A9A68;
+}
+
+.radar-caption-title {
+  display: block;
+  margin-top: 13rpx;
+  color: #1D3C57;
+  font-size: 35rpx;
+  font-weight: 720;
+}
+
+.radar-caption-desc {
+  display: block;
+  margin-top: 6rpx;
+  color: #72899D;
+  font-size: 19rpx;
+}
+
+.rescue-radar {
+  position: absolute;
+  top: 390rpx;
+  left: 50%;
+  width: 560rpx;
+  height: 560rpx;
+  transform: translateX(-50%);
+}
+
+.radar-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1rpx solid rgba(46, 109, 209, 0.2);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.radar-ring-one { width: 180rpx; height: 180rpx; }
+.radar-ring-two { width: 360rpx; height: 360rpx; }
+.radar-ring-three { width: 540rpx; height: 540rpx; }
+
+.radar-cross {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: rgba(46, 109, 209, 0.11);
+  transform: translate(-50%, -50%);
+}
+
+.radar-cross-horizontal { width: 540rpx; height: 1rpx; }
+.radar-cross-vertical { width: 1rpx; height: 540rpx; }
+
+.radar-sweep {
+  position: absolute;
+  inset: 10rpx;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(46, 109, 209, 0.2), transparent 20%, transparent 100%);
+  animation: radarSweep 4s linear infinite;
+}
+
+@keyframes radarSweep {
+  to { transform: rotate(360deg); }
+}
+
+.radar-self {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72rpx;
+  height: 72rpx;
+  transform: translate(-50%, -50%);
+}
+
+.radar-self-ring {
+  position: absolute;
+  inset: 0;
+  border: 1rpx solid rgba(46, 109, 209, 0.28);
+  border-radius: 50%;
+  animation: selfPulse 2s ease-out infinite;
+}
+
+@keyframes selfPulse {
+  from { transform: scale(0.7); opacity: 1; }
+  to { transform: scale(1.5); opacity: 0; }
+}
+
+.radar-self-core,
+.radar-node-core {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.radar-self-core {
+  width: 50rpx;
+  height: 50rpx;
+  background: #2E6DD1;
+  box-shadow: 0 6rpx 18rpx rgba(46, 109, 209, 0.24);
+}
+
+.radar-node {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  transform: translate(-50%, -50%);
+}
+
+.radar-node-core {
+  width: 42rpx;
+  height: 42rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.86);
+  background: #2E6DD1;
+  box-shadow: 0 5rpx 16rpx rgba(46, 109, 209, 0.2);
+}
+
+.radar-node-kit .radar-node-core { background: #168293; }
+.radar-node-volunteer .radar-node-core { background: #2A8B61; }
+
+.radar-node-label {
+  padding: 4rpx 9rpx;
+  border: 1rpx solid rgba(108, 137, 161, 0.13);
+  border-radius: 8rpx;
+  background: rgba(255, 255, 255, 0.88);
+  color: #4D6780;
+  font-size: 16rpx;
+}
+
 .device-popup {
   position: fixed;
   bottom: 460rpx;
@@ -862,10 +969,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.popup-close-icon {
-  font-size: 22rpx;
-  color: #86909C;
 }
 .popup-body {
   margin-bottom: 24rpx;
@@ -973,7 +1076,6 @@ onUnmounted(() => {
   color: #FFFFFF;
 }
 
-/* 底部抽屉 */
 .bottom-drawer {
   position: fixed;
   left: 0;
@@ -1024,7 +1126,6 @@ onUnmounted(() => {
   max-height: 55vh;
 }
 
-/* 设备卡片 */
 .device-card {
   display: flex;
   align-items: center;
@@ -1046,15 +1147,10 @@ onUnmounted(() => {
   justify-content: center;
 }
 .device-icon-fixed {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: #EAF2FC;
 }
 .device-icon-mobile {
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 100%);
-}
-.device-icon-text {
-  font-size: 24rpx;
-  font-weight: 700;
-  color: #FFFFFF;
+  background: #EAF6F1;
 }
 .device-card-center {
   flex: 1;
@@ -1174,7 +1270,6 @@ onUnmounted(() => {
   font-size: 32rpx;
 }
 
-/* 空状态 */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1190,7 +1285,6 @@ onUnmounted(() => {
   color: #C9CDD4;
 }
 
-/* 定位按钮 */
 .locate-btn {
   position: fixed;
   right: 24rpx;
@@ -1213,126 +1307,8 @@ onUnmounted(() => {
   font-size: 36rpx;
 }
 
-/* 底部安全区 */
 .drawer-bottom-safe {
   height: 40rpx;
 }
 
-/* 导航面板 */
-.nav-panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 300;
-  background: linear-gradient(135deg, #2B6FF0 0%, #4A8BFF 100%);
-  padding-bottom: 16rpx;
-}
-.nav-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 24rpx;
-}
-.nav-panel-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.nav-back-icon {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-panel-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-panel-placeholder {
-  width: 64rpx;
-}
-.nav-route-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 24rpx;
-  padding: 20rpx 24rpx;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 16rpx;
-}
-.nav-route-left {
-  flex: 1;
-}
-.nav-route-dest {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-  display: block;
-}
-.nav-route-detail {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.85);
-  margin-top: 6rpx;
-  display: block;
-}
-.nav-route-right {
-  padding: 12rpx 28rpx;
-  background: rgba(255, 255, 255, 0.25);
-  border-radius: 28rpx;
-}
-.nav-cancel-text {
-  font-size: 26rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-
-/* 导航步骤面板 */
-.nav-step-panel {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 300;
-  background: #FFFFFF;
-  border-radius: 32rpx 32rpx 0 0;
-  padding: 28rpx 32rpx 40rpx;
-  box-shadow: 0 -4rpx 32rpx rgba(0, 0, 0, 0.1);
-}
-.nav-step-content {
-  display: flex;
-  flex-direction: column;
-}
-.nav-step-action {
-  font-size: 36rpx;
-  font-weight: 800;
-  color: #2B6FF0;
-  margin-bottom: 8rpx;
-}
-.nav-step-desc {
-  font-size: 26rpx;
-  color: #4E5969;
-  line-height: 1.5;
-}
-.nav-step-distance {
-  margin-top: 16rpx;
-  padding-top: 16rpx;
-  border-top: 1rpx solid #F2F3F5;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.nav-step-dist-text {
-  font-size: 28rpx;
-  color: #86909C;
-  font-weight: 500;
-}
-
-/* 导航模式下的定位按钮位置调整 */
-.locate-btn-nav {
-  bottom: 280rpx !important;
-}
 </style>

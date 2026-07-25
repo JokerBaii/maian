@@ -1,10 +1,9 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
     <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <text class="back-arrow">&#x2190;</text>
+        <view class="nav-bar-content">
+          <view class="nav-back" @tap="goBack">
+          <app-icon name="left" :size="24" color="#FFFFFF" />
         </view>
         <text class="nav-title">紧急呼救</text>
         <view class="nav-placeholder"></view>
@@ -16,7 +15,6 @@
       scroll-y
       :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
     >
-      <!-- SOS 主按钮区域 -->
       <view class="sos-hero">
         <view class="sos-ring-container" @tap="triggerSOS">
           <view class="sos-pulse sos-pulse-1"></view>
@@ -24,16 +22,16 @@
           <view class="sos-pulse sos-pulse-3"></view>
           <view class="sos-main-btn" :class="{ 'sos-activated': isActivated }">
             <text class="sos-main-text">SOS</text>
-            <text class="sos-main-label">{{ isActivated ? '已发送' : '一键呼救' }}</text>
+            <text class="sos-main-label">{{ isActivated ? '已选择危急' : '危急模式' }}</text>
           </view>
         </view>
-        <text class="sos-location">
-          <text class="location-icon">📍</text>
+        <text class="sos-location" @tap="refreshLocation">
+          <app-icon class="location-icon" name="location-filled" :size="18" color="#1F63D5" />
           {{ locationText }}
         </text>
+        <text class="sos-guidance">确认症状和位置后再发送，减少误触</text>
       </view>
 
-      <!-- 紧急等级选择 -->
       <view class="form-section">
         <view class="form-label">
           <view class="label-bar"></view>
@@ -56,7 +54,6 @@
         </view>
       </view>
 
-      <!-- 症状标签 -->
       <view class="form-section">
         <view class="form-label">
           <view class="label-bar"></view>
@@ -75,7 +72,6 @@
         </view>
       </view>
 
-      <!-- 详细描述 -->
       <view class="form-section">
         <view class="form-label">
           <view class="label-bar"></view>
@@ -94,7 +90,6 @@
         </view>
       </view>
 
-      <!-- 照片上传 -->
       <view class="form-section">
         <view class="form-label">
           <view class="label-bar"></view>
@@ -109,92 +104,85 @@
           >
             <image class="photo-img" :src="img" mode="aspectFill" />
             <view class="photo-delete" @tap="removePhoto(idx)">
-              <text class="delete-icon">&#x2715;</text>
+              <app-icon name="closeempty" :size="18" color="#FFFFFF" />
             </view>
           </view>
-          <view class="photo-add" @tap="addPhoto">
-            <text class="add-icon">+</text>
+          <view v-if="photoList.length < 9" class="photo-add" @tap="addPhoto">
+            <app-icon name="camera-filled" :size="28" color="#77849A" />
             <text class="add-label">上传照片</text>
           </view>
         </view>
       </view>
 
-      <!-- 提交按钮 -->
       <view class="submit-area">
-        <view class="submit-btn" :class="{ 'submit-disabled': isSubmitting }" @tap="submitRescue">
+        <view class="submit-btn" :class="{ 'submit-disabled': submitDisabled }" @tap="submitRescue">
           <text class="submit-text">{{ submitBtnText }}</text>
         </view>
       </view>
 
-      <!-- 匹配动画遮罩 -->
-      <view v-if="isMatching" class="matching-overlay">
-        <view class="matching-card">
-          <view class="matching-animation">
-            <view class="matching-ring matching-ring-1"></view>
-            <view class="matching-ring matching-ring-2"></view>
-            <view class="matching-ring matching-ring-3"></view>
-            <view class="matching-center">
-              <text class="matching-icon">🔍</text>
-            </view>
-          </view>
-          <text class="matching-title">正在匹配附近救援资源</text>
-          <text class="matching-desc">已通知周边志愿者和设备持有者</text>
-          <view class="matching-progress">
-            <view class="progress-bar">
-              <view class="progress-fill" :style="{ width: matchProgress + '%' }"></view>
-            </view>
-            <text class="progress-text">{{ matchProgress }}%</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 底部安全区 -->
       <view class="bottom-safe"></view>
     </scroll-view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import AppIcon from '@/components/AppIcon.vue'
+import { uploadImage } from '@/api/files'
+import { ApiRequestError } from '@/api/http'
+import { createRescueCall, type RescueUrgency } from '@/api/rescue'
 
-// 系统信息
 const statusBarHeight = ref(0)
 const systemInfo = uni.getSystemInfoSync()
 statusBarHeight.value = systemInfo.statusBarHeight || 20
 
-// 状态
 const isActivated = ref(false)
 const isSubmitting = ref(false)
-const isMatching = ref(false)
-const matchProgress = ref(0)
 
-// 表单数据
 const selectedUrgency = ref('critical')
 const selectedSymptoms = ref<string[]>([])
 const description = ref('')
 const photoList = ref<string[]>([])
 
-// 位置
-const locationText = ref('杭州市西湖区文三路')
+const locationText = ref('正在获取当前位置')
+const rescueCoordinates = ref<{ latitude: number; longitude: number } | null>(null)
 
-// 紧急等级选项
+function refreshLocation() {
+  uni.getLocation({
+    type: 'gcj02',
+    isHighAccuracy: true,
+    success: (result) => {
+      rescueCoordinates.value = {
+        latitude: result.latitude,
+        longitude: result.longitude
+      }
+      locationText.value = `当前位置 · ${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}`
+    },
+    fail: () => {
+      rescueCoordinates.value = null
+      locationText.value = '定位失败，点击重新获取'
+    }
+  })
+}
+
+onMounted(refreshLocation)
+
 const urgencyOptions = [
   { value: 'critical', label: '危急' },
   { value: 'high', label: '紧急' },
   { value: 'medium', label: '一般' }
 ]
 
-// 症状标签
 const symptomTags = ['心脏骤停', '呼吸困难', '外伤出血', '晕厥', '骨折', '其他']
 
-// 提交按钮文字
 const submitBtnText = computed(() => {
   if (isSubmitting.value) return '正在发送...'
-  if (isMatching.value) return '匹配中...'
   return '发送救援请求'
 })
+const submitDisabled = computed(() => (
+  isSubmitting.value || selectedSymptoms.value.length === 0 || !rescueCoordinates.value
+))
 
-// 切换症状标签
 function toggleSymptom(tag: string) {
   const idx = selectedSymptoms.value.indexOf(tag)
   if (idx > -1) {
@@ -204,54 +192,9 @@ function toggleSymptom(tag: string) {
   }
 }
 
-// 添加照片 - H5环境下使用复用的file input
-let h5FileInput: HTMLInputElement | null = null
-
-onMounted(() => {
-  const isH5 = typeof window !== 'undefined' && typeof document !== 'undefined'
-  if (isH5) {
-    h5FileInput = document.createElement('input')
-    h5FileInput.type = 'file'
-    h5FileInput.accept = 'image/*'
-    h5FileInput.multiple = true
-    h5FileInput.style.display = 'none'
-    h5FileInput.onchange = (e: Event) => {
-      const target = e.target as HTMLInputElement
-      const files = target.files
-      if (!files || files.length === 0) return
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        const reader = new FileReader()
-        reader.onload = (ev) => {
-          const result = ev.target?.result as string
-          if (result) {
-            photoList.value.push(result)
-          }
-        }
-        reader.readAsDataURL(file)
-      }
-    }
-    document.body.appendChild(h5FileInput)
-  }
-})
-
-onUnmounted(() => {
-  if (h5FileInput && h5FileInput.parentNode) {
-    h5FileInput.parentNode.removeChild(h5FileInput)
-    h5FileInput = null
-  }
-})
-
 function addPhoto() {
-  const isH5 = typeof window !== 'undefined' && typeof document !== 'undefined'
-  if (isH5 && h5FileInput) {
-    h5FileInput.value = ''
-    h5FileInput.click()
-    return
-  }
-  // 小程序/APP环境
   uni.chooseImage({
-    count: 9,
+    count: 9 - photoList.value.length,
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
     success: (res) => {
@@ -260,53 +203,67 @@ function addPhoto() {
   })
 }
 
-// 删除照片
 function removePhoto(idx: number) {
   photoList.value.splice(idx, 1)
 }
 
-// 触发SOS
 function triggerSOS() {
   if (isActivated.value) return
   isActivated.value = true
   selectedUrgency.value = 'critical'
-  if (!selectedSymptoms.value.length) {
-    selectedSymptoms.value = ['心脏骤停']
-  }
   setTimeout(() => {
     isActivated.value = false
-  }, 3000)
+  }, 600)
 }
 
-// 提交救援
-function submitRescue() {
-  if (isSubmitting.value || isMatching.value) return
+async function submitRescue() {
+  if (isSubmitting.value) return
+  if (!selectedSymptoms.value.length) {
+    uni.showToast({ title: '请至少选择一项症状', icon: 'none' })
+    return
+  }
+  const coordinates = rescueCoordinates.value
+  if (!coordinates) {
+    uni.showModal({
+      title: '无法发送位置',
+      content: '请先授权定位；如情况危急，请立即拨打 120。',
+      showCancel: false,
+      confirmText: '知道了'
+    })
+    return
+  }
 
   isSubmitting.value = true
 
-  setTimeout(() => {
+  try {
+    const uploadedImages = await Promise.all(photoList.value.map(uploadImage))
+    const rescueCall = await createRescueCall({
+      urgency: selectedUrgency.value.toUpperCase() as RescueUrgency,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+      address: locationText.value,
+      description: description.value.trim() || undefined,
+      symptoms: selectedSymptoms.value,
+      imageUrls: uploadedImages.map((image) => image.url)
+    })
+    uni.navigateTo({
+      url: `/pages/rescue/detail?id=${encodeURIComponent(rescueCall.id)}`
+    })
+  } catch (error) {
+    const message = error instanceof ApiRequestError
+      ? error.message
+      : '救援请求发送失败，请重试'
+    uni.showModal({
+      title: '发送失败',
+      content: `${message}\n如情况危急，请立即拨打 120。`,
+      showCancel: false,
+      confirmText: '知道了'
+    })
+  } finally {
     isSubmitting.value = false
-    isMatching.value = true
-    matchProgress.value = 0
-
-    // 模拟匹配进度
-    const timer = setInterval(() => {
-      matchProgress.value += Math.floor(Math.random() * 15) + 5
-      if (matchProgress.value >= 100) {
-        matchProgress.value = 100
-        clearInterval(timer)
-        setTimeout(() => {
-          isMatching.value = false
-          uni.navigateTo({
-            url: '/pages/rescue/detail?id=R001'
-          })
-        }, 800)
-      }
-    }, 400)
-  }, 1500)
+  }
 }
 
-// 返回
 function goBack() {
   uni.navigateBack()
 }
@@ -315,17 +272,17 @@ function goBack() {
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F4F7FB;
 }
 
-/* 导航栏 */
 .nav-bar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 999;
-  background: linear-gradient(135deg, #F53F3F 0%, #E02020 100%);
+  background: #A9212B;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.16);
 }
 .nav-bar-content {
   display: flex;
@@ -355,19 +312,18 @@ function goBack() {
   width: 64rpx;
 }
 
-/* 滚动内容 */
 .scroll-content {
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-/* SOS 主区域 */
 .sos-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 48rpx 0 32rpx;
-  background: linear-gradient(180deg, #F53F3F 0%, rgba(245, 63, 63, 0.15) 70%, transparent 100%);
+  background: #F4F7FB;
+  border-bottom: 1rpx solid #E1E7F0;
 }
 .sos-ring-container {
   position: relative;
@@ -380,8 +336,8 @@ function goBack() {
 .sos-pulse {
   position: absolute;
   border-radius: 50%;
-  border: 4rpx solid rgba(245, 63, 63, 0.3);
-  animation: rescuePulse 2s ease-out infinite;
+  border: 2rpx solid rgba(169, 33, 43, 0.22);
+  animation: rescuePulse 2.4s ease-out infinite;
 }
 .sos-pulse-1 {
   width: 280rpx;
@@ -389,14 +345,10 @@ function goBack() {
   animation-delay: 0s;
 }
 .sos-pulse-2 {
-  width: 360rpx;
-  height: 360rpx;
-  animation-delay: 0.4s;
+  display: none;
 }
 .sos-pulse-3 {
-  width: 440rpx;
-  height: 440rpx;
-  animation-delay: 0.8s;
+  display: none;
 }
 @keyframes rescuePulse {
   0% {
@@ -412,12 +364,12 @@ function goBack() {
   width: 200rpx;
   height: 200rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #F53F3F 0%, #CB2634 100%);
+  background: #A9212B;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12rpx 48rpx rgba(245, 63, 63, 0.5);
+  box-shadow: 0 4rpx 12rpx rgba(96, 20, 27, 0.18);
   z-index: 3;
   transition: all 0.3s ease;
 }
@@ -443,16 +395,20 @@ function goBack() {
   gap: 8rpx;
   margin-top: 24rpx;
   font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.15);
+  color: #33415C;
+  background: #E9EEF6;
   padding: 8rpx 24rpx;
   border-radius: 24rpx;
+}
+.sos-guidance {
+  margin-top: 12rpx;
+  color: #77849A;
+  font-size: 22rpx;
 }
 .location-icon {
   font-size: 24rpx;
 }
 
-/* 表单区域 */
 .form-section {
   padding: 32rpx 32rpx 0;
 }
@@ -465,7 +421,7 @@ function goBack() {
   width: 6rpx;
   height: 28rpx;
   border-radius: 3rpx;
-  background: #F53F3F;
+  background: #1F63D5;
   margin-right: 12rpx;
 }
 .label-text {
@@ -479,7 +435,6 @@ function goBack() {
   margin-left: 8rpx;
 }
 
-/* 紧急等级 */
 .urgency-selector {
   display: flex;
   gap: 20rpx;
@@ -491,25 +446,25 @@ function goBack() {
   justify-content: center;
   gap: 10rpx;
   padding: 20rpx 0;
-  border-radius: 16rpx;
+  border-radius: 12rpx;
   background: #FFFFFF;
   border: 2rpx solid #E5E6EB;
-  transition: all 0.3s ease;
+  transition: border-color 150ms ease, background 150ms ease;
 }
 .urgency-option.urgency-active {
   border-color: transparent;
 }
 .urgency-critical.urgency-active {
-  background: linear-gradient(135deg, rgba(245, 63, 63, 0.1) 0%, rgba(245, 63, 63, 0.05) 100%);
-  border-color: #F53F3F;
+  background: #FBEAEC;
+  border-color: #A9212B;
 }
 .urgency-high.urgency-active {
-  background: linear-gradient(135deg, rgba(255, 154, 46, 0.1) 0%, rgba(255, 154, 46, 0.05) 100%);
-  border-color: #FF9A2E;
+  background: #FFF4DE;
+  border-color: #A86708;
 }
 .urgency-medium.urgency-active {
-  background: linear-gradient(135deg, rgba(43, 111, 240, 0.1) 0%, rgba(43, 111, 240, 0.05) 100%);
-  border-color: #2B6FF0;
+  background: #EAF1FD;
+  border-color: #1F63D5;
 }
 .urgency-dot {
   width: 16rpx;
@@ -543,7 +498,6 @@ function goBack() {
   color: #2B6FF0;
 }
 
-/* 症状标签 */
 .symptom-tags {
   display: flex;
   flex-wrap: wrap;
@@ -554,11 +508,11 @@ function goBack() {
   border-radius: 32rpx;
   background: #FFFFFF;
   border: 2rpx solid #E5E6EB;
-  transition: all 0.3s ease;
+  transition: border-color 150ms ease, background 150ms ease;
 }
 .symptom-tag-active {
-  background: linear-gradient(135deg, #F53F3F 0%, #E02020 100%);
-  border-color: transparent;
+  background: #EAF1FD;
+  border-color: #1F63D5;
 }
 .symptom-tag-text {
   font-size: 26rpx;
@@ -566,17 +520,16 @@ function goBack() {
   font-weight: 500;
 }
 .symptom-tag-active .symptom-tag-text {
-  color: #FFFFFF;
+  color: #174D9F;
   font-weight: 600;
 }
 
-/* 描述输入 */
 .desc-input-wrap {
   background: #FFFFFF;
-  border-radius: 20rpx;
+  border-radius: 16rpx;
   padding: 24rpx;
   position: relative;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  border: 1rpx solid #DCE3ED;
 }
 .desc-input {
   width: 100%;
@@ -597,7 +550,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 照片上传 */
 .photo-upload {
   display: flex;
   flex-wrap: wrap;
@@ -652,7 +604,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 提交按钮 */
 .submit-area {
   padding: 48rpx 32rpx;
 }
@@ -660,12 +611,12 @@ function goBack() {
   width: 100%;
   height: 96rpx;
   border-radius: 48rpx;
-  background: linear-gradient(135deg, #F53F3F 0%, #E02020 100%);
+  background: #A9212B;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 32rpx rgba(245, 63, 63, 0.35);
-  transition: all 0.3s ease;
+  box-shadow: 0 3rpx 10rpx rgba(96, 20, 27, 0.16);
+  transition: transform 150ms ease, opacity 150ms ease;
 }
 .submit-btn:active {
   transform: scale(0.98);
@@ -681,119 +632,6 @@ function goBack() {
   letter-spacing: 2rpx;
 }
 
-/* 匹配动画遮罩 */
-.matching-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(8px);
-}
-.matching-card {
-  width: 560rpx;
-  background: #FFFFFF;
-  border-radius: 32rpx;
-  padding: 64rpx 48rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.matching-animation {
-  position: relative;
-  width: 200rpx;
-  height: 200rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.matching-ring {
-  position: absolute;
-  border-radius: 50%;
-  border: 4rpx solid rgba(43, 111, 240, 0.3);
-  animation: matchPulse 2s ease-out infinite;
-}
-.matching-ring-1 {
-  width: 120rpx;
-  height: 120rpx;
-  animation-delay: 0s;
-}
-.matching-ring-2 {
-  width: 160rpx;
-  height: 160rpx;
-  animation-delay: 0.3s;
-}
-.matching-ring-3 {
-  width: 200rpx;
-  height: 200rpx;
-  animation-delay: 0.6s;
-}
-@keyframes matchPulse {
-  0% {
-    transform: scale(0.8);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
-  }
-}
-.matching-center {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-.matching-icon {
-  font-size: 36rpx;
-}
-.matching-title {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #1D2129;
-  margin-top: 32rpx;
-}
-.matching-desc {
-  font-size: 24rpx;
-  color: #86909C;
-  margin-top: 12rpx;
-}
-.matching-progress {
-  width: 100%;
-  margin-top: 32rpx;
-}
-.progress-bar {
-  width: 100%;
-  height: 12rpx;
-  border-radius: 6rpx;
-  background: #F2F3F5;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  border-radius: 6rpx;
-  background: linear-gradient(90deg, #2B6FF0 0%, #5B8DEF 100%);
-  transition: width 0.3s ease;
-}
-.progress-text {
-  font-size: 24rpx;
-  color: #2B6FF0;
-  font-weight: 600;
-  margin-top: 12rpx;
-  text-align: center;
-  display: block;
-}
-
-/* 底部安全区 */
 .bottom-safe {
   height: 60rpx;
 }

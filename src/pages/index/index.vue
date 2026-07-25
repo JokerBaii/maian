@@ -1,893 +1,1271 @@
 <template>
-  <view class="page">
-    <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-left">
-          <view class="app-logo">
-            <view class="logo-icon">
-              <text class="logo-text">脉</text>
+  <view class="home-page">
+    <scroll-view class="home-scroll" scroll-y>
+      <view class="hero" :style="{ paddingTop: statusBarHeight + 'px' }">
+        <image
+          class="hero-art"
+          src="/static/illustrations/rescue-network-hero-light-v1.webp"
+          mode="aspectFill"
+        />
+        <view class="hero-wash"></view>
+
+        <view class="hero-nav">
+          <view class="brand-lockup">
+            <view class="brand-pulse">
+              <view class="pulse-stem pulse-stem-short"></view>
+              <view class="pulse-stem pulse-stem-tall"></view>
+              <view class="pulse-stem pulse-stem-short"></view>
             </view>
-            <text class="app-name">脉安驰援</text>
+            <view class="brand-copy">
+              <text class="brand-name">脉安驰援</text>
+              <text class="brand-caption">MAIAN RESPONSE</text>
+            </view>
+          </view>
+          <view class="nav-alert" @tap="openNotifications">
+            <app-icon name="notification-filled" :size="20" color="#24415F" />
           </view>
         </view>
-        <view class="nav-right">
-          <view class="nav-icon-btn" @tap="handleSearch">
-            <text class="iconfont">🔍</text>
+
+        <view class="hero-copy">
+          <view class="network-state">
+            <view class="network-state-dot"></view>
+            <text>{{ devicesLoaded ? '城市急救网络在线' : '正在同步急救网络' }}</text>
           </view>
-          <view class="nav-icon-btn" @tap="handleMessage">
-            <view class="badge-dot"></view>
-            <text class="iconfont">💬</text>
+          <text class="hero-title">让每一次求救，</text>
+          <text class="hero-title hero-title-accent">更快被看见</text>
+          <text class="hero-desc">连接附近 AED、急救包与志愿者，为关键几分钟争取更多可能。</text>
+        </view>
+
+        <view class="hero-location">
+          <app-icon name="location-filled" :size="15" color="#2E6DD1" />
+          <text class="hero-location-main">{{ locationLabel }}</text>
+          <text class="hero-location-sub">{{ locationHint }}</text>
+        </view>
+
+        <view class="network-console">
+          <view class="console-stat">
+            <text class="console-value">{{ availableDeviceCount }}</text>
+            <text class="console-label">可用设备</text>
+          </view>
+          <view class="console-divider"></view>
+          <view class="console-stat">
+            <text class="console-value">{{ fixedDeviceCount }}</text>
+            <text class="console-label">固定设备</text>
+          </view>
+          <view class="console-divider"></view>
+          <view class="console-stat">
+            <text class="console-value">{{ mobileDeviceCount }}</text>
+            <text class="console-label">移动设备</text>
           </view>
         </view>
       </view>
-    </view>
 
-    <!-- 可滚动内容区 -->
-    <scroll-view
-      class="scroll-content"
-      scroll-y
-      :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
-    >
-      <!-- SOS 紧急呼救区域 -->
-      <view class="sos-section">
-        <view class="sos-bg"></view>
-        <view class="sos-container" @tap="goRescue">
-          <view class="sos-pulse-ring sos-pulse-ring-1"></view>
-          <view class="sos-pulse-ring sos-pulse-ring-2"></view>
-          <view class="sos-pulse-ring sos-pulse-ring-3"></view>
-          <view class="sos-btn">
-            <text class="sos-text">SOS</text>
-            <text class="sos-label">紧急呼救</text>
+      <view class="action-deck">
+        <view class="sos-action" @tap="openSOS">
+          <view class="sos-signal">
+            <view class="sos-signal-ring"></view>
+            <text class="sos-code">SOS</text>
           </view>
+          <view class="sos-copy">
+            <text class="sos-title">紧急呼救</text>
+            <text class="sos-desc">发送位置并匹配救援资源</text>
+          </view>
+          <app-icon name="right" :size="22" color="#FFFFFF" />
         </view>
-        <text class="sos-hint">一键呼叫 · 智能匹配 · 快速救援</text>
-      </view>
 
-      <!-- 快捷功能入口 -->
-      <view class="quick-actions">
-        <view class="action-item" @tap="goDevice">
-          <view class="action-icon action-icon-blue">
-            <text class="iconfont action-icon-text">📍</text>
+        <view class="quick-grid">
+          <view class="quick-action" @tap="openMap">
+            <view class="quick-icon quick-icon-blue">
+              <app-icon name="map-filled" :size="24" color="#2467C8" />
+            </view>
+            <view class="quick-copy">
+              <text class="quick-title">急救地图</text>
+              <text class="quick-desc">{{ nearestResourceText }}</text>
+            </view>
           </view>
-          <text class="action-label">设备查询</text>
-        </view>
-        <view class="action-item" @tap="goRescue">
-          <view class="action-icon action-icon-red">
-            <text class="iconfont action-icon-text">🆘</text>
+          <view class="quick-action" @tap="openDevice">
+            <view class="quick-icon quick-icon-cyan">
+              <app-icon name="plus-filled" :size="24" color="#177E8D" />
+            </view>
+            <view class="quick-copy">
+              <text class="quick-title">共享设备</text>
+              <text class="quick-desc">加入城市救援网</text>
+            </view>
           </view>
-          <text class="action-label">紧急呼救</text>
-        </view>
-        <view class="action-item" @tap="goHealth">
-          <view class="action-icon action-icon-green">
-            <text class="iconfont action-icon-text">❤️</text>
-          </view>
-          <text class="action-label">健康监测</text>
-        </view>
-        <view class="action-item" @tap="goCheckup">
-          <view class="action-icon action-icon-orange">
-            <text class="iconfont action-icon-text">📋</text>
-          </view>
-          <text class="action-label">体检分析</text>
         </view>
       </view>
 
-      <!-- 附近急救设备 -->
-      <view class="section">
-        <view class="section-header">
-          <view class="section-title-wrap">
-            <view class="section-title-bar"></view>
-            <text class="section-title">附近急救设备</text>
+      <view class="section network-section">
+        <view class="section-heading">
+          <view>
+            <text class="section-kicker">LIVE NETWORK</text>
+            <text class="section-title">身边的生命网络</text>
           </view>
-          <view class="section-more" @tap="goDevice">
-            <text class="section-more-text">查看全部</text>
-            <text class="iconfont arrow-icon">›</text>
+          <view class="section-link" @tap="openMap">
+            <text>查看地图</text>
+            <app-icon name="right" :size="15" color="#2E6DD1" />
           </view>
         </view>
-        <scroll-view class="device-scroll" scroll-x>
-          <view class="device-cards">
+
+        <view class="signal-band">
+          <view class="signal-band-top">
+            <view>
+              <text class="signal-title">急救网络脉冲</text>
+              <text class="signal-subtitle">设备状态由服务端实时同步</text>
+            </view>
+            <view class="signal-live">
+              <view class="signal-live-dot"></view>
+              <text>实时</text>
+            </view>
+          </view>
+          <view class="waveform" aria-hidden="true">
             <view
-              v-for="device in nearbyDevices"
-              :key="device.id"
-              class="device-card"
-              @tap="goDeviceDetail(device)"
+              v-for="(height, index) in waveform"
+              :key="index"
+              class="wave-bar"
+              :class="{ 'wave-bar-hot': index >= 9 && index <= 13 }"
+              :style="{ height: height + 'rpx' }"
+            ></view>
+            <view class="wave-sweep"></view>
+          </view>
+          <view class="signal-legend">
+            <text>固定设备 {{ fixedDeviceCount }}</text>
+            <text>移动设备 {{ mobileDeviceCount }}</text>
+            <text>当前可用 {{ availableDeviceCount }}</text>
+          </view>
+        </view>
+
+        <scroll-view class="resource-scroll" scroll-x show-scrollbar="false">
+          <view class="resource-track">
+            <view
+              v-for="resource in nearbyResources"
+              :key="resource.name"
+              class="resource-item"
+              @tap="openMap"
             >
-              <view class="device-card-top" :class="device.type === 'fixed' ? 'device-card-fixed' : 'device-card-mobile'">
-                <view class="device-type-tag">
-                  <text class="device-type-text">{{ device.type === 'fixed' ? '固定' : '移动' }}</text>
+              <view class="resource-top">
+                <view class="resource-icon">
+                  <app-icon :name="resource.icon" :size="22" color="#2E6DD1" />
                 </view>
-                <text class="device-category">{{ device.category }}</text>
-              </view>
-              <view class="device-card-body">
-                <text class="device-name">{{ device.name }}</text>
-                <text class="device-address">{{ device.address }}</text>
-                <view class="device-status-row">
-                  <view class="device-status" :class="'status-' + device.status">
-                    <view class="status-dot"></view>
-                    <text class="status-text">{{ statusLabel(device.status) }}</text>
-                  </view>
-                  <text class="device-distance">{{ device.distance || '0.8km' }}</text>
+                <view class="resource-status">
+                  <view class="resource-status-dot"></view>
+                  <text>可用</text>
                 </view>
               </view>
+              <text class="resource-distance">{{ resource.distance }}</text>
+              <text class="resource-name">{{ resource.name }}</text>
+              <text class="resource-place">{{ resource.place }}</text>
             </view>
           </view>
         </scroll-view>
       </view>
 
-      <!-- 健康概览 -->
-      <view class="section">
-        <view class="section-header">
-          <view class="section-title-wrap">
-            <view class="section-title-bar"></view>
-            <text class="section-title">健康概览</text>
+      <view class="section health-section">
+        <view class="section-heading">
+          <view>
+            <text class="section-kicker">HEALTH SIGNAL</text>
+            <text class="section-title">今日健康信号</text>
           </view>
-          <view class="section-more" @tap="goHealth">
-            <text class="section-more-text">详情</text>
-            <text class="iconfont arrow-icon">›</text>
-          </view>
-        </view>
-        <view class="health-card" @tap="goHealth">
-          <view class="health-card-bg"></view>
-          <view class="health-card-content">
-            <view class="health-left">
-              <view class="heart-rate-main">
-                <text class="heart-icon">&#x2764;</text>
-                <text class="heart-value">{{ heartRateData.current }}</text>
-                <text class="heart-unit">BPM</text>
-              </view>
-              <view class="heart-rate-status">
-                <view class="status-indicator" :class="'status-' + heartRateData.status"></view>
-                <text class="status-label">{{ heartStatusLabel(heartRateData.status) }}</text>
-              </view>
-              <view class="heart-rate-range">
-                <text class="range-text">今日 {{ heartRateData.min }}-{{ heartRateData.max }} BPM</text>
-              </view>
-            </view>
-            <view class="health-right">
-              <view class="mini-chart">
-                <view
-                  v-for="(item, idx) in miniChartData"
-                  :key="idx"
-                  class="chart-bar"
-                  :style="{ height: item.height + 'rpx', background: item.color }"
-                ></view>
-              </view>
-            </view>
+          <view class="section-link" @tap="openHealth">
+            <text>完整数据</text>
+            <app-icon name="right" :size="15" color="#2E6DD1" />
           </view>
         </view>
-      </view>
 
-      <!-- 科普推荐 -->
-      <view class="section">
-        <view class="section-header">
-          <view class="section-title-wrap">
-            <view class="section-title-bar"></view>
-            <text class="section-title">科普推荐</text>
+        <view class="health-panel" @tap="openHealth">
+          <view class="heart-orbit">
+            <view class="orbit orbit-one"></view>
+            <view class="orbit orbit-two"></view>
+            <view class="heart-core">
+              <app-icon name="heart-filled" :size="27" color="#B52832" />
+            </view>
           </view>
-          <view class="section-more" @tap="goScience">
-            <text class="section-more-text">更多</text>
-            <text class="iconfont arrow-icon">›</text>
+          <view class="heart-reading">
+            <view class="heart-number-line">
+              <text class="heart-number">{{ heartValue }}</text>
+              <text class="heart-unit">BPM</text>
+            </view>
+            <text class="heart-state">{{ heartState }}</text>
+            <text class="heart-time">{{ heartSource }}</text>
           </view>
-        </view>
-        <scroll-view class="science-scroll" scroll-x>
-          <view class="science-cards">
+          <view class="health-bars">
             <view
-              v-for="item in scienceList"
-              :key="item.id"
-              class="science-card"
-              @tap="goScienceDetail(item)"
-            >
-              <view class="science-card-cover">
-                <view class="science-cover-placeholder" :class="'science-cover-' + item.category">
-                  <text class="science-cover-icon">{{ categoryIcon(item.category) }}</text>
-                </view>
-                <view class="science-category-tag">
-                  <text class="science-category-text">{{ item.categoryLabel }}</text>
-                </view>
-              </view>
-              <view class="science-card-info">
-                <text class="science-title">{{ item.title }}</text>
-                <view class="science-meta">
-                  <text class="science-author">{{ item.author }}</text>
-                  <text class="science-views">{{ formatCount(item.viewCount) }}阅读</text>
-                </view>
-              </view>
-            </view>
+              v-for="(height, index) in healthBars"
+              :key="index"
+              class="health-bar"
+              :style="{ height: height + 'rpx' }"
+            ></view>
           </view>
-        </scroll-view>
+        </view>
+
+        <view class="health-metrics">
+          <view class="metric">
+            <text class="metric-label">最低心率</text>
+            <text class="metric-value">{{ metricValue(healthMonitoring.min) }}</text>
+            <text class="metric-state">BPM</text>
+          </view>
+          <view class="metric">
+            <text class="metric-label">平均心率</text>
+            <text class="metric-value">{{ metricValue(healthMonitoring.avg) }}</text>
+            <text class="metric-state">BPM</text>
+          </view>
+          <view class="metric">
+            <text class="metric-label">最高心率</text>
+            <text class="metric-value">{{ metricValue(healthMonitoring.max) }}</text>
+            <text class="metric-state">BPM</text>
+          </view>
+        </view>
       </view>
 
-      <!-- 底部安全区 -->
-      <view class="bottom-safe"></view>
+      <view class="section service-section">
+        <view class="section-heading">
+          <view>
+            <text class="section-kicker">CARE SERVICES</text>
+            <text class="section-title">把健康主动权握在手里</text>
+          </view>
+        </view>
+        <view class="service-layout">
+          <view class="service-primary" @tap="openCheckup">
+            <view class="service-icon">
+              <app-icon name="folder-add-filled" :size="26" color="#FFFFFF" />
+            </view>
+            <text class="service-primary-kicker">AI HEALTH REPORT</text>
+            <text class="service-primary-title">上传体检报告</text>
+            <text class="service-primary-desc">自动整理指标并给出结构化健康建议</text>
+            <view class="service-arrow">
+              <app-icon name="right" :size="18" color="#2E6DD1" />
+            </view>
+          </view>
+          <view class="service-secondary" @tap="openScience">
+            <view class="science-ring">
+              <app-icon name="videocam-filled" :size="22" color="#177E8D" />
+            </view>
+            <text class="service-secondary-title">急救课堂</text>
+            <text class="service-secondary-desc">系统学习关键急救动作</text>
+            <text class="lesson-meta">已收录 {{ scienceArticles.length }} 篇科普内容</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="safety-note">
+        <view class="safety-line"></view>
+        <text>如遇危及生命的紧急情况，请立即拨打 120</text>
+      </view>
+      <view class="bottom-space"></view>
     </scroll-view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { mockFixedDevices, mockMobileDevices, mockHeartRateData, mockScienceContents } from '@/mock/data'
+import { computed, ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import AppIcon from '@/components/AppIcon.vue'
+import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
+import { scienceArticles } from '@/data/editorial'
+import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
 
-// 系统信息
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
+const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
+const waveform = [12, 18, 16, 24, 20, 30, 22, 18, 28, 42, 16, 64, 20, 36, 24, 18, 22, 30, 20, 16, 24, 18, 14]
+const { monitoring: healthMonitoring, loadMonitoring } = useHealthMonitoring()
 
-// 附近设备 - 取前5个固定 + 3个移动
-const nearbyDevices = computed(() => {
-  const fixed = mockFixedDevices
-    .filter(d => d.status === 'available')
-    .slice(0, 5)
-    .map(d => ({ ...d, distance: (Math.random() * 2 + 0.3).toFixed(1) + 'km' }))
-  const mobile = mockMobileDevices
-    .filter(d => d.online)
-    .slice(0, 3)
-    .map(d => ({ ...d, distance: (Math.random() * 3 + 0.5).toFixed(1) + 'km' }))
-  return [...fixed, ...mobile]
+const nearbyResources = ref<{ icon: string; distance: string; name: string; place: string }[]>([])
+const deviceSnapshot = ref<EmergencyDeviceResponse[]>([])
+const currentCoordinates = ref<{ longitude: number; latitude: number } | null>(null)
+const devicesLoaded = ref(false)
+
+const availableDeviceCount = computed(() => (
+  deviceSnapshot.value.filter(device => device.status === 'AVAILABLE').length
+))
+const fixedDeviceCount = computed(() => (
+  deviceSnapshot.value.filter(device => device.type === 'FIXED').length
+))
+const mobileDeviceCount = computed(() => (
+  deviceSnapshot.value.filter(device => device.type === 'MOBILE').length
+))
+const locationLabel = computed(() => (
+  currentCoordinates.value ? '当前位置已定位' : '杭州城区急救网络'
+))
+const locationHint = computed(() => (
+  currentCoordinates.value ? '距离已按当前位置计算' : '授权定位后显示距离'
+))
+const nearestResourceText = computed(() => {
+  const nearest = nearbyResources.value[0]
+  return nearest && nearest.distance !== '--'
+    ? `最近资源 ${nearest.distance}`
+    : '查看附近急救资源'
 })
 
-// 心率数据
-const heartRateData = computed(() => mockHeartRateData)
+const heartValue = computed(() => (
+  healthMonitoring.value.current > 0 ? healthMonitoring.value.current : '--'
+))
+const heartState = computed(() => {
+  if (!healthMonitoring.value.current) return '暂无心率记录'
+  if (healthMonitoring.value.status === 'warning') return '最近心率偏高'
+  if (healthMonitoring.value.status === 'danger') return '最近心率偏低'
+  return '最近心率在正常范围'
+})
+const heartSource = computed(() => (
+  healthMonitoring.value.wearable.connected
+    ? `${healthMonitoring.value.wearable.name} 已连接`
+    : '示例趋势 · 连接设备后同步'
+))
+const healthBars = computed(() => {
+  const values = healthMonitoring.value.todayData
+    .filter((_, index) => index % 4 === 0)
+    .map(point => point.value)
+  if (!values.length) return []
+  const min = Math.min(...values)
+  const range = Math.max(...values) - min || 1
+  return values.map(value => Math.round(18 + ((value - min) / range) * 38))
+})
 
-// 迷你图表数据
-const miniChartData = computed(() => {
-  const data = mockHeartRateData.todayData
-  const maxVal = Math.max(...data.map(d => d.value))
-  const minVal = Math.min(...data.map(d => d.value))
-  const range = maxVal - minVal || 1
-  return data.map(item => {
-    const h = ((item.value - minVal) / range) * 80 + 16
-    let color = '#2B6FF0'
-    if (item.value > 100) color = '#F53F3F'
-    else if (item.value > 85) color = '#FF9A2E'
-    else if (item.value < 60) color = '#00B42A'
-    return { height: h, color }
+function metricValue(value: number) {
+  return value > 0 ? value : '--'
+}
+
+function distanceKm(device: EmergencyDeviceResponse, longitude: number, latitude: number) {
+  const radians = (value: number) => value * Math.PI / 180
+  const earthRadius = 6371
+  const latDelta = radians(device.latitude - latitude)
+  const lngDelta = radians(device.longitude - longitude)
+  const a = Math.sin(latDelta / 2) ** 2
+    + Math.cos(radians(latitude)) * Math.cos(radians(device.latitude)) * Math.sin(lngDelta / 2) ** 2
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function currentLocation() {
+  return new Promise<{ longitude: number; latitude: number } | null>((resolve) => {
+    uni.getLocation({
+      type: 'gcj02',
+      success: ({ longitude, latitude }) => resolve({ longitude, latitude }),
+      fail: () => resolve(null)
+    })
   })
-})
+}
 
-// 科普列表
-const scienceList = computed(() => mockScienceContents.slice(0, 6))
-
-// 状态标签
-function statusLabel(status: string) {
-  const map: Record<string, string> = {
-    available: '可用',
-    maintenance: '维护中',
-    online: '在线',
-    offline: '离线'
+async function loadNearbyResources() {
+  const [devicesResult, locationResult] = await Promise.allSettled([
+    listEmergencyDevices(),
+    currentLocation(),
+    loadMonitoring()
+  ])
+  if (devicesResult.status === 'rejected') {
+    devicesLoaded.value = false
+    deviceSnapshot.value = []
+    nearbyResources.value = []
+    return
   }
-  return map[status] || status
+  devicesLoaded.value = true
+  deviceSnapshot.value = devicesResult.value.content
+  const location = locationResult.status === 'fulfilled' ? locationResult.value : null
+  currentCoordinates.value = location
+  const available = devicesResult.value.content.filter(device => device.status === 'AVAILABLE')
+  const ranked = location
+    ? available
+        .map(device => ({ device, distance: distanceKm(device, location.longitude, location.latitude) }))
+        .sort((left, right) => left.distance - right.distance)
+    : available.map(device => ({ device, distance: null }))
+  nearbyResources.value = ranked
+      .slice(0, 3)
+      .map(({ device, distance }) => ({
+        icon: device.type === 'MOBILE' ? 'staff-filled' : (device.category === 'AED' ? 'heart-filled' : 'plus-filled'),
+        distance: distance === null
+          ? '--'
+          : distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`,
+        name: device.name,
+        place: device.address
+      }))
 }
 
-function heartStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    normal: '心率正常',
-    warning: '心率偏高',
-    danger: '心率异常'
-  }
-  return map[status] || status
-}
-
-function categoryIcon(category: string) {
-  const map: Record<string, string> = {
-    device: 'AED',
-    emergency: 'SOS',
-    health: 'HR',
-    exercise: 'RUN'
-  }
-  return map[category] || 'TIP'
-}
-
-function formatCount(count: number) {
-  if (count >= 10000) return (count / 10000).toFixed(1) + 'w'
-  if (count >= 1000) return (count / 1000).toFixed(1) + 'k'
-  return count.toString()
-}
-
-// 导航
-function goRescue() {
+function openSOS() {
   uni.navigateTo({ url: '/pages/rescue/index' })
 }
-function goDevice() {
+
+function openMap() {
   uni.switchTab({ url: '/pages/map/index' })
 }
-function goHealth() {
+
+function openHealth() {
   uni.switchTab({ url: '/pages/health/index' })
 }
-function goCheckup() {
+
+function openDevice() {
+  uni.navigateTo({ url: '/pages/device/add' })
+}
+
+function openCheckup() {
   uni.navigateTo({ url: '/pages/checkup/upload' })
 }
-function goScience() {
+
+function openScience() {
   uni.navigateTo({ url: '/pages/science/index' })
 }
-function goDeviceDetail(device: any) {
-  uni.navigateTo({ url: '/pages/device/manage?id=' + device.id })
+
+function openNotifications() {
+  uni.showToast({ title: '暂无新的紧急通知', icon: 'none' })
 }
-function goScienceDetail(item: any) {
-  uni.navigateTo({ url: '/pages/science/detail?id=' + item.id })
-}
-function handleSearch() {
-  uni.navigateTo({ url: '/pages/device/manage' })
-}
-function handleMessage() {
-  uni.navigateTo({ url: '/pages/mine/records' })
-}
+
+onShow(loadNearbyResources)
 </script>
 
 <style lang="scss" scoped>
-.page {
+.home-page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FC;
+  color: #16283C;
 }
 
-/* 导航栏 */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+.home-scroll {
+  height: 100vh;
 }
-.nav-bar-content {
+
+.hero {
+  position: relative;
+  min-height: 760rpx;
+  overflow: hidden;
+  background: #ECF5FC;
+}
+
+.hero-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-wash {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(248, 252, 255, 0.98) 0%,
+    rgba(248, 252, 255, 0.84) 34%,
+    rgba(238, 247, 253, 0.22) 64%,
+    rgba(238, 247, 253, 0.7) 100%
+  );
+}
+
+.hero-nav,
+.hero-copy,
+.hero-location,
+.network-console {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 88rpx;
+  height: 96rpx;
   padding: 0 32rpx;
 }
-.nav-left {
+
+.brand-lockup {
   display: flex;
   align-items: center;
-}
-.app-logo {
-  display: flex;
-  align-items: center;
-}
-.logo-icon {
-  width: 52rpx;
-  height: 52rpx;
-  border-radius: 14rpx;
-  background: rgba(255, 255, 255, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 16rpx;
-}
-.logo-text {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.app-name {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-  letter-spacing: 2rpx;
-}
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-.nav-icon-btn {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-.nav-icon-btn .iconfont {
-  font-size: 36rpx;
-  color: #FFFFFF;
-}
-.badge-dot {
-  position: absolute;
-  top: 12rpx;
-  right: 12rpx;
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  background: #F53F3F;
-  border: 2rpx solid #2B6FF0;
+  gap: 14rpx;
 }
 
-/* 滚动内容 */
-.scroll-content {
-  min-height: 100vh;
-  box-sizing: border-box;
-}
-
-/* SOS 区域 */
-.sos-section {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 40rpx 0 32rpx;
-  overflow: hidden;
-}
-.sos-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 100%;
-  background: linear-gradient(180deg, #2B6FF0 0%, rgba(43, 111, 240, 0.3) 70%, transparent 100%);
-}
-.sos-container {
-  position: relative;
-  width: 240rpx;
-  height: 240rpx;
+.brand-pulse {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2;
-}
-.sos-pulse-ring {
-  position: absolute;
-  border-radius: 50%;
-  border: 4rpx solid rgba(245, 63, 63, 0.4);
-  animation: sosPulse 2s ease-out infinite;
-}
-.sos-pulse-ring-1 {
-  width: 240rpx;
-  height: 240rpx;
-  animation-delay: 0s;
-}
-.sos-pulse-ring-2 {
-  width: 300rpx;
-  height: 300rpx;
-  animation-delay: 0.5s;
-}
-.sos-pulse-ring-3 {
-  width: 360rpx;
-  height: 360rpx;
-  animation-delay: 1s;
-}
-@keyframes sosPulse {
-  0% {
-    transform: scale(0.8);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.4);
-    opacity: 0;
-  }
-}
-.sos-btn {
-  width: 180rpx;
-  height: 180rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #F53F3F 0%, #E02020 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 32rpx rgba(245, 63, 63, 0.5);
-  z-index: 3;
-}
-.sos-text {
-  font-size: 56rpx;
-  font-weight: 800;
-  color: #FFFFFF;
-  letter-spacing: 4rpx;
-  line-height: 1;
-}
-.sos-label {
-  font-size: 22rpx;
-  color: rgba(255, 255, 255, 0.9);
-  margin-top: 4rpx;
-}
-.sos-hint {
-  position: relative;
-  z-index: 2;
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.8);
-  margin-top: 24rpx;
-  letter-spacing: 2rpx;
-}
-
-/* 快捷功能 */
-.quick-actions {
-  display: flex;
-  justify-content: space-between;
-  padding: 32rpx 40rpx;
-  margin: 0 24rpx;
-  background: #FFFFFF;
-  border-radius: 24rpx;
-  box-shadow: 0 4rpx 24rpx rgba(43, 111, 240, 0.08);
-  margin-top: -16rpx;
-  position: relative;
-  z-index: 3;
-}
-.action-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12rpx;
-}
-.action-icon {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.action-icon-blue {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.action-icon-red {
-  background: linear-gradient(135deg, #F53F3F 0%, #FF7D7D 100%);
-}
-.action-icon-green {
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 100%);
-}
-.action-icon-orange {
-  background: linear-gradient(135deg, #FF9A2E 0%, #FFCF8B 100%);
-}
-.action-icon-text {
-  font-size: 40rpx;
-  color: #FFFFFF;
-}
-.action-label {
-  font-size: 24rpx;
-  color: #4E5969;
-  font-weight: 500;
-}
-
-/* 通用 section */
-.section {
-  padding: 32rpx 24rpx 0;
-}
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24rpx;
-}
-.section-title-wrap {
-  display: flex;
-  align-items: center;
-}
-.section-title-bar {
-  width: 6rpx;
-  height: 32rpx;
-  border-radius: 3rpx;
-  background: #2B6FF0;
-  margin-right: 12rpx;
-}
-.section-title {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #1D2129;
-}
-.section-more {
-  display: flex;
-  align-items: center;
   gap: 4rpx;
-}
-.section-more-text {
-  font-size: 24rpx;
-  color: #86909C;
-}
-.arrow-icon {
-  font-size: 24rpx;
-  color: #86909C;
+  width: 54rpx;
+  height: 54rpx;
+  border: 1rpx solid rgba(46, 109, 209, 0.2);
+  border-radius: 14rpx;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
 }
 
-/* 设备卡片横向滚动 */
-.device-scroll {
-  white-space: nowrap;
+.pulse-stem {
+  width: 5rpx;
+  border-radius: 4rpx;
+  background: #2E6DD1;
 }
-.device-cards {
-  display: inline-flex;
-  gap: 20rpx;
-  padding-bottom: 8rpx;
+
+.pulse-stem-short {
+  height: 16rpx;
 }
-.device-card {
-  display: inline-flex;
+
+.pulse-stem-tall {
+  height: 32rpx;
+  background: #B52832;
+}
+
+.brand-copy {
+  display: flex;
   flex-direction: column;
-  width: 320rpx;
-  background: #FFFFFF;
-  border-radius: 20rpx;
-  overflow: hidden;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
 }
-.device-card-top {
-  height: 120rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24rpx;
-  position: relative;
-}
-.device-card-fixed {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.device-card-mobile {
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 100%);
-}
-.device-type-tag {
-  background: rgba(255, 255, 255, 0.25);
-  border-radius: 8rpx;
-  padding: 4rpx 16rpx;
-}
-.device-type-text {
-  font-size: 22rpx;
-  color: #FFFFFF;
-  font-weight: 500;
-}
-.device-category {
-  font-size: 28rpx;
-  color: #FFFFFF;
+
+.brand-name {
+  color: #18334F;
+  font-size: 29rpx;
   font-weight: 700;
+  letter-spacing: 2rpx;
 }
-.device-card-body {
-  padding: 20rpx 24rpx 24rpx;
-}
-.device-name {
-  font-size: 26rpx;
-  color: #1D2129;
+
+.brand-caption {
+  margin-top: 2rpx;
+  color: #6A8198;
+  font-size: 15rpx;
   font-weight: 600;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal;
+  letter-spacing: 2rpx;
 }
-.device-address {
-  font-size: 22rpx;
-  color: #86909C;
-  margin-top: 8rpx;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal;
-  line-height: 1.4;
-}
-.device-status-row {
+
+.nav-alert {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 16rpx;
+  justify-content: center;
+  width: 68rpx;
+  height: 68rpx;
+  border: 1rpx solid rgba(36, 65, 95, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(12px);
 }
-.device-status {
-  display: flex;
+
+.hero-copy {
+  width: 69%;
+  padding: 54rpx 32rpx 0;
+}
+
+.network-state {
+  display: inline-flex;
   align-items: center;
-  gap: 8rpx;
+  gap: 10rpx;
+  padding: 9rpx 16rpx;
+  border: 1rpx solid rgba(34, 132, 90, 0.18);
+  border-radius: 24rpx;
+  background: rgba(237, 250, 244, 0.88);
+  color: #237653;
+  font-size: 20rpx;
+  font-weight: 600;
 }
-.status-dot {
+
+.network-state-dot,
+.signal-live-dot,
+.resource-status-dot {
   width: 12rpx;
   height: 12rpx;
   border-radius: 50%;
+  background: #2A9A68;
+  box-shadow: 0 0 0 6rpx rgba(42, 154, 104, 0.1);
 }
-.status-available .status-dot,
-.status-online .status-dot {
-  background: #00B42A;
+
+.hero-title {
+  display: block;
+  margin-top: 24rpx;
+  color: #152D46;
+  font-size: 53rpx;
+  font-weight: 750;
+  line-height: 1.12;
+  letter-spacing: -2rpx;
 }
-.status-maintenance .status-dot,
-.status-offline .status-dot {
-  background: #F53F3F;
+
+.hero-title-accent {
+  margin-top: 3rpx;
+  color: #2E6DD1;
 }
-.status-text {
+
+.hero-desc {
+  display: block;
+  margin-top: 22rpx;
+  color: #536C84;
+  font-size: 24rpx;
+  line-height: 1.65;
+}
+
+.hero-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  margin: 34rpx 32rpx 0;
+  padding: 12rpx 17rpx;
+  border: 1rpx solid rgba(46, 109, 209, 0.14);
+  border-radius: 12rpx;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+.hero-location-main {
+  color: #27435E;
   font-size: 22rpx;
-  color: #4E5969;
-}
-.device-distance {
-  font-size: 22rpx;
-  color: #2B6FF0;
   font-weight: 600;
 }
 
-/* 健康概览卡片 */
-.health-card {
-  position: relative;
-  background: #FFFFFF;
-  border-radius: 24rpx;
-  overflow: hidden;
-  box-shadow: 0 4rpx 24rpx rgba(43, 111, 240, 0.1);
+.hero-location-sub {
+  padding-left: 10rpx;
+  border-left: 1rpx solid #CBD9E7;
+  color: #71879C;
+  font-size: 19rpx;
 }
-.health-card-bg {
+
+.network-console {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, #2B6FF0 0%, #1A4FD0 50%, #0D3AAF 100%);
-  opacity: 0.03;
+  right: 24rpx;
+  bottom: 24rpx;
+  left: 24rpx;
+  display: flex;
+  align-items: center;
+  padding: 22rpx 10rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.78);
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 10rpx 28rpx rgba(45, 92, 132, 0.1);
+  backdrop-filter: blur(18px);
 }
-.health-card-content {
+
+.console-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.console-value {
+  color: #18334F;
+  font-size: 35rpx;
+  font-weight: 720;
+  font-variant-numeric: tabular-nums;
+}
+
+.console-label {
+  margin-top: 5rpx;
+  color: #71879C;
+  font-size: 18rpx;
+}
+
+.console-divider {
+  width: 1rpx;
+  height: 48rpx;
+  background: #D8E3ED;
+}
+
+.action-deck {
+  padding: 28rpx 24rpx 0;
+}
+
+.sos-action {
+  display: flex;
+  align-items: center;
+  min-height: 118rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 20rpx;
+  background: #B52832;
+  box-shadow: 0 10rpx 24rpx rgba(181, 40, 50, 0.18);
+}
+
+.sos-signal {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 32rpx;
+  justify-content: center;
+  width: 74rpx;
+  height: 74rpx;
+  margin-right: 22rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.13);
 }
-.health-left {
+
+.sos-signal-ring {
+  position: absolute;
+  inset: -8rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+}
+
+.sos-code {
+  color: #FFFFFF;
+  font-size: 25rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+}
+
+.sos-copy {
+  flex: 1;
   display: flex;
   flex-direction: column;
 }
-.heart-rate-main {
+
+.sos-title {
+  color: #FFFFFF;
+  font-size: 31rpx;
+  font-weight: 700;
+}
+
+.sos-desc {
+  margin-top: 7rpx;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 21rpx;
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.quick-action {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 22rpx 20rpx;
+  border: 1rpx solid #DCE7F0;
+  border-radius: 18rpx;
+  background: #FFFFFF;
+}
+
+.quick-icon,
+.resource-icon,
+.service-icon,
+.science-ring {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.quick-icon {
+  width: 62rpx;
+  height: 62rpx;
+  margin-right: 14rpx;
+  border-radius: 15rpx;
+}
+
+.quick-icon-blue {
+  background: #EAF2FD;
+}
+
+.quick-icon-cyan {
+  background: #E6F5F5;
+}
+
+.quick-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.quick-title {
+  color: #213951;
+  font-size: 25rpx;
+  font-weight: 650;
+}
+
+.quick-desc {
+  margin-top: 5rpx;
+  overflow: hidden;
+  color: #7A8FA3;
+  font-size: 18rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section {
+  padding: 56rpx 24rpx 0;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.section-kicker {
+  display: block;
+  color: #6D8DA9;
+  font-size: 17rpx;
+  font-weight: 700;
+  letter-spacing: 3rpx;
+}
+
+.section-title {
+  display: block;
+  margin-top: 7rpx;
+  color: #1B334B;
+  font-size: 34rpx;
+  font-weight: 720;
+  letter-spacing: -1rpx;
+}
+
+.section-link {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  color: #2E6DD1;
+  font-size: 21rpx;
+}
+
+.signal-band {
+  position: relative;
+  overflow: hidden;
+  padding: 26rpx;
+  border: 1rpx solid #D7E4EF;
+  border-radius: 20rpx;
+  background: #F9FCFF;
+}
+
+.signal-band-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.signal-title {
+  display: block;
+  color: #203A52;
+  font-size: 26rpx;
+  font-weight: 650;
+}
+
+.signal-subtitle {
+  display: block;
+  margin-top: 6rpx;
+  color: #7B90A4;
+  font-size: 19rpx;
+}
+
+.signal-live {
+  display: flex;
+  align-items: center;
+  gap: 9rpx;
+  padding: 8rpx 13rpx;
+  border-radius: 20rpx;
+  background: #EAF8F1;
+  color: #247653;
+  font-size: 18rpx;
+}
+
+.signal-live-dot,
+.resource-status-dot {
+  width: 9rpx;
+  height: 9rpx;
+  box-shadow: none;
+}
+
+.waveform {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100rpx;
+  gap: 7rpx;
+  margin-top: 22rpx;
+  overflow: hidden;
+}
+
+.waveform::before {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1rpx;
+  background: #D7E5F0;
+  content: '';
+}
+
+.wave-bar {
+  flex: 1;
+  min-width: 3rpx;
+  border-radius: 4rpx;
+  background: #7AB1E8;
+}
+
+.wave-bar-hot {
+  background: #2E6DD1;
+}
+
+.wave-sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 55%;
+  width: 80rpx;
+  background: linear-gradient(90deg, transparent, rgba(46, 109, 209, 0.14), transparent);
+  animation: sweep 2.8s linear infinite;
+}
+
+@keyframes sweep {
+  from { transform: translateX(-420rpx); }
+  to { transform: translateX(360rpx); }
+}
+
+.signal-legend {
+  display: flex;
+  justify-content: space-between;
+  color: #71879B;
+  font-size: 18rpx;
+}
+
+.resource-scroll {
+  width: calc(100% + 24rpx);
+  margin-top: 16rpx;
+}
+
+.resource-track {
+  display: inline-flex;
+  gap: 14rpx;
+  padding-right: 24rpx;
+}
+
+.resource-item {
+  width: 250rpx;
+  padding: 22rpx;
+  border: 1rpx solid #DCE7F0;
+  border-radius: 18rpx;
+  background: #FFFFFF;
+}
+
+.resource-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.resource-icon {
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 14rpx;
+  background: #EAF2FD;
+}
+
+.resource-status {
+  display: flex;
+  align-items: center;
+  gap: 7rpx;
+  color: #367A5C;
+  font-size: 17rpx;
+}
+
+.resource-distance {
+  display: block;
+  margin-top: 28rpx;
+  color: #2E6DD1;
+  font-size: 34rpx;
+  font-weight: 720;
+  font-variant-numeric: tabular-nums;
+}
+
+.resource-name {
+  display: block;
+  margin-top: 7rpx;
+  color: #243B52;
+  font-size: 24rpx;
+  font-weight: 650;
+}
+
+.resource-place {
+  display: block;
+  margin-top: 6rpx;
+  overflow: hidden;
+  color: #7C90A3;
+  font-size: 18rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.health-panel {
+  display: flex;
+  align-items: center;
+  padding: 26rpx;
+  border: 1rpx solid #D8E4EE;
+  border-radius: 20rpx 20rpx 0 0;
+  background: #FFFFFF;
+}
+
+.heart-orbit {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 108rpx;
+  height: 108rpx;
+}
+
+.orbit {
+  position: absolute;
+  border: 1rpx solid rgba(181, 40, 50, 0.17);
+  border-radius: 50%;
+}
+
+.orbit-one {
+  width: 96rpx;
+  height: 96rpx;
+}
+
+.orbit-two {
+  width: 72rpx;
+  height: 72rpx;
+}
+
+.heart-core {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #FBECEF;
+}
+
+.heart-reading {
+  flex: 1;
+  min-width: 0;
+  margin-left: 18rpx;
+}
+
+.heart-number-line {
   display: flex;
   align-items: baseline;
   gap: 8rpx;
 }
-.heart-icon {
-  font-size: 40rpx;
-  color: #F53F3F;
-  animation: heartBeat 1.2s ease-in-out infinite;
-}
-@keyframes heartBeat {
-  0%, 100% { transform: scale(1); }
-  15% { transform: scale(1.15); }
-  30% { transform: scale(1); }
-  45% { transform: scale(1.1); }
-  60% { transform: scale(1); }
-}
-.heart-value {
-  font-size: 72rpx;
-  font-weight: 800;
-  color: #1D2129;
-  line-height: 1;
-}
-.heart-unit {
-  font-size: 24rpx;
-  color: #86909C;
-  margin-left: 4rpx;
-}
-.heart-rate-status {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-top: 12rpx;
-}
-.status-indicator {
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
-}
-.status-indicator.status-normal {
-  background: #00B42A;
-  box-shadow: 0 0 8rpx rgba(0, 180, 42, 0.4);
-}
-.status-indicator.status-warning {
-  background: #FF9A2E;
-  box-shadow: 0 0 8rpx rgba(255, 154, 46, 0.4);
-}
-.status-indicator.status-danger {
-  background: #F53F3F;
-  box-shadow: 0 0 8rpx rgba(245, 63, 63, 0.4);
-}
-.status-label {
-  font-size: 26rpx;
-  color: #4E5969;
-  font-weight: 500;
-}
-.heart-rate-range {
-  margin-top: 8rpx;
-}
-.range-text {
-  font-size: 22rpx;
-  color: #86909C;
+
+.heart-number {
+  color: #18334F;
+  font-size: 52rpx;
+  font-weight: 730;
+  font-variant-numeric: tabular-nums;
 }
 
-/* 迷你图表 */
-.health-right {
-  display: flex;
-  align-items: flex-end;
+.heart-unit {
+  color: #7C90A3;
+  font-size: 18rpx;
+  font-weight: 600;
 }
-.mini-chart {
+
+.heart-state {
+  display: block;
+  color: #31516C;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.heart-time {
+  display: block;
+  margin-top: 4rpx;
+  color: #95A5B5;
+  font-size: 17rpx;
+}
+
+.health-bars {
   display: flex;
   align-items: flex-end;
   gap: 4rpx;
-  height: 100rpx;
-  padding: 0 8rpx;
-}
-.chart-bar {
-  width: 8rpx;
-  border-radius: 4rpx;
-  min-height: 8rpx;
-  transition: height 0.3s ease;
+  width: 126rpx;
+  height: 70rpx;
 }
 
-/* 科普推荐 */
-.science-scroll {
-  white-space: nowrap;
+.health-bar {
+  flex: 1;
+  min-width: 4rpx;
+  border-radius: 4rpx;
+  background: #77AEE6;
 }
-.science-cards {
-  display: inline-flex;
-  gap: 20rpx;
-  padding-bottom: 8rpx;
+
+.health-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1rpx solid #D8E4EE;
+  border-top: 0;
+  border-radius: 0 0 20rpx 20rpx;
+  background: #F9FCFF;
 }
-.science-card {
-  display: inline-flex;
-  flex-direction: column;
-  width: 280rpx;
-  background: #FFFFFF;
-  border-radius: 20rpx;
-  overflow: hidden;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
-}
-.science-card-cover {
+
+.metric {
   position: relative;
-  height: 160rpx;
+  display: flex;
+  flex-direction: column;
+  padding: 22rpx 18rpx;
 }
-.science-cover-placeholder {
-  width: 100%;
-  height: 100%;
+
+.metric + .metric::before {
+  position: absolute;
+  top: 22rpx;
+  bottom: 22rpx;
+  left: 0;
+  width: 1rpx;
+  background: #DDE7F0;
+  content: '';
+}
+
+.metric-label {
+  color: #7B90A4;
+  font-size: 18rpx;
+}
+
+.metric-value {
+  margin-top: 8rpx;
+  color: #203A52;
+  font-size: 29rpx;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-state {
+  margin-top: 5rpx;
+  color: #4C789C;
+  font-size: 16rpx;
+}
+
+.service-layout {
+  display: grid;
+  grid-template-columns: 1.18fr 0.82fr;
+  gap: 16rpx;
+}
+
+.service-primary,
+.service-secondary {
+  position: relative;
+  min-height: 280rpx;
+  padding: 24rpx;
+  overflow: hidden;
+  border-radius: 20rpx;
+}
+
+.service-primary {
+  background: #2E6DD1;
+}
+
+.service-primary::after {
+  position: absolute;
+  right: -50rpx;
+  bottom: -70rpx;
+  width: 190rpx;
+  height: 190rpx;
+  border: 28rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  content: '';
+}
+
+.service-icon {
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 15rpx;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.service-primary-kicker {
+  display: block;
+  margin-top: 35rpx;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 14rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+}
+
+.service-primary-title {
+  display: block;
+  margin-top: 8rpx;
+  color: #FFFFFF;
+  font-size: 29rpx;
+  font-weight: 700;
+}
+
+.service-primary-desc {
+  display: block;
+  margin-top: 9rpx;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 19rpx;
+  line-height: 1.55;
+}
+
+.service-arrow {
+  position: absolute;
+  right: 20rpx;
+  bottom: 20rpx;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.science-cover-device {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.science-cover-emergency {
-  background: linear-gradient(135deg, #F53F3F 0%, #FF7D7D 100%);
-}
-.science-cover-health {
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 100%);
-}
-.science-cover-exercise {
-  background: linear-gradient(135deg, #FF9A2E 0%, #FFCF8B 100%);
-}
-.science-cover-icon {
-  font-size: 48rpx;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.6);
-  letter-spacing: 2rpx;
-}
-.science-category-tag {
-  position: absolute;
-  top: 16rpx;
-  left: 16rpx;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 8rpx;
-  padding: 4rpx 12rpx;
-}
-.science-category-text {
-  font-size: 20rpx;
-  color: #FFFFFF;
-}
-.science-card-info {
-  padding: 20rpx;
-}
-.science-title {
-  font-size: 26rpx;
-  color: #1D2129;
-  font-weight: 600;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal;
-  line-height: 1.5;
-}
-.science-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 12rpx;
-}
-.science-author {
-  font-size: 20rpx;
-  color: #86909C;
-}
-.science-views {
-  font-size: 20rpx;
-  color: #C9CDD4;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #FFFFFF;
 }
 
-/* 底部安全区 */
-.bottom-safe {
-  height: 180rpx;
+.service-secondary {
+  border: 1rpx solid #CFE3E5;
+  background: #EAF7F7;
+}
+
+.science-ring {
+  width: 58rpx;
+  height: 58rpx;
+  border: 1rpx solid rgba(23, 126, 141, 0.16);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.service-secondary-title {
+  display: block;
+  margin-top: 35rpx;
+  color: #23545B;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.service-secondary-desc {
+  display: block;
+  margin-top: 9rpx;
+  color: #62848A;
+  font-size: 18rpx;
+  line-height: 1.55;
+}
+
+.lesson-meta {
+  display: block;
+  margin-top: 9rpx;
+  color: #5E8086;
+  font-size: 16rpx;
+}
+
+.safety-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  margin: 52rpx 24rpx 0;
+  padding: 20rpx;
+  border-top: 1rpx solid #D9E4EE;
+  color: #7A8EA1;
+  font-size: 19rpx;
+}
+
+.safety-line {
+  width: 24rpx;
+  height: 3rpx;
+  border-radius: 2rpx;
+  background: #B52832;
+}
+
+.bottom-space {
+  height: calc(50rpx + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 340px) {
+  .hero-copy {
+    width: 76%;
+  }
+
+  .hero-title {
+    font-size: 47rpx;
+  }
+
+  .quick-action {
+    padding: 18rpx 14rpx;
+  }
+
+  .quick-icon {
+    margin-right: 9rpx;
+  }
+
+  .health-bars {
+    display: none;
+  }
 }
 </style>

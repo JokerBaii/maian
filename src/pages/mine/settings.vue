@@ -1,14 +1,13 @@
 <template>
   <view class="page">
     <scroll-view class="settings-scroll" scroll-y>
-      <!-- 通知设置 -->
       <view class="settings-section">
         <text class="section-title">通知设置</text>
         <view class="settings-list">
           <view class="settings-item">
             <view class="settings-item-left">
               <view class="settings-icon-wrap settings-icon-red">
-                <text class="settings-icon-text">🚨</text>
+                <app-icon name="notification-filled" :size="19" color="#FFFFFF" />
               </view>
               <text class="settings-label">呼救推送</text>
             </view>
@@ -21,7 +20,7 @@
           <view class="settings-item">
             <view class="settings-item-left">
               <view class="settings-icon-wrap settings-icon-orange">
-                <text class="settings-icon-text">&#x26A0;</text>
+                <app-icon name="notification-filled" :size="19" color="#FFFFFF" />
               </view>
               <text class="settings-label">健康预警</text>
             </view>
@@ -34,7 +33,7 @@
           <view class="settings-item settings-item-last">
             <view class="settings-item-left">
               <view class="settings-icon-wrap settings-icon-blue">
-                <text class="settings-icon-text">📢</text>
+                <app-icon name="sound-filled" :size="19" color="#FFFFFF" />
               </view>
               <text class="settings-label">科普更新</text>
             </view>
@@ -47,14 +46,13 @@
         </view>
       </view>
 
-      <!-- 隐私设置 -->
       <view class="settings-section">
         <text class="section-title">隐私设置</text>
         <view class="settings-list">
           <view class="settings-item">
             <view class="settings-item-left">
               <view class="settings-icon-wrap settings-icon-green">
-                <text class="settings-icon-text">📍</text>
+                <app-icon name="location-filled" :size="19" color="#FFFFFF" />
               </view>
               <text class="settings-label">位置共享</text>
             </view>
@@ -67,7 +65,7 @@
           <view class="settings-item settings-item-last">
             <view class="settings-item-left">
               <view class="settings-icon-wrap settings-icon-purple">
-                <text class="settings-icon-text">📊</text>
+                <app-icon name="bars" :size="19" color="#FFFFFF" />
               </view>
               <text class="settings-label">健康数据共享</text>
             </view>
@@ -80,83 +78,62 @@
         </view>
       </view>
 
-      <!-- 心率预警阈值 -->
       <view class="settings-section">
         <text class="section-title">心率预警阈值</text>
         <view class="settings-list">
           <view class="settings-item">
             <view class="settings-item-left">
               <view class="settings-icon-wrap settings-icon-red">
-                <text class="settings-icon-text">&#x2191;</text>
+                <app-icon name="arrow-up" :size="19" color="#FFFFFF" />
               </view>
               <text class="settings-label">最高心率</text>
             </view>
             <view class="threshold-wrap" @tap="editThreshold('max')">
               <text class="threshold-value">{{ settings.maxHeartRate }}</text>
               <text class="threshold-unit">BPM</text>
-              <text class="threshold-arrow">&#x2038;</text>
+              <app-icon name="right" :size="14" color="#A8B2C1" />
             </view>
           </view>
           <view class="settings-item settings-item-last">
             <view class="settings-item-left">
               <view class="settings-icon-wrap settings-icon-blue">
-                <text class="settings-icon-text">&#x2193;</text>
+                <app-icon name="arrow-down" :size="19" color="#FFFFFF" />
               </view>
               <text class="settings-label">最低心率</text>
             </view>
             <view class="threshold-wrap" @tap="editThreshold('min')">
               <text class="threshold-value">{{ settings.minHeartRate }}</text>
               <text class="threshold-unit">BPM</text>
-              <text class="threshold-arrow">&#x2038;</text>
+              <app-icon name="right" :size="14" color="#A8B2C1" />
             </view>
           </view>
         </view>
       </view>
 
-      <!-- 其他 -->
       <view class="settings-section">
         <text class="section-title">其他</text>
         <view class="settings-list">
           <view class="settings-item" @tap="clearCache">
             <view class="settings-item-left">
               <view class="settings-icon-wrap settings-icon-grey">
-                <text class="settings-icon-text">🗑️</text>
+                <app-icon name="trash-filled" :size="19" color="#FFFFFF" />
               </view>
               <text class="settings-label">清除缓存</text>
             </view>
-            <text class="settings-extra">12.3MB</text>
+            <text class="settings-extra">{{ cacheSizeText }}</text>
           </view>
           <view class="settings-item" @tap="goAbout">
             <view class="settings-item-left">
               <view class="settings-icon-wrap settings-icon-cyan">
-                <text class="settings-icon-text">&#x2139;</text>
+                <app-icon name="info-filled" :size="19" color="#FFFFFF" />
               </view>
               <text class="settings-label">关于我们</text>
             </view>
-            <text class="settings-arrow">&#x2038;</text>
-          </view>
-          <view class="settings-item" @tap="goAgreement">
-            <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-orange">
-                <text class="settings-icon-text">📝</text>
-              </view>
-              <text class="settings-label">用户协议</text>
-            </view>
-            <text class="settings-arrow">&#x2038;</text>
-          </view>
-          <view class="settings-item settings-item-last" @tap="goPrivacy">
-            <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-purple">
-                <text class="settings-icon-text">🔒</text>
-              </view>
-              <text class="settings-label">隐私政策</text>
-            </view>
-            <text class="settings-arrow">&#x2038;</text>
+            <app-icon name="right" :size="14" color="#A8B2C1" />
           </view>
         </view>
       </view>
 
-      <!-- 版本信息 -->
       <view class="version-info">
         <text class="version-text">脉安驰援 v1.0.0</text>
       </view>
@@ -164,13 +141,12 @@
       <view class="bottom-safe"></view>
     </scroll-view>
 
-    <!-- 心率阈值编辑弹窗 -->
     <view v-if="thresholdPopupVisible" class="popup-mask" @tap="thresholdPopupVisible = false">
       <view class="popup-content" @tap.stop>
         <view class="popup-header">
           <text class="popup-title">{{ editingMax ? '设置最高心率' : '设置最低心率' }}</text>
           <view class="popup-close" @tap="thresholdPopupVisible = false">
-            <text class="popup-close-text">&#x2715;</text>
+            <app-icon name="closeempty" :size="16" color="#748198" />
           </view>
         </view>
         <view class="popup-form">
@@ -192,8 +168,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import AppIcon from '@/components/AppIcon.vue'
 
+const SETTINGS_STORAGE_KEY = 'maian:user-settings'
 const settings = reactive({
   rescuePush: true,
   healthAlert: true,
@@ -207,6 +185,24 @@ const settings = reactive({
 const thresholdPopupVisible = ref(false)
 const editingMax = ref(true)
 const thresholdInput = ref('')
+const cacheSizeKb = ref(0)
+const cacheSizeText = computed(() => (
+  cacheSizeKb.value >= 1024
+    ? `${(cacheSizeKb.value / 1024).toFixed(1)}MB`
+    : `${cacheSizeKb.value}KB`
+))
+
+onMounted(() => {
+  const saved = uni.getStorageSync(SETTINGS_STORAGE_KEY)
+  if (saved && typeof saved === 'object') {
+    Object.assign(settings, saved)
+  }
+  cacheSizeKb.value = uni.getStorageInfoSync().currentSize || 0
+})
+
+watch(settings, (value) => {
+  uni.setStorageSync(SETTINGS_STORAGE_KEY, { ...value })
+}, { deep: true })
 
 function editThreshold(type: string) {
   editingMax.value = type === 'max'
@@ -216,8 +212,14 @@ function editThreshold(type: string) {
 
 function saveThreshold() {
   const val = parseInt(thresholdInput.value)
-  if (isNaN(val) || val <= 0) {
-    uni.showToast({ title: '请输入有效数值', icon: 'none' })
+  const validRange = editingMax.value
+    ? val >= 80 && val <= 240 && val > settings.minHeartRate
+    : val >= 30 && val <= 120 && val < settings.maxHeartRate
+  if (!validRange) {
+    uni.showToast({
+      title: editingMax.value ? '最高心率需为 80–240' : '最低心率需为 30–120',
+      icon: 'none'
+    })
     return
   }
   if (editingMax.value) {
@@ -236,20 +238,25 @@ function clearCache() {
     confirmColor: '#2B6FF0',
     success: (res) => {
       if (res.confirm) {
-        uni.showToast({ title: '缓存已清除', icon: 'success' })
+        try {
+          uni.clearStorageSync()
+          cacheSizeKb.value = 0
+          uni.showToast({ title: '缓存已清除', icon: 'success' })
+        } catch {
+          uni.showToast({ title: '缓存清理失败', icon: 'none' })
+        }
       }
     }
   })
 }
 
 function goAbout() {
-  uni.showToast({ title: '脉安驰援 v1.0.0', icon: 'none' })
-}
-function goAgreement() {
-  uni.showToast({ title: '用户协议', icon: 'none' })
-}
-function goPrivacy() {
-  uni.showToast({ title: '隐私政策', icon: 'none' })
+  uni.showModal({
+    title: '脉安驰援 v1.0.0',
+    content: '共享急救设备、紧急救援协同与健康管理应用。',
+    showCancel: false,
+    confirmText: '知道了'
+  })
 }
 </script>
 
@@ -264,7 +271,6 @@ function goPrivacy() {
   box-sizing: border-box;
 }
 
-/* 分区 */
 .settings-section {
   padding: 28rpx 32rpx 0;
 }
@@ -337,17 +343,12 @@ function goPrivacy() {
   background: linear-gradient(135deg, #86909C 0%, #C9CDD4 100%);
   box-shadow: 0 4rpx 12rpx rgba(134, 144, 156, 0.15);
 }
-.settings-icon-text {
-  font-size: 28rpx;
-  color: #FFFFFF;
-}
 .settings-label {
   font-size: 28rpx;
   color: #1D2129;
   font-weight: 500;
 }
 
-/* 开关 */
 .toggle-wrap {
   flex-shrink: 0;
 }
@@ -377,7 +378,6 @@ function goPrivacy() {
   transform: translateX(40rpx);
 }
 
-/* 阈值设置 */
 .threshold-wrap {
   display: flex;
   align-items: center;
@@ -393,24 +393,11 @@ function goPrivacy() {
   font-size: 22rpx;
   color: #86909C;
 }
-.threshold-arrow {
-  font-size: 24rpx;
-  color: #C9CDD4;
-  margin-left: 4rpx;
-}
-
-/* 右侧额外信息 */
 .settings-extra {
   font-size: 24rpx;
   color: #86909C;
   margin-right: 8rpx;
 }
-.settings-arrow {
-  font-size: 24rpx;
-  color: #C9CDD4;
-}
-
-/* 版本信息 */
 .version-info {
   display: flex;
   justify-content: center;
@@ -421,12 +408,10 @@ function goPrivacy() {
   color: #C9CDD4;
 }
 
-/* 底部安全区 */
 .bottom-safe {
   height: 80rpx;
 }
 
-/* 弹窗 */
 .popup-mask {
   position: fixed;
   top: 0;
@@ -465,10 +450,6 @@ function goPrivacy() {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.popup-close-text {
-  font-size: 24rpx;
-  color: #86909C;
 }
 .popup-form {
   margin-bottom: 28rpx;

@@ -1,10 +1,9 @@
 <template>
   <view class="page">
-    <!-- 联系人列表 -->
     <view class="contact-list">
       <view
         v-for="(contact, idx) in contacts"
-        :key="idx"
+        :key="contact.id"
         class="contact-card"
       >
         <view class="contact-avatar">
@@ -29,27 +28,24 @@
         </view>
       </view>
 
-      <!-- 空状态 -->
       <view v-if="contacts.length === 0" class="empty-state">
-        <text class="empty-icon">📞</text>
+        <app-icon class="empty-icon" name="phone" :size="44" color="#8994A8" />
         <text class="empty-text">暂无紧急联系人</text>
         <text class="empty-hint">添加联系人以便在紧急情况下快速通知</text>
       </view>
     </view>
 
-    <!-- 添加联系人按钮 -->
     <view class="add-btn" @tap="showAddPopup">
       <text class="add-btn-icon">+</text>
       <text class="add-btn-text">添加联系人</text>
     </view>
 
-    <!-- 添加/编辑联系人弹窗 -->
     <view v-if="popupVisible" class="popup-mask" @tap="hidePopup">
       <view class="popup-content" @tap.stop>
         <view class="popup-header">
           <text class="popup-title">{{ isEditing ? '编辑联系人' : '添加联系人' }}</text>
           <view class="popup-close" @tap="hidePopup">
-            <text class="popup-close-text">&#x2715;</text>
+            <app-icon class="popup-close-text" name="closeempty" :size="20" color="#6E7A90" />
           </view>
         </view>
         <view class="popup-form">
@@ -99,10 +95,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
-import { mockUser } from '@/mock/data'
+import { ref, reactive } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import AppIcon from '@/components/AppIcon.vue'
+import {
+  createEmergencyContact,
+  deleteEmergencyContact,
+  listEmergencyContacts,
+  updateEmergencyContact,
+  type EmergencyContactResponse
+} from '@/api/user'
 
-const contacts = ref([...mockUser.emergencyContacts])
+const contacts = ref<EmergencyContactResponse[]>([])
 
 const popupVisible = ref(false)
 const isEditing = ref(false)
@@ -136,14 +140,20 @@ function editContact(idx: number) {
 }
 
 function deleteContact(idx: number) {
+  const contact = contacts.value[idx]
   uni.showModal({
     title: '确认删除',
-    content: `确定要删除联系人"${contacts.value[idx].name}"吗？`,
+    content: `确定要删除联系人“${contact.name}”吗？`,
     confirmColor: '#F53F3F',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        contacts.value.splice(idx, 1)
-        uni.showToast({ title: '已删除', icon: 'success' })
+        try {
+          await deleteEmergencyContact(contact.id)
+          contacts.value.splice(idx, 1)
+          uni.showToast({ title: '已删除', icon: 'success' })
+        } catch {
+          uni.showToast({ title: '删除失败，请重试', icon: 'none' })
+        }
       }
     }
   })
@@ -153,7 +163,7 @@ function hidePopup() {
   popupVisible.value = false
 }
 
-function handleSave() {
+async function handleSave() {
   if (!popupForm.name.trim()) {
     uni.showToast({ title: '请输入姓名', icon: 'none' })
     return
@@ -162,23 +172,35 @@ function handleSave() {
     uni.showToast({ title: '请输入电话', icon: 'none' })
     return
   }
-  if (isEditing.value && editingIndex.value >= 0) {
-    contacts.value[editingIndex.value] = {
-      name: popupForm.name,
-      phone: popupForm.phone,
-      relation: popupForm.relation
-    }
-    uni.showToast({ title: '修改成功', icon: 'success' })
-  } else {
-    contacts.value.push({
-      name: popupForm.name,
-      phone: popupForm.phone,
-      relation: popupForm.relation
-    })
-    uni.showToast({ title: '添加成功', icon: 'success' })
+  const payload = {
+    name: popupForm.name.trim(),
+    phone: popupForm.phone.trim(),
+    relation: popupForm.relation
   }
-  hidePopup()
+  try {
+    if (isEditing.value && editingIndex.value >= 0) {
+      const current = contacts.value[editingIndex.value]
+      contacts.value[editingIndex.value] = await updateEmergencyContact(current.id, payload)
+      uni.showToast({ title: '修改成功', icon: 'success' })
+    } else {
+      contacts.value.push(await createEmergencyContact(payload))
+      uni.showToast({ title: '添加成功', icon: 'success' })
+    }
+    hidePopup()
+  } catch (error: any) {
+    uni.showToast({ title: error?.message || '保存失败，请重试', icon: 'none' })
+  }
 }
+
+async function loadContacts() {
+  try {
+    contacts.value = await listEmergencyContacts()
+  } catch {
+    uni.showToast({ title: '联系人加载失败', icon: 'none' })
+  }
+}
+
+onShow(loadContacts)
 </script>
 
 <style lang="scss" scoped>
@@ -190,7 +212,6 @@ function handleSave() {
   padding-bottom: 160rpx;
 }
 
-/* 联系人卡片 */
 .contact-list {
   display: flex;
   flex-direction: column;
@@ -277,7 +298,6 @@ function handleSave() {
   font-weight: 500;
 }
 
-/* 空状态 */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -299,7 +319,6 @@ function handleSave() {
   color: #C9CDD4;
 }
 
-/* 添加按钮 */
 .add-btn {
   position: fixed;
   bottom: 60rpx;
@@ -330,7 +349,6 @@ function handleSave() {
   font-weight: 600;
 }
 
-/* 弹窗 */
 .popup-mask {
   position: fixed;
   top: 0;
@@ -374,7 +392,6 @@ function handleSave() {
   color: #86909C;
 }
 
-/* 弹窗表单 */
 .popup-form {
   background: #FAFBFC;
   border-radius: 20rpx;
@@ -405,7 +422,6 @@ function handleSave() {
   background: #E5E6EB;
 }
 
-/* 关系选择器 */
 .relation-selector {
   display: flex;
   flex-wrap: wrap;
@@ -433,7 +449,6 @@ function handleSave() {
   font-weight: 600;
 }
 
-/* 弹窗提交 */
 .popup-submit {
   margin-top: 40rpx;
   background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);

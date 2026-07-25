@@ -1,22 +1,6 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <text class="back-arrow">&#x2190;</text>
-        </view>
-        <text class="nav-title">心率详情</text>
-        <view class="nav-placeholder"></view>
-      </view>
-    </view>
-
-    <scroll-view
-      class="scroll-content"
-      scroll-y
-      :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
-    >
-      <!-- Tab切换 -->
+    <scroll-view class="scroll-content" scroll-y>
       <view class="tab-switcher">
         <view
           class="tab-item"
@@ -35,46 +19,70 @@
         <view class="tab-indicator" :class="{ 'tab-indicator-right': activeTab === 'week' }"></view>
       </view>
 
-      <!-- 今日视图 -->
+      <view v-if="!heartRateData.wearable.connected" class="sample-note">
+        <app-icon name="info-filled" :size="15" color="#1F63D5" />
+        <text>示例数据 · 连接设备后显示真实记录</text>
+      </view>
+
       <view v-if="activeTab === 'today'" class="chart-section">
+        <view class="chart-heading">
+          <view>
+            <text class="chart-eyebrow">24 小时心率轨迹</text>
+            <view class="chart-current">
+              <text class="chart-current-value">{{ heartRateData.current }}</text>
+              <text class="chart-current-unit">BPM</text>
+            </view>
+          </view>
+          <view class="normal-range">
+            <view class="normal-range-dot"></view>
+            <text>正常区间 60–100</text>
+          </view>
+        </view>
         <view class="chart-container">
           <canvas
             canvas-id="heartRateCanvas"
             id="heartRateCanvas"
             class="chart-canvas"
-            :style="{ width: '100%', height: '400rpx' }"
           ></canvas>
         </view>
-        <!-- 场景标签 -->
+        <view class="chart-axis">
+          <text>00:00</text>
+          <text>06:00</text>
+          <text>12:00</text>
+          <text>18:00</text>
+          <text>23:00</text>
+        </view>
         <view class="scene-labels">
           <view class="scene-label-item">
-            <view class="scene-dot scene-dot-sleep"></view>
-            <text class="scene-label-text">睡眠 0:00-5:00</text>
+            <view class="scene-icon scene-icon-sleep">
+              <app-icon name="cloud-filled" :size="13" color="#7657D6" />
+            </view>
+            <view>
+              <text class="scene-label-text">睡眠</text>
+              <text class="scene-label-time">00:00–05:00</text>
+            </view>
           </view>
           <view class="scene-label-item">
-            <view class="scene-dot scene-dot-rest"></view>
-            <text class="scene-label-text">静息 6:00-8:00</text>
+            <view class="scene-icon scene-icon-rest">
+              <app-icon name="heart-filled" :size="13" color="#22A06B" />
+            </view>
+            <view>
+              <text class="scene-label-text">静息</text>
+              <text class="scene-label-time">06:00–16:00</text>
+            </view>
           </view>
           <view class="scene-label-item">
-            <view class="scene-dot scene-dot-exercise"></view>
-            <text class="scene-label-text">运动 9:00-11:00</text>
-          </view>
-          <view class="scene-label-item">
-            <view class="scene-dot scene-dot-rest"></view>
-            <text class="scene-label-text">静息 12:00-16:00</text>
-          </view>
-          <view class="scene-label-item">
-            <view class="scene-dot scene-dot-exercise"></view>
-            <text class="scene-label-text">运动 17:00-18:00</text>
-          </view>
-          <view class="scene-label-item">
-            <view class="scene-dot scene-dot-rest"></view>
-            <text class="scene-label-text">静息 19:00-22:00</text>
+            <view class="scene-icon scene-icon-exercise">
+              <app-icon name="fire-filled" :size="13" color="#F08C2E" />
+            </view>
+            <view>
+              <text class="scene-label-text">运动</text>
+              <text class="scene-label-time">17:00–18:00</text>
+            </view>
           </view>
         </view>
       </view>
 
-      <!-- 本周视图 -->
       <view v-if="activeTab === 'week'" class="chart-section">
         <view class="week-chart">
           <view
@@ -108,7 +116,6 @@
         </view>
       </view>
 
-      <!-- 统计卡片 -->
       <view class="stats-grid">
         <view class="stat-card">
           <text class="stat-value">{{ heartRateData.avg }}</text>
@@ -132,7 +139,6 @@
         </view>
       </view>
 
-      <!-- 场景分析 -->
       <view class="card scene-card">
         <view class="card-header">
           <view class="card-title-wrap">
@@ -144,7 +150,7 @@
           <view class="scene-row">
             <view class="scene-row-left">
               <view class="scene-row-icon scene-icon-blue">
-                <text class="scene-icon-text">~</text>
+                <app-icon name="heart-filled" :size="16" color="#2B6FF0" />
               </view>
               <view class="scene-row-info">
                 <text class="scene-row-label">静息心率</text>
@@ -159,7 +165,7 @@
           <view class="scene-row">
             <view class="scene-row-left">
               <view class="scene-row-icon scene-icon-orange">
-                <text class="scene-icon-text">!</text>
+                <app-icon name="fire-filled" :size="16" color="#F08C2E" />
               </view>
               <view class="scene-row-info">
                 <text class="scene-row-label">运动心率</text>
@@ -174,7 +180,7 @@
           <view class="scene-row">
             <view class="scene-row-left">
               <view class="scene-row-icon scene-icon-purple">
-                <text class="scene-icon-text">z</text>
+                <app-icon name="cloud-filled" :size="16" color="#7657D6" />
               </view>
               <view class="scene-row-info">
                 <text class="scene-row-label">睡眠心率</text>
@@ -189,7 +195,6 @@
         </view>
       </view>
 
-      <!-- 预警历史 -->
       <view class="card alert-card">
         <view class="card-header">
           <view class="card-title-wrap">
@@ -219,7 +224,6 @@
         </view>
       </view>
 
-      <!-- 底部安全区 -->
       <view class="bottom-safe"></view>
     </scroll-view>
   </view>
@@ -227,17 +231,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { mockHeartRateData } from '@/mock/data'
+import AppIcon from '@/components/AppIcon.vue'
+import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 
-// 系统信息
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
-
-const heartRateData = computed(() => mockHeartRateData)
+const { monitoring: heartRateData, loadMonitoring } = useHealthMonitoring()
 const activeTab = ref<'today' | 'week'>('today')
 
-// 场景平均心率
 const restingAvg = computed(() => {
   const items = heartRateData.value.todayData.filter(d => d.scene === 'resting')
   if (!items.length) return 0
@@ -256,7 +255,6 @@ const sleepAvg = computed(() => {
   return Math.round(items.reduce((s, d) => s + d.value, 0) / items.length)
 })
 
-// 本周柱状图数据
 const weekBars = computed(() => {
   const data = heartRateData.value.weekData
   const chartHeight = 280
@@ -275,7 +273,7 @@ const weekBars = computed(() => {
     else if (item.max > 100) barColor = 'linear-gradient(180deg, #FF9A2E 0%, #FFCF8B 100%)'
 
     return {
-      dateLabel: item.date.slice(5),
+      dateLabel: item.date.replace('-', '/'),
       rangeTop,
       rangeHeight,
       avgTop,
@@ -284,32 +282,30 @@ const weekBars = computed(() => {
   })
 })
 
-// 绘制今日心率曲线
-function drawTodayChart() {
+async function drawTodayChart() {
   const data = heartRateData.value.todayData
-  const canvas = uni.createCanvasContext('heartRateCanvas')
+  const rect = await new Promise<any>((resolve) => {
+    uni.createSelectorQuery()
+      .select('#heartRateCanvas')
+      .boundingClientRect(resolve)
+      .exec()
+  })
+  if (!rect?.width || !rect?.height || data.length < 2) return
 
-  const dpr = systemInfo.pixelRatio || 2
-  // 使用固定逻辑尺寸
-  const cw = 700
-  const ch = 400
-  const padLeft = 50
-  const padRight = 20
-  const padTop = 30
-  const padBottom = 40
+  const canvas = uni.createCanvasContext('heartRateCanvas')
+  const cw = rect.width
+  const ch = rect.height
+  const padLeft = 8
+  const padRight = 8
+  const padTop = 10
+  const padBottom = 8
   const chartW = cw - padLeft - padRight
   const chartH = ch - padTop - padBottom
-
   const maxVal = 130
   const minVal = 40
   const valRange = maxVal - minVal
 
-  // 背景
-  canvas.setFillStyle('#FFFFFF')
-  canvas.fillRect(0, 0, cw, ch)
-
-  // 网格线
-  canvas.setStrokeStyle('#F2F3F5')
+  canvas.setStrokeStyle('#E8EEF7')
   canvas.setLineWidth(1)
   const gridLines = [60, 80, 100, 120]
   gridLines.forEach(val => {
@@ -318,33 +314,23 @@ function drawTodayChart() {
     canvas.moveTo(padLeft, y)
     canvas.lineTo(cw - padRight, y)
     canvas.stroke()
-    // Y轴标签
-    canvas.setFontSize(18)
-    canvas.setFillStyle('#C9CDD4')
-    canvas.setTextAlign('right')
-    canvas.fillText(val.toString(), padLeft - 8, y + 5)
   })
 
-  // 正常范围标注
   const normalTop = padTop + ((maxVal - 100) / valRange) * chartH
   const normalBottom = padTop + ((maxVal - 60) / valRange) * chartH
-  canvas.setFillStyle('rgba(0, 180, 42, 0.05)')
+  canvas.setFillStyle('rgba(34, 160, 107, 0.07)')
   canvas.fillRect(padLeft, normalTop, chartW, normalBottom - normalTop)
 
-  // 绘制曲线 - 分段着色
   const stepX = chartW / (data.length - 1)
-
   function getX(i: number) { return padLeft + i * stepX }
   function getY(val: number) { return padTop + ((maxVal - val) / valRange) * chartH }
-
   function getLineColor(val: number) {
-    if (val > 100) return '#F53F3F'
-    if (val > 85) return '#FF9A2E'
-    if (val < 60) return '#2B6FF0'
-    return '#00B42A'
+    if (val > 110) return '#F04F5F'
+    if (val > 95) return '#F08C2E'
+    if (val < 60) return '#4D7FF3'
+    return '#22A06B'
   }
 
-  // 绘制渐变填充区域
   canvas.beginPath()
   canvas.moveTo(getX(0), getY(data[0].value))
   for (let i = 1; i < data.length; i++) {
@@ -354,14 +340,12 @@ function drawTodayChart() {
   canvas.lineTo(getX(data.length - 1), padTop + chartH)
   canvas.lineTo(getX(0), padTop + chartH)
   canvas.closePath()
-
   const gradient = canvas.createLinearGradient(0, padTop, 0, padTop + chartH)
-  gradient.addColorStop(0, 'rgba(43, 111, 240, 0.15)')
-  gradient.addColorStop(1, 'rgba(43, 111, 240, 0.01)')
+  gradient.addColorStop(0, 'rgba(43, 111, 240, 0.22)')
+  gradient.addColorStop(1, 'rgba(43, 111, 240, 0)')
   canvas.setFillStyle(gradient)
   canvas.fill()
 
-  // 绘制曲线线条 - 分段着色
   for (let i = 0; i < data.length - 1; i++) {
     const val1 = data[i].value
     const val2 = data[i + 1].value
@@ -369,22 +353,21 @@ function drawTodayChart() {
 
     canvas.beginPath()
     canvas.setStrokeStyle(color)
-    canvas.setLineWidth(3)
+    canvas.setLineWidth(2.5)
     canvas.moveTo(getX(i), getY(val1))
     const cpx = (getX(i) + getX(i + 1)) / 2
     canvas.bezierCurveTo(cpx, getY(val1), cpx, getY(val2), getX(i + 1), getY(val2))
     canvas.stroke()
   }
 
-  // 数据点
   data.forEach((item, i) => {
-    if (i % 3 === 0 || item.value > 100 || item.value < 60) {
+    if (item.value > 110 || item.value < 55) {
       const x = getX(i)
       const y = getY(item.value)
       const color = getLineColor(item.value)
 
       canvas.beginPath()
-      canvas.arc(x, y, 4, 0, 2 * Math.PI)
+      canvas.arc(x, y, 4.5, 0, 2 * Math.PI)
       canvas.setFillStyle(color)
       canvas.fill()
       canvas.beginPath()
@@ -394,19 +377,15 @@ function drawTodayChart() {
     }
   })
 
-  // X轴标签
-  canvas.setFontSize(16)
-  canvas.setFillStyle('#C9CDD4')
-  canvas.setTextAlign('center')
-  const xLabels = [0, 6, 12, 18, 23]
-  xLabels.forEach(i => {
-    canvas.fillText(data[i].time, getX(i), ch - 8)
-  })
-
   canvas.draw()
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    await loadMonitoring()
+  } catch {
+    uni.showToast({ title: '健康数据加载失败', icon: 'none' })
+  }
   nextTick(() => {
     setTimeout(() => {
       drawTodayChart()
@@ -424,9 +403,6 @@ watch(activeTab, () => {
   }
 })
 
-function goBack() {
-  uni.navigateBack()
-}
 </script>
 
 <style lang="scss" scoped>
@@ -435,50 +411,23 @@ function goBack() {
   background: #F0F4FA;
 }
 
-/* 导航栏 */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.nav-bar-content {
+.sample-note {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.back-arrow {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-placeholder {
-  width: 64rpx;
+  gap: 10rpx;
+  margin: 20rpx 24rpx 0;
+  padding: 14rpx 18rpx;
+  border-radius: 14rpx;
+  background: #EDF4FF;
+  color: #41658F;
+  font-size: 21rpx;
 }
 
-/* 滚动内容 */
 .scroll-content {
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-/* Tab切换 */
 .tab-switcher {
   display: flex;
   position: relative;
@@ -521,58 +470,123 @@ function goBack() {
   left: 50%;
 }
 
-/* 图表区域 */
 .chart-section {
   margin: 24rpx 24rpx 0;
   background: #FFFFFF;
-  border-radius: 24rpx;
-  padding: 28rpx;
-  box-shadow: 0 4rpx 24rpx rgba(43, 111, 240, 0.06);
+  border-radius: 28rpx;
+  padding: 30rpx 28rpx 24rpx;
+  box-shadow: 0 12rpx 40rpx rgba(32, 71, 132, 0.08);
+}
+.chart-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.chart-eyebrow {
+  display: block;
+  font-size: 23rpx;
+  font-weight: 600;
+  color: #748198;
+}
+.chart-current {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+  margin-top: 4rpx;
+}
+.chart-current-value {
+  font-size: 52rpx;
+  line-height: 1.1;
+  font-weight: 800;
+  color: #1C2B45;
+  font-variant-numeric: tabular-nums;
+}
+.chart-current-unit {
+  font-size: 21rpx;
+  font-weight: 700;
+  color: #7D8AA0;
+}
+.normal-range {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 10rpx 14rpx;
+  border-radius: 999rpx;
+  background: #ECF8F2;
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #23845D;
+}
+.normal-range-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: #22A06B;
 }
 .chart-container {
   width: 100%;
-  height: 400rpx;
+  height: 320rpx;
   position: relative;
 }
 .chart-canvas {
   width: 100%;
-  height: 400rpx;
+  height: 320rpx;
+}
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8rpx;
+  font-size: 18rpx;
+  color: #A6B0C0;
 }
 
-/* 场景标签 */
 .scene-labels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx 24rpx;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
   margin-top: 24rpx;
-  padding-top: 20rpx;
-  border-top: 1rpx solid #F2F3F5;
 }
 .scene-label-item {
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: 10rpx;
+  min-width: 0;
+  padding: 14rpx 12rpx;
+  border-radius: 16rpx;
+  background: #F7F9FC;
 }
-.scene-dot {
-  width: 12rpx;
-  height: 12rpx;
+.scene-icon {
+  width: 42rpx;
+  height: 42rpx;
   border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.scene-dot-sleep {
-  background: #722ED1;
+.scene-icon-sleep {
+  background: #F0ECFF;
 }
-.scene-dot-rest {
-  background: #00B42A;
+.scene-icon-rest {
+  background: #E8F7F0;
 }
-.scene-dot-exercise {
-  background: #FF9A2E;
+.scene-icon-exercise {
+  background: #FFF2E5;
 }
 .scene-label-text {
+  display: block;
   font-size: 22rpx;
-  color: #86909C;
+  font-weight: 700;
+  color: #334057;
+}
+.scene-label-time {
+  display: block;
+  margin-top: 2rpx;
+  font-size: 16rpx;
+  color: #98A3B5;
 }
 
-/* 本周柱状图 */
 .week-chart {
   display: flex;
   align-items: flex-end;
@@ -644,7 +658,6 @@ function goBack() {
   color: #86909C;
 }
 
-/* 统计网格 */
 .stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -685,7 +698,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 通用卡片 */
 .card {
   margin: 24rpx 24rpx 0;
   background: #FFFFFF;
@@ -719,7 +731,6 @@ function goBack() {
   color: #1D2129;
 }
 
-/* 场景分析 */
 .scene-breakdown {
   display: flex;
   flex-direction: column;
@@ -807,7 +818,6 @@ function goBack() {
   color: #86909C;
 }
 
-/* 预警时间线 */
 .alert-timeline {
   padding-left: 8rpx;
 }
@@ -879,7 +889,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 底部安全区 */
 .bottom-safe {
   height: 60rpx;
 }

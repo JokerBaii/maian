@@ -1,22 +1,6 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <text class="back-arrow">&#x2190;</text>
-        </view>
-        <text class="nav-title">设备录入</text>
-        <view class="nav-placeholder"></view>
-      </view>
-    </view>
-
-    <scroll-view
-      class="scroll-content"
-      scroll-y
-      :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
-    >
-      <!-- 设备类型选择 -->
+    <scroll-view class="scroll-content" scroll-y>
       <view class="form-section">
         <view class="form-label">
           <view class="label-bar"></view>
@@ -29,12 +13,12 @@
             @tap="deviceType = 'fixed'"
           >
             <view class="type-option-icon type-icon-fixed">
-              <text class="type-icon-text">📦</text>
+              <app-icon class="type-icon-text" name="cart-filled" :size="28" color="#1F63D5" />
             </view>
             <text class="type-option-label">固定设备</text>
             <text class="type-option-desc">放置在固定位置</text>
             <view v-if="deviceType === 'fixed'" class="type-check">
-              <text class="type-check-icon">&#x2713;</text>
+              <app-icon class="type-check-icon" name="checkmarkempty" :size="14" color="#FFFFFF" />
             </view>
           </view>
           <view
@@ -43,18 +27,17 @@
             @tap="deviceType = 'mobile'"
           >
             <view class="type-option-icon type-icon-mobile">
-              <text class="type-icon-text">🚗</text>
+              <app-icon class="type-icon-text" name="navigate-filled" :size="28" color="#158F63" />
             </view>
             <text class="type-option-label">移动设备</text>
             <text class="type-option-desc">车载便携设备</text>
             <view v-if="deviceType === 'mobile'" class="type-check">
-              <text class="type-check-icon">&#x2713;</text>
+              <app-icon class="type-check-icon" name="checkmarkempty" :size="14" color="#FFFFFF" />
             </view>
           </view>
         </view>
       </view>
 
-      <!-- 设备品类 -->
       <view class="form-section">
         <view class="form-label">
           <view class="label-bar"></view>
@@ -74,7 +57,6 @@
         </view>
       </view>
 
-      <!-- 固定设备表单 -->
       <template v-if="deviceType === 'fixed'">
         <view class="form-section">
           <view class="form-label">
@@ -125,7 +107,7 @@
             </view>
           </view>
           <view v-if="pickedAddress" class="picked-address">
-            <text class="picked-address-icon">📍</text>
+            <app-icon class="picked-address-icon" name="location-filled" :size="18" color="#1F63D5" />
             <text class="picked-address-text">{{ pickedAddress }}</text>
           </view>
         </view>
@@ -144,7 +126,7 @@
               <view class="picker-display">
                 <text v-if="fixedForm.expireDate" class="picker-value">{{ fixedForm.expireDate }}</text>
                 <text v-else class="picker-placeholder">请选择有效期</text>
-                <text class="picker-arrow">&#x203A;</text>
+                <app-icon class="picker-arrow" name="right" :size="17" color="#96A1B3" />
               </view>
             </picker>
           </view>
@@ -180,9 +162,9 @@
               :key="idx"
               class="photo-item"
             >
-              <image class="photo-img" :src="img" mode="aspectFill" />
+              <image class="photo-img" :src="displayImageSource(img)" mode="aspectFill" />
               <view class="photo-delete" @tap="removeImage(idx)">
-                <text class="delete-icon">&#x2715;</text>
+                <app-icon class="delete-icon" name="closeempty" :size="13" color="#FFFFFF" />
               </view>
             </view>
             <view
@@ -197,7 +179,6 @@
         </view>
       </template>
 
-      <!-- 移动设备表单 -->
       <template v-if="deviceType === 'mobile'">
         <view class="form-section">
           <view class="form-label">
@@ -294,12 +275,16 @@
               :key="'dev-' + idx"
               class="photo-item"
             >
-              <image class="photo-img" :src="img" mode="aspectFill" />
+              <image class="photo-img" :src="displayImageSource(img)" mode="aspectFill" />
               <view class="photo-delete" @tap="removeDeviceImage(idx)">
-                <text class="delete-icon">&#x2715;</text>
+                <app-icon class="delete-icon" name="closeempty" :size="13" color="#FFFFFF" />
               </view>
             </view>
-            <view class="photo-add" @tap="addDeviceImage">
+            <view
+              v-if="mobileForm.deviceImages.length < 9"
+              class="photo-add"
+              @tap="addDeviceImage"
+            >
               <text class="add-icon">+</text>
               <text class="add-label">上传图片</text>
             </view>
@@ -318,12 +303,16 @@
               :key="'veh-' + idx"
               class="photo-item"
             >
-              <image class="photo-img" :src="img" mode="aspectFill" />
+              <image class="photo-img" :src="displayImageSource(img)" mode="aspectFill" />
               <view class="photo-delete" @tap="removeVehicleImage(idx)">
-                <text class="delete-icon">&#x2715;</text>
+                <app-icon class="delete-icon" name="closeempty" :size="13" color="#FFFFFF" />
               </view>
             </view>
-            <view class="photo-add" @tap="addVehicleImage">
+            <view
+              v-if="mobileForm.vehicleImages.length < 9"
+              class="photo-add"
+              @tap="addVehicleImage"
+            >
               <text class="add-icon">+</text>
               <text class="add-label">上传图片</text>
             </view>
@@ -331,32 +320,29 @@
         </view>
       </template>
 
-      <!-- 提交按钮 -->
       <view class="submit-area">
         <view class="submit-btn" :class="{ 'submit-disabled': isSubmitting }" @tap="handleSubmit">
-          <text class="submit-text">{{ isSubmitting ? '提交中...' : '提交录入' }}</text>
+          <text class="submit-text">{{ isSubmitting ? '提交中...' : (editingId ? '保存修改' : '提交录入') }}</text>
         </view>
       </view>
 
-      <!-- 底部安全区 -->
       <view class="bottom-safe"></view>
     </scroll-view>
 
-    <!-- 地图位置选择器遮罩 -->
+    <!-- #ifdef H5 -->
     <view v-if="showLocationPicker" class="location-picker-overlay">
       <view class="lp-header" :style="{ paddingTop: statusBarHeight + 'px' }">
         <view class="lp-header-bar">
           <view class="lp-back" @tap="cancelLocationPicker">
-            <text class="lp-back-icon">&#x2190;</text>
+            <app-icon class="lp-back-icon" name="back" :size="22" color="#1D2A3E" />
           </view>
           <text class="lp-title">选取位置</text>
           <view class="lp-confirm" @tap="confirmLocationPicker">
             <text class="lp-confirm-text">确定</text>
           </view>
         </view>
-        <!-- POI搜索 -->
         <view class="lp-search-bar">
-          <text class="lp-search-icon">🔍</text>
+          <app-icon class="lp-search-icon" name="search" :size="18" color="#56627A" />
           <input
             class="lp-search-input"
             v-model="poiSearchText"
@@ -366,12 +352,11 @@
             @confirm="searchPOI"
           />
           <view v-if="poiSearchText" class="lp-search-clear" @tap="clearPOISearch">
-            <text class="lp-clear-icon">&#x2715;</text>
+            <app-icon class="lp-clear-icon" name="closeempty" :size="16" color="#6E7A90" />
           </view>
         </view>
       </view>
 
-      <!-- 搜索结果列表 -->
       <view v-if="poiResults.length > 0" class="poi-results">
         <scroll-view scroll-y class="poi-list">
           <view
@@ -386,22 +371,19 @@
               <text class="poi-item-addr">{{ poi.address || poi.name }}</text>
             </view>
             <view v-if="selectedPoiIdx === idx" class="poi-item-check">
-              <text class="poi-check-icon">&#x2713;</text>
+              <app-icon class="poi-check-icon" name="checkmarkempty" :size="15" color="#FFFFFF" />
             </view>
           </view>
         </scroll-view>
       </view>
 
-      <!-- 地图 -->
       <view id="lp-map-container" class="lp-map-container"></view>
 
-      <!-- 中心标记 -->
       <view class="lp-center-marker">
         <view class="lp-marker-pin"></view>
         <view class="lp-marker-shadow"></view>
       </view>
 
-      <!-- 当前选中信息 -->
       <view class="lp-bottom-info">
         <view class="lp-info-content">
           <text v-if="pickerAddress" class="lp-info-addr">{{ pickerAddress }}</text>
@@ -410,21 +392,32 @@
         </view>
       </view>
     </view>
+    <!-- #endif -->
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+import AppIcon from '@/components/AppIcon.vue'
+// #ifdef H5
+import { loadAMap } from '@/common/amap'
+// #endif
+import { uploadImage } from '@/api/files'
+import { resolveApiUrl } from '@/api/http'
+import {
+  createEmergencyDevice,
+  getEmergencyDevice,
+  updateEmergencyDevice,
+  type SaveEmergencyDeviceRequest
+} from '@/api/devices'
 
-// 系统信息
 const statusBarHeight = ref(0)
 const systemInfo = uni.getSystemInfoSync()
 statusBarHeight.value = systemInfo.statusBarHeight || 20
 
-// 设备类型
 const deviceType = ref<'fixed' | 'mobile'>('fixed')
 
-// 设备品类
 const category = ref('AED')
 const categoryOptions = [
   { value: 'AED', label: 'AED', icon: 'AED' },
@@ -432,7 +425,6 @@ const categoryOptions = [
   { value: '急救包', label: '急救包', icon: '急救' }
 ]
 
-// 固定设备表单
 const fixedForm = ref({
   name: '',
   address: '',
@@ -443,7 +435,6 @@ const fixedForm = ref({
   images: [] as string[]
 })
 
-// 移动设备表单
 const mobileForm = ref({
   name: '',
   deviceCategory: '',
@@ -454,7 +445,6 @@ const mobileForm = ref({
   vehicleImages: [] as string[]
 })
 
-// 服务范围选项
 const rangeOptions = [
   { value: 3, label: '3km' },
   { value: 5, label: '5km' },
@@ -462,7 +452,6 @@ const rangeOptions = [
   { value: 10, label: '10km' }
 ]
 
-// 可用时段选项
 const timeOptions = [
   { value: '全天', label: '全天' },
   { value: '工作日 8:00-18:00', label: '工作日白天' },
@@ -470,92 +459,73 @@ const timeOptions = [
   { value: '周末', label: '周末' }
 ]
 
-// 提交状态
 const isSubmitting = ref(false)
+const editingId = ref('')
 
-// 位置选择器
+const pickedAddress = ref('')
+
+// #ifdef H5
 const showLocationPicker = ref(false)
 let pickerMapInstance: any = null
 const pickerLng = ref(0)
 const pickerLat = ref(0)
 const pickerAddress = ref('')
-const pickedAddress = ref('')
 const poiSearchText = ref('')
 const poiResults = ref<any[]>([])
 const selectedPoiIdx = ref(-1)
+// #endif
 
-// H5文件上传
-let h5FileInput: HTMLInputElement | null = null
-
-onMounted(() => {
-  const isH5 = typeof window !== 'undefined' && typeof document !== 'undefined'
-  if (isH5) {
-    h5FileInput = document.createElement('input')
-    h5FileInput.type = 'file'
-    h5FileInput.accept = 'image/*'
-    h5FileInput.multiple = true
-    h5FileInput.style.display = 'none'
-    h5FileInput.onchange = (e: Event) => {
-      const target = e.target as HTMLInputElement
-      const files = target.files
-      if (!files || files.length === 0) return
-      const callback = (h5FileInput as any)._callback
-      if (callback) {
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i]
-          const reader = new FileReader()
-          reader.onload = (ev) => {
-            const result = ev.target?.result as string
-            if (result) callback(result)
-          }
-          reader.readAsDataURL(file)
-        }
-      }
-    }
-    document.body.appendChild(h5FileInput)
-  }
-})
-
-onUnmounted(() => {
-  if (h5FileInput && h5FileInput.parentNode) {
-    h5FileInput.parentNode.removeChild(h5FileInput)
-    h5FileInput = null
-  }
-})
-
-// 通用图片上传
-function triggerImageUpload(callback: (url: string) => void) {
-  const isH5 = typeof window !== 'undefined' && typeof document !== 'undefined'
-  if (isH5 && h5FileInput) {
-    ;(h5FileInput as any)._callback = callback
-    h5FileInput.value = ''
-    h5FileInput.click()
-    return
-  }
+function triggerImageUpload(count: number, callback: (url: string) => void) {
   uni.chooseImage({
-    count: 9,
+    count,
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
     success: (res) => {
-      res.tempFilePaths.forEach(url => callback(url))
+      const filePaths = Array.isArray(res.tempFilePaths)
+        ? res.tempFilePaths
+        : [res.tempFilePaths]
+      filePaths.forEach((url: string) => callback(url))
     }
   })
 }
 
-// 打开位置选择器
+function displayImageSource(path: string) {
+  return path.startsWith('/api/') ? resolveApiUrl(path) : path
+}
+
+async function persistImagePaths(paths: string[]) {
+  return Promise.all(paths.map(async (path) => {
+    if (path.startsWith('/api/') || /^https?:\/\//.test(path)) return path
+    return (await uploadImage(path)).url
+  }))
+}
+
 function openLocationPicker() {
+  // #ifdef H5
   showLocationPicker.value = true
   poiResults.value = []
   selectedPoiIdx.value = -1
   poiSearchText.value = ''
 
-  // 初始化地图
   setTimeout(() => {
     initPickerMap()
   }, 300)
+  // #endif
+  // #ifndef H5
+  uni.chooseLocation({
+    latitude: fixedForm.value.latitude || undefined,
+    longitude: fixedForm.value.longitude || undefined,
+    success: (location) => {
+      fixedForm.value.latitude = location.latitude
+      fixedForm.value.longitude = location.longitude
+      fixedForm.value.address = location.address || location.name || fixedForm.value.address
+      pickedAddress.value = fixedForm.value.address
+    }
+  })
+  // #endif
 }
 
-// 取消位置选择器
+// #ifdef H5
 function cancelLocationPicker() {
   showLocationPicker.value = false
   if (pickerMapInstance) {
@@ -565,13 +535,11 @@ function cancelLocationPicker() {
   poiResults.value = []
 }
 
-// 确认选取位置
 function confirmLocationPicker() {
   if (pickerLng.value) {
     fixedForm.value.longitude = pickerLng.value
     fixedForm.value.latitude = pickerLat.value
     pickedAddress.value = pickerAddress.value
-    // 自动填充地址
     if (pickerAddress.value && !fixedForm.value.address) {
       fixedForm.value.address = pickerAddress.value
     }
@@ -579,21 +547,29 @@ function confirmLocationPicker() {
   cancelLocationPicker()
 }
 
-// 加载高德地图
-const loadAMap = () => {
-  return new Promise((resolve) => {
-    if ((window as any).AMap) { resolve(true); return }
-    ;(window as any)._AMapSecurityConfig = { securityJsCode: '2b1374475410bd35525b1e1770ad69d1' }
-    const script = document.createElement('script')
-    script.src = 'https://webapi.amap.com/maps?v=2.0&key=d8ce027a3ead033d535a5a99bb81490f'
-    script.onload = () => resolve(true)
-    document.head.appendChild(script)
-  })
-}
-
-// 初始化选点地图
 async function initPickerMap() {
-  await loadAMap()
+  const loaded = await loadAMap()
+  if (!loaded) {
+    const useLocation = (longitude: number, latitude: number) => {
+      fixedForm.value.longitude = longitude
+      fixedForm.value.latitude = latitude
+      pickedAddress.value = fixedForm.value.address || '当前位置'
+      uni.showToast({ title: '已使用当前位置', icon: 'none' })
+      cancelLocationPicker()
+    }
+    uni.getLocation({
+      type: 'gcj02',
+      isHighAccuracy: true,
+      success: (location) => {
+        useLocation(location.longitude, location.latitude)
+      },
+      fail: () => {
+        uni.showToast({ title: '请授权定位后重试', icon: 'none' })
+        cancelLocationPicker()
+      }
+    })
+    return
+  }
   const AMap = (window as any).AMap
 
   const center = fixedForm.value.longitude
@@ -607,7 +583,6 @@ async function initPickerMap() {
     resizeEnable: true
   })
 
-  // 地图点击选点
   pickerMapInstance.on('click', (e: any) => {
     pickerLng.value = e.lnglat.getLng()
     pickerLat.value = e.lnglat.getLat()
@@ -615,7 +590,6 @@ async function initPickerMap() {
     reverseGeocode(pickerLng.value, pickerLat.value)
   })
 
-  // 如果已有经纬度，设置初始位置
   if (fixedForm.value.longitude) {
     pickerLng.value = fixedForm.value.longitude
     pickerLat.value = fixedForm.value.latitude
@@ -623,7 +597,6 @@ async function initPickerMap() {
   }
 }
 
-// 逆地理编码 - 根据经纬度获取地址
 async function reverseGeocode(lng: number, lat: number) {
   const AMap = (window as any).AMap
   try {
@@ -643,7 +616,6 @@ async function reverseGeocode(lng: number, lat: number) {
   }
 }
 
-// POI搜索
 async function searchPOI() {
   if (!poiSearchText.value) return
   const AMap = (window as any).AMap
@@ -678,38 +650,33 @@ async function searchPOI() {
   }
 }
 
-// 选择POI
 function selectPOI(poi: any, idx: number) {
   selectedPoiIdx.value = idx
   pickerLng.value = poi.longitude
   pickerLat.value = poi.latitude
   pickerAddress.value = poi.address || poi.name
 
-  // 移动地图到选中位置
   if (pickerMapInstance) {
     pickerMapInstance.setCenter([poi.longitude, poi.latitude])
   }
 
-  // 清空搜索结果
   poiResults.value = []
   poiSearchText.value = ''
 }
 
-// 清除POI搜索
 function clearPOISearch() {
   poiSearchText.value = ''
   poiResults.value = []
   selectedPoiIdx.value = -1
 }
+// #endif
 
-// 有效期变更
 function onExpireDateChange(e: any) {
   fixedForm.value.expireDate = e.detail.value
 }
 
-// 固定设备图片上传
 function addImage() {
-  triggerImageUpload((url: string) => {
+  triggerImageUpload(3 - fixedForm.value.images.length, (url: string) => {
     if (fixedForm.value.images.length < 3) {
       fixedForm.value.images.push(url)
     }
@@ -720,9 +687,8 @@ function removeImage(idx: number) {
   fixedForm.value.images.splice(idx, 1)
 }
 
-// 移动设备图片上传
 function addDeviceImage() {
-  triggerImageUpload((url: string) => {
+  triggerImageUpload(9 - mobileForm.value.deviceImages.length, (url: string) => {
     mobileForm.value.deviceImages.push(url)
   })
 }
@@ -732,7 +698,7 @@ function removeDeviceImage(idx: number) {
 }
 
 function addVehicleImage() {
-  triggerImageUpload((url: string) => {
+  triggerImageUpload(9 - mobileForm.value.vehicleImages.length, (url: string) => {
     mobileForm.value.vehicleImages.push(url)
   })
 }
@@ -741,11 +707,59 @@ function removeVehicleImage(idx: number) {
   mobileForm.value.vehicleImages.splice(idx, 1)
 }
 
-// 提交
-function handleSubmit() {
+function getCurrentLocation() {
+  return new Promise<{ longitude: number; latitude: number }>((resolve, reject) => {
+    uni.getLocation({
+      type: 'gcj02',
+      isHighAccuracy: true,
+      success: ({ longitude, latitude }) => resolve({ longitude, latitude }),
+      fail: () => reject(new Error('无法获取当前位置，请授权定位后重试'))
+    })
+  })
+}
+
+async function loadEditingDevice(id: string) {
+  try {
+    const device = await getEmergencyDevice(id)
+    deviceType.value = device.type === 'FIXED' ? 'fixed' : 'mobile'
+    category.value = device.category
+    if (device.type === 'FIXED') {
+      fixedForm.value = {
+        name: device.name,
+        address: device.address,
+        longitude: device.longitude,
+        latitude: device.latitude,
+        expireDate: device.expireDate || '',
+        instructions: device.instructions || '',
+        images: device.imageUrls
+      }
+      pickedAddress.value = device.address
+    } else {
+      mobileForm.value = {
+        name: device.name,
+        deviceCategory: device.category,
+        vehicleInfo: device.vehicleInfo || '',
+        serviceRange: device.serviceRange || 5,
+        serviceTime: device.serviceTime || '全天',
+        deviceImages: device.imageUrls,
+        vehicleImages: device.vehicleImageUrls
+      }
+    }
+  } catch {
+    uni.showToast({ title: '设备信息加载失败', icon: 'none' })
+  }
+}
+
+onLoad((query) => {
+  if (query?.id) {
+    editingId.value = String(query.id)
+    loadEditingDevice(editingId.value)
+  }
+})
+
+async function handleSubmit() {
   if (isSubmitting.value) return
 
-  // 基础校验
   if (deviceType.value === 'fixed') {
     if (!fixedForm.value.name) {
       uni.showToast({ title: '请输入设备名称', icon: 'none' })
@@ -753,6 +767,10 @@ function handleSubmit() {
     }
     if (!fixedForm.value.address) {
       uni.showToast({ title: '请输入安装地址', icon: 'none' })
+      return
+    }
+    if (!fixedForm.value.longitude || !fixedForm.value.latitude) {
+      uni.showToast({ title: '请选择设备位置', icon: 'none' })
       return
     }
   } else {
@@ -768,23 +786,66 @@ function handleSubmit() {
 
   isSubmitting.value = true
 
-  setTimeout(() => {
+  try {
+    const location = deviceType.value === 'mobile'
+      ? await getCurrentLocation()
+      : { longitude: fixedForm.value.longitude, latitude: fixedForm.value.latitude }
+    const [imageUrls, vehicleImageUrls] = deviceType.value === 'fixed'
+      ? [await persistImagePaths(fixedForm.value.images), []]
+      : await Promise.all([
+          persistImagePaths(mobileForm.value.deviceImages),
+          persistImagePaths(mobileForm.value.vehicleImages)
+        ])
+    const payload: SaveEmergencyDeviceRequest = deviceType.value === 'fixed'
+      ? {
+          type: 'FIXED',
+          category: category.value,
+          name: fixedForm.value.name.trim(),
+          address: fixedForm.value.address.trim(),
+          longitude: location.longitude,
+          latitude: location.latitude,
+          serviceTime: '全天',
+          expireDate: fixedForm.value.expireDate || undefined,
+          owner: '个人录入',
+          instructions: fixedForm.value.instructions.trim() || undefined,
+          imageUrls,
+          vehicleImageUrls
+        }
+      : {
+          type: 'MOBILE',
+          category: mobileForm.value.deviceCategory.trim() || category.value,
+          name: mobileForm.value.name.trim(),
+          address: '移动设备实时位置',
+          longitude: location.longitude,
+          latitude: location.latitude,
+          serviceTime: mobileForm.value.serviceTime,
+          owner: '个人录入',
+          vehicleInfo: mobileForm.value.vehicleInfo.trim(),
+          serviceRange: mobileForm.value.serviceRange,
+          imageUrls,
+          vehicleImageUrls
+        }
+
+    if (editingId.value) {
+      await updateEmergencyDevice(editingId.value, payload)
+    } else {
+      await createEmergencyDevice(payload)
+    }
     isSubmitting.value = false
     uni.showToast({
-      title: '设备录入成功',
+      title: editingId.value ? '设备修改成功' : '设备录入成功',
       icon: 'success',
-      duration: 2000
+      duration: 1200
     })
     setTimeout(() => {
       uni.navigateBack()
-    }, 1500)
-  }, 1200)
+    }, 800)
+  } catch (error: any) {
+    isSubmitting.value = false
+    uni.showToast({ title: error?.message || '提交失败，请重试', icon: 'none' })
+  }
 }
 
-// 返回
-function goBack() {
-  uni.navigateBack()
-}
 </script>
 
 <style lang="scss" scoped>
@@ -793,50 +854,11 @@ function goBack() {
   background: #F0F4FA;
 }
 
-/* 导航栏 */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.nav-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.back-arrow {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-placeholder {
-  width: 64rpx;
-}
-
-/* 滚动内容 */
 .scroll-content {
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-/* 表单区域 */
 .form-section {
   padding: 28rpx 32rpx 0;
 }
@@ -868,7 +890,6 @@ function goBack() {
   margin-left: 8rpx;
 }
 
-/* 设备类型切换 */
 .type-toggle {
   display: flex;
   gap: 20rpx;
@@ -938,7 +959,6 @@ function goBack() {
   font-weight: 700;
 }
 
-/* 品类选择 */
 .category-selector {
   display: flex;
   gap: 16rpx;
@@ -977,7 +997,6 @@ function goBack() {
   font-weight: 600;
 }
 
-/* 输入框 */
 .input-wrap {
   background: #FFFFFF;
   border-radius: 16rpx;
@@ -997,7 +1016,6 @@ function goBack() {
   font-size: 28rpx;
 }
 
-/* 位置选择 */
 .location-picker {
   display: flex;
   align-items: center;
@@ -1031,7 +1049,6 @@ function goBack() {
   font-weight: 600;
 }
 
-/* 日期选择器 */
 .picker-display {
   display: flex;
   align-items: center;
@@ -1052,7 +1069,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 文本域 */
 .textarea-wrap {
   background: #FFFFFF;
   border-radius: 16rpx;
@@ -1075,7 +1091,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 图片上传 */
 .photo-upload {
   display: flex;
   gap: 20rpx;
@@ -1130,7 +1145,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 服务范围选择 */
 .range-selector {
   display: flex;
   gap: 16rpx;
@@ -1160,7 +1174,6 @@ function goBack() {
   font-weight: 600;
 }
 
-/* 可用时段选择 */
 .time-selector {
   display: flex;
   flex-wrap: wrap;
@@ -1187,7 +1200,6 @@ function goBack() {
   font-weight: 600;
 }
 
-/* 提交按钮 */
 .submit-area {
   padding: 48rpx 32rpx;
 }
@@ -1216,12 +1228,10 @@ function goBack() {
   letter-spacing: 2rpx;
 }
 
-/* 底部安全区 */
 .bottom-safe {
   height: 60rpx;
 }
 
-/* 选中地址显示 */
 .picked-address {
   display: flex;
   align-items: center;
@@ -1240,7 +1250,7 @@ function goBack() {
   font-weight: 500;
 }
 
-/* 位置选择器遮罩 */
+/* #ifdef H5 */
 .location-picker-overlay {
   position: fixed;
   top: 0;
@@ -1328,7 +1338,6 @@ function goBack() {
   color: #FFFFFF;
 }
 
-/* 搜索结果 */
 .poi-results {
   position: absolute;
   top: 200rpx;
@@ -1395,13 +1404,11 @@ function goBack() {
   font-weight: 700;
 }
 
-/* 地图容器 */
 .lp-map-container {
   flex: 1;
   width: 100%;
 }
 
-/* 中心标记 */
 .lp-center-marker {
   position: absolute;
   top: 50%;
@@ -1448,7 +1455,6 @@ function goBack() {
   margin: 4px auto 0;
 }
 
-/* 底部信息 */
 .lp-bottom-info {
   position: absolute;
   bottom: 0;
@@ -1479,4 +1485,5 @@ function goBack() {
   color: #86909C;
   margin-top: 6rpx;
 }
+/* #endif */
 </style>

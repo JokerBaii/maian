@@ -1,28 +1,12 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <text class="back-arrow">&#x2190;</text>
-        </view>
-        <text class="nav-title">健康档案</text>
-        <view class="nav-placeholder"></view>
-      </view>
-    </view>
-
-    <scroll-view
-      class="scroll-content"
-      scroll-y
-      :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
-    >
-      <!-- 顶部概览卡片 -->
+    <scroll-view class="scroll-content" scroll-y>
       <view class="summary-card">
         <view class="summary-bg"></view>
         <view class="summary-content">
           <view class="summary-top">
             <view class="summary-icon-wrap">
-              <text class="summary-icon">📁</text>
+              <app-icon class="summary-icon" name="folder-add-filled" :size="22" color="#1F63D5" />
             </view>
             <view class="summary-info">
               <text class="summary-title">我的健康档案</text>
@@ -48,7 +32,6 @@
         </view>
       </view>
 
-      <!-- 时间线列表 -->
       <view class="timeline-section">
         <view class="section-header">
           <view class="section-title-wrap">
@@ -64,7 +47,6 @@
             class="timeline-item"
             @tap="goReport(record)"
           >
-            <!-- 时间线节点 -->
             <view class="timeline-left">
               <view class="timeline-dot-wrap">
                 <view class="timeline-dot" :class="'dot-' + record.riskLevel"></view>
@@ -76,12 +58,11 @@
               </view>
             </view>
 
-            <!-- 记录卡片 -->
             <view class="record-card" :class="'card-' + record.riskLevel">
               <view class="record-header">
                 <view class="record-hospital-wrap">
                   <view class="hospital-icon">
-                    <text class="hospital-icon-text">🏥</text>
+                    <app-icon class="hospital-icon-text" name="staff-filled" :size="20" color="#1F63D5" />
                   </view>
                   <text class="record-hospital">{{ record.hospital }}</text>
                 </view>
@@ -121,11 +102,9 @@
         </view>
       </view>
 
-      <!-- 底部安全区 -->
       <view class="bottom-safe"></view>
     </scroll-view>
 
-    <!-- 浮动上传按钮 -->
     <view class="fab-btn" @tap="goUpload">
       <view class="fab-icon-wrap">
         <text class="fab-icon">+</text>
@@ -136,18 +115,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { mockHealthArchive } from '@/mock/data'
+import { computed, ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import AppIcon from '@/components/AppIcon.vue'
+import { listHealthReports } from '@/api/reports'
 
-// 系统信息
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
+interface ArchiveRecord {
+  id: string
+  date: string
+  hospital: string
+  riskLevel: string
+  abnormalCount: number
+}
 
-// 数据
-const archive = computed(() => mockHealthArchive)
+const archive = ref<ArchiveRecord[]>([])
 
-// 概览数据
+onShow(async () => {
+  try {
+    const reports = await listHealthReports()
+    archive.value = reports.map(report => ({
+      id: report.id,
+      date: report.checkupDate,
+      hospital: report.hospital,
+      riskLevel: report.riskLevel.toLowerCase(),
+      abnormalCount: report.indicators.filter(indicator => indicator.abnormal).length
+    }))
+  } catch {
+    uni.showToast({ title: '健康档案加载失败', icon: 'none' })
+  }
+})
+
 const latestDate = computed(() => {
   if (archive.value.length > 0) {
     const d = archive.value[0].date
@@ -179,7 +176,6 @@ function riskWidth(level: string) {
   return map[level] || 33
 }
 
-// 导航
 function goReport(record: any) {
   uni.navigateTo({ url: '/pages/checkup/report?id=' + record.id })
 }
@@ -188,9 +184,6 @@ function goUpload() {
   uni.navigateTo({ url: '/pages/checkup/upload' })
 }
 
-function goBack() {
-  uni.navigateBack()
-}
 </script>
 
 <style lang="scss" scoped>
@@ -199,51 +192,12 @@ function goBack() {
   background: #F0F4FA;
 }
 
-/* 导航栏 */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.nav-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.back-arrow {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-placeholder {
-  width: 64rpx;
-}
-
-/* 滚动内容 */
 .scroll-content {
   min-height: 100vh;
   box-sizing: border-box;
   padding-bottom: 160rpx;
 }
 
-/* 概览卡片 */
 .summary-card {
   position: relative;
   margin: 24rpx 24rpx 0;
@@ -332,7 +286,6 @@ function goBack() {
   background: rgba(255, 255, 255, 0.15);
 }
 
-/* 时间线区域 */
 .timeline-section {
   margin: 24rpx 24rpx 0;
 }
@@ -356,7 +309,6 @@ function goBack() {
   color: #1D2129;
 }
 
-/* 时间线 */
 .timeline {
   padding-left: 4rpx;
 }
@@ -369,7 +321,6 @@ function goBack() {
   padding-bottom: 0;
 }
 
-/* 时间线左侧 */
 .timeline-left {
   display: flex;
   flex-direction: column;
@@ -428,7 +379,6 @@ function goBack() {
   font-weight: 700;
 }
 
-/* 记录卡片 */
 .record-card {
   flex: 1;
   background: #FFFFFF;
@@ -589,7 +539,6 @@ function goBack() {
   color: #2B6FF0;
 }
 
-/* 浮动按钮 */
 .fab-btn {
   position: fixed;
   right: 32rpx;
@@ -627,7 +576,6 @@ function goBack() {
   font-weight: 600;
 }
 
-/* 底部安全区 */
 .bottom-safe {
   height: 60rpx;
 }

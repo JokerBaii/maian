@@ -1,14 +1,22 @@
 <template>
   <view class="page">
-    <!-- 封面/视频区域 -->
     <view class="cover-area">
-      <!-- 视频播放器 -->
       <view v-if="article.media && article.media.type === 'video'" class="video-area">
+        <view v-if="!videoStarted" class="video-cover" @tap="startVideo">
+          <image
+            class="video-cover-image"
+            :src="article.cover"
+            mode="aspectFill"
+          />
+          <view class="video-cover-wash"></view>
+          <view class="video-play"></view>
+          <text class="video-cover-label">播放急救教学视频</text>
+        </view>
         <video
+          v-else
           id="science-video"
           class="cover-video"
           :src="article.media.url"
-          :poster="article.media.poster || article.cover"
           controls
           autoplay
           muted
@@ -19,23 +27,18 @@
           playsinline
           x5-playsinline
         ></video>
-        <view class="video-badge">
-          <text class="video-badge-icon">▶</text>
+        <view class="video-badge" :class="{ 'video-badge-playing': videoStarted }">
+          <app-icon name="videocam-filled" :size="16" color="#2B6FF0" />
           <text class="video-badge-text">视频教程</text>
         </view>
       </view>
-      <!-- 封面图（无视频时） -->
       <view v-else class="cover-image-area">
-        <image class="cover-image" :src="article.cover" mode="aspectFill" />
+        <image
+          class="cover-image"
+          :src="article.cover"
+          mode="aspectFill"
+        />
         <view class="cover-gradient"></view>
-      </view>
-      <view class="cover-nav" :style="{ paddingTop: statusBarHeight + 'px' }">
-        <view class="nav-bar-content">
-          <view class="nav-back" @tap="goBack">
-            <text class="back-icon">&#x2190;</text>
-          </view>
-          <view class="nav-placeholder"></view>
-        </view>
       </view>
       <view v-if="!(article.media && article.media.type === 'video')" class="cover-category">
         <view class="category-tag">
@@ -44,16 +47,13 @@
       </view>
     </view>
 
-    <scroll-view
-      class="scroll-content"
-      scroll-y
-      :style="{ marginTop: coverHeight + 'px' }"
-    >
-      <!-- 文章信息 -->
+    <view class="scroll-content">
       <view class="article-header">
         <text class="article-title">{{ article.title }}</text>
         <view class="author-row">
-          <image class="author-avatar" :src="article.authorAvatar" mode="aspectFill" />
+          <view class="author-avatar">
+            <app-icon name="person-filled" :size="22" color="#2B6FF0" />
+          </view>
           <view class="author-info">
             <text class="author-name">{{ article.author }}</text>
             <view class="meta-row">
@@ -65,7 +65,6 @@
         </view>
       </view>
 
-      <!-- 图片画廊 -->
       <view v-if="article.media && article.media.images && article.media.images.length > 0" class="media-gallery">
         <view class="gallery-header">
           <view class="gallery-title-bar"></view>
@@ -86,7 +85,6 @@
         </scroll-view>
       </view>
 
-      <!-- 文章正文 -->
       <view class="article-body">
         <view
           v-for="(paragraph, idx) in contentParagraphs"
@@ -97,16 +95,19 @@
         </view>
       </view>
 
-      <!-- 底部操作栏占位 -->
       <view class="action-bar-placeholder"></view>
-    </scroll-view>
+    </view>
 
-    <!-- 底部操作栏 -->
     <view class="action-bar">
       <view class="action-bar-inner">
         <view class="action-item" @tap="toggleLike">
           <view class="action-icon-wrap" :class="{ 'action-icon-active': isLiked }">
-            <text class="action-icon">{{ isLiked ? '&#x2764;' : '&#x2661;' }}</text>
+            <app-icon
+              class="action-icon"
+              :name="isLiked ? 'heart-filled' : 'heart'"
+              :size="21"
+              :color="isLiked ? '#D64B4B' : '#738099'"
+            />
           </view>
           <text class="action-label" :class="{ 'action-label-active': isLiked }">
             {{ isLiked ? article.likeCount + 1 : article.likeCount }}
@@ -114,7 +115,12 @@
         </view>
         <view class="action-item" @tap="toggleCollect">
           <view class="action-icon-wrap" :class="{ 'action-icon-active': isCollected }">
-            <text class="action-icon">{{ isCollected ? '&#x2605;' : '&#x2606;' }}</text>
+            <app-icon
+              class="action-icon"
+              :name="isCollected ? 'star-filled' : 'star'"
+              :size="21"
+              :color="isCollected ? '#D18A2A' : '#738099'"
+            />
           </view>
           <text class="action-label" :class="{ 'action-label-active': isCollected }">
             {{ isCollected ? article.collectCount + 1 : article.collectCount }}
@@ -122,7 +128,7 @@
         </view>
         <view class="action-item" @tap="handleShare">
           <view class="action-icon-wrap">
-            <text class="action-icon">&#x2197;</text>
+            <app-icon class="action-icon" name="redo-filled" :size="21" color="#738099" />
           </view>
           <text class="action-label">分享</text>
         </view>
@@ -132,15 +138,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { mockScienceContents } from '@/mock/data'
+import { ref, computed, nextTick } from 'vue'
+import { scienceArticles } from '@/data/editorial'
+import AppIcon from '@/components/AppIcon.vue'
 
-// 系统信息
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
-
-// 获取路由参数
 const articleId = ref('S001')
 const pages = getCurrentPages()
 const currentPage = pages[pages.length - 1] as any
@@ -148,43 +149,48 @@ if (currentPage?.options?.id) {
   articleId.value = currentPage.options.id
 }
 
-// 封面高度（导航栏 + 封面图区域）
-const coverHeight = computed(() => {
-  return statusBarHeight.value + 44 + 320
-})
-
-// 文章数据 - 根据URL参数查找
 const article = computed(() => {
-  const found = mockScienceContents.find(c => c.id === articleId.value)
-  return found || mockScienceContents[0]
+  const found = scienceArticles.find(c => c.id === articleId.value)
+  return found || scienceArticles[0]
 })
 
-// 点赞/收藏状态
-const isLiked = ref(article.value.isLiked)
-const isCollected = ref(article.value.isCollected)
+const INTERACTION_STORAGE_KEY = 'maian:science-interactions'
+type ArticleInteraction = { liked?: boolean; collected?: boolean }
+type ArticleInteractions = Record<string, ArticleInteraction>
 
-// 内容段落拆分
+function getStoredInteractions(): ArticleInteractions {
+  const stored = uni.getStorageSync(INTERACTION_STORAGE_KEY)
+  return stored && typeof stored === 'object' ? stored as ArticleInteractions : {}
+}
+
+const storedInteraction = getStoredInteractions()[articleId.value] || {}
+const isLiked = ref(storedInteraction.liked ?? article.value.isLiked)
+const isCollected = ref(storedInteraction.collected ?? article.value.isCollected)
+
+function persistInteraction() {
+  const interactions = getStoredInteractions()
+  interactions[articleId.value] = {
+    liked: isLiked.value,
+    collected: isCollected.value
+  }
+  uni.setStorageSync(INTERACTION_STORAGE_KEY, interactions)
+}
+
 const contentParagraphs = computed(() => {
   const content = article.value.content || ''
   return content.split('\n\n').filter(p => p.trim())
 })
 
-// 视频自动播放 - 使用uni-app VideoContext
+const videoStarted = ref(false)
 let videoContext: any = null
 
-// 页面加载后触发视频自动播放
-onMounted(() => {
-  if (article.value.media && article.value.media.type === 'video') {
-    setTimeout(() => {
-      videoContext = uni.createVideoContext('science-video')
-      if (videoContext) {
-        videoContext.play()
-      }
-    }, 800)
-  }
-})
+async function startVideo() {
+  videoStarted.value = true
+  await nextTick()
+  videoContext = uni.createVideoContext('science-video')
+  videoContext?.play()
+}
 
-// 格式化阅读数
 function formatViewCount(count: number) {
   if (count >= 10000) {
     return (count / 10000).toFixed(1) + '万'
@@ -192,9 +198,9 @@ function formatViewCount(count: number) {
   return count.toString()
 }
 
-// 切换点赞
 function toggleLike() {
   isLiked.value = !isLiked.value
+  persistInteraction()
   uni.showToast({
     title: isLiked.value ? '已点赞' : '已取消点赞',
     icon: 'none',
@@ -202,9 +208,9 @@ function toggleLike() {
   })
 }
 
-// 切换收藏
 function toggleCollect() {
   isCollected.value = !isCollected.value
+  persistInteraction()
   uni.showToast({
     title: isCollected.value ? '已收藏' : '已取消收藏',
     icon: 'none',
@@ -212,16 +218,13 @@ function toggleCollect() {
   })
 }
 
-// 分享
 function handleShare() {
-  uni.showToast({
-    title: '分享功能开发中',
-    icon: 'none',
-    duration: 1000
+  uni.setClipboardData({
+    data: `${article.value.title}\n${article.value.summary}`,
+    success: () => uni.showToast({ title: '分享内容已复制', icon: 'none' })
   })
 }
 
-// 预览图片
 function previewImage(idx: number) {
   if (article.value.media && article.value.media.images) {
     uni.previewImage({
@@ -231,10 +234,6 @@ function previewImage(idx: number) {
   }
 }
 
-// 返回
-function goBack() {
-  uni.navigateBack()
-}
 </script>
 
 <style lang="scss" scoped>
@@ -243,14 +242,9 @@ function goBack() {
   background: #F5F7FA;
 }
 
-/* 封面图区域 */
 .cover-area {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: relative;
   height: 500rpx;
-  z-index: 10;
 }
 .cover-image-area {
   width: 100%;
@@ -265,31 +259,82 @@ function goBack() {
   width: 100%;
   height: 100%;
   position: relative;
-  background: #000;
+  overflow: hidden;
+  background: #EAF2FF;
 }
 .cover-video {
   width: 100%;
   height: 100%;
 }
+.video-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18rpx;
+}
+.video-cover-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.video-cover-wash {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(247, 251, 255, 0.18), rgba(232, 242, 255, 0.68));
+}
+.video-play {
+  position: relative;
+  z-index: 2;
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2B6FF0;
+  box-shadow: 0 14rpx 34rpx rgba(43, 111, 240, 0.3);
+}
+.video-play::before {
+  content: '';
+  width: 0;
+  height: 0;
+  margin-left: 8rpx;
+  border-top: 18rpx solid transparent;
+  border-bottom: 18rpx solid transparent;
+  border-left: 28rpx solid #FFFFFF;
+}
+.video-cover-label {
+  position: relative;
+  z-index: 2;
+  padding: 10rpx 20rpx;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.86);
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #245BB8;
+}
 .video-badge {
   position: absolute;
-  top: 100rpx;
+  top: 24rpx;
   right: 24rpx;
   display: flex;
   align-items: center;
   gap: 6rpx;
   padding: 8rpx 20rpx;
   border-radius: 20rpx;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.9);
   z-index: 20;
 }
-.video-badge-icon {
-  font-size: 22rpx;
-  color: #FFFFFF;
+.video-badge-playing {
+  opacity: 0.82;
 }
 .video-badge-text {
   font-size: 22rpx;
-  color: #FFFFFF;
+  color: #245BB8;
   font-weight: 500;
 }
 .cover-gradient {
@@ -300,38 +345,6 @@ function goBack() {
   height: 280rpx;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.6) 100%);
   z-index: 2;
-}
-.cover-nav {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 20;
-}
-.nav-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 50%;
-  backdrop-filter: blur(8px);
-}
-.back-icon {
-  font-size: 36rpx;
-  color: #FFFFFF;
-  font-weight: 700;
-}
-.nav-placeholder {
-  width: 64rpx;
 }
 .cover-category {
   position: absolute;
@@ -352,17 +365,15 @@ function goBack() {
   color: #FFFFFF;
 }
 
-/* 滚动内容 */
 .scroll-content {
   position: relative;
-  z-index: 15;
-  min-height: 100vh;
+  z-index: 2;
+  margin-top: -32rpx;
   background: #FFFFFF;
   border-radius: 32rpx 32rpx 0 0;
   box-shadow: 0 -8rpx 32rpx rgba(0, 0, 0, 0.08);
 }
 
-/* 文章头部 */
 .article-header {
   padding: 40rpx 32rpx 0;
 }
@@ -386,6 +397,10 @@ function goBack() {
   border-radius: 50%;
   border: 3rpx solid #E8F0FE;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #F2F7FF;
 }
 .author-info {
   margin-left: 16rpx;
@@ -412,7 +427,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 文章正文 */
 .article-body {
   padding: 32rpx;
 }
@@ -429,7 +443,6 @@ function goBack() {
   letter-spacing: 1rpx;
 }
 
-/* 图片画廊 */
 .media-gallery {
   padding: 24rpx 32rpx 0;
 }
@@ -469,12 +482,10 @@ function goBack() {
   flex-shrink: 0;
 }
 
-/* 底部操作栏占位 */
 .action-bar-placeholder {
   height: 140rpx;
 }
 
-/* 底部操作栏 */
 .action-bar {
   position: fixed;
   bottom: 0;

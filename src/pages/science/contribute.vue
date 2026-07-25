@@ -1,26 +1,10 @@
 <template>
   <view class="page">
-    <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <text class="back-arrow">&#x2190;</text>
-        </view>
-        <text class="nav-title">内容投稿</text>
-        <view class="nav-placeholder"></view>
-      </view>
-    </view>
-
-    <scroll-view
-      class="scroll-content"
-      scroll-y
-      :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
-    >
-      <!-- 投稿须知卡片 -->
+    <scroll-view class="scroll-content" scroll-y>
       <view class="tips-card">
         <view class="tips-header">
           <view class="tips-icon-wrap">
-            <text class="tips-icon">📝</text>
+            <app-icon class="tips-icon" name="compose" :size="22" color="#1F63D5" />
           </view>
           <text class="tips-title">投稿须知</text>
         </view>
@@ -44,9 +28,7 @@
         </view>
       </view>
 
-      <!-- 表单区域 -->
       <view class="form-card">
-        <!-- 标题输入 -->
         <view class="form-section">
           <view class="form-label-row">
             <view class="form-label-bar"></view>
@@ -65,7 +47,6 @@
           </view>
         </view>
 
-        <!-- 分类选择 -->
         <view class="form-section">
           <view class="form-label-row">
             <view class="form-label-bar"></view>
@@ -85,7 +66,6 @@
           </view>
         </view>
 
-        <!-- 内容输入 -->
         <view class="form-section">
           <view class="form-label-row">
             <view class="form-label-bar"></view>
@@ -107,7 +87,6 @@
           </view>
         </view>
 
-        <!-- 封面图上传 -->
         <view class="form-section">
           <view class="form-label-row">
             <view class="form-label-bar"></view>
@@ -124,14 +103,13 @@
             <view v-else class="upload-preview" @tap="chooseCoverImage">
               <image class="preview-image" :src="formData.coverImage" mode="aspectFill" />
               <view class="preview-remove" @tap.stop="removeCoverImage">
-                <text class="remove-icon">&#x2717;</text>
+                <app-icon class="remove-icon" name="closeempty" :size="14" color="#FFFFFF" />
               </view>
             </view>
           </view>
         </view>
       </view>
 
-      <!-- 提交按钮 -->
       <view class="submit-area">
         <view
           class="submit-btn"
@@ -142,7 +120,6 @@
         </view>
       </view>
 
-      <!-- 底部安全区 -->
       <view class="bottom-safe"></view>
     </scroll-view>
   </view>
@@ -150,13 +127,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import AppIcon from '@/components/AppIcon.vue'
+import { createScienceSubmission } from '@/api/science'
+import { uploadImage } from '@/api/files'
 
-// 系统信息
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
-
-// 分类选项
 const categories = [
   { key: 'device', label: '设备使用' },
   { key: 'emergency', label: '突发急症' },
@@ -164,7 +138,6 @@ const categories = [
   { key: 'exercise', label: '运动养生' }
 ]
 
-// 表单数据
 const formData = ref({
   title: '',
   category: '',
@@ -172,14 +145,12 @@ const formData = ref({
   coverImage: ''
 })
 
-// 是否可提交
 const canSubmit = computed(() => {
   return formData.value.title.trim() !== '' &&
     formData.value.category !== '' &&
     formData.value.content.trim() !== ''
 })
 
-// 选择封面图
 function chooseCoverImage() {
   uni.chooseImage({
     count: 1,
@@ -191,13 +162,11 @@ function chooseCoverImage() {
   })
 }
 
-// 移除封面图
 function removeCoverImage() {
   formData.value.coverImage = ''
 }
 
-// 提交
-function handleSubmit() {
+async function handleSubmit() {
   if (!canSubmit.value) {
     uni.showToast({
       title: '请填写必填项',
@@ -211,30 +180,34 @@ function handleSubmit() {
     title: '提交中...'
   })
 
-  setTimeout(() => {
+  try {
+    const cover = formData.value.coverImage
+      ? await uploadImage(formData.value.coverImage)
+      : null
+    await createScienceSubmission({
+      title: formData.value.title.trim(),
+      category: formData.value.category,
+      content: formData.value.content.trim(),
+      coverImageUrl: cover?.url
+    })
     uni.hideLoading()
     uni.showToast({
       title: '投稿成功，等待审核',
       icon: 'success',
-      duration: 2000
+      duration: 1500
     })
-
-    // 重置表单
-    setTimeout(() => {
-      formData.value = {
-        title: '',
-        category: '',
-        content: '',
-        coverImage: ''
-      }
-    }, 2000)
-  }, 1500)
+    formData.value = {
+      title: '',
+      category: '',
+      content: '',
+      coverImage: ''
+    }
+  } catch (error: any) {
+    uni.hideLoading()
+    uni.showToast({ title: error?.message || '投稿失败，请重试', icon: 'none' })
+  }
 }
 
-// 返回
-function goBack() {
-  uni.navigateBack()
-}
 </script>
 
 <style lang="scss" scoped>
@@ -243,50 +216,11 @@ function goBack() {
   background: #F0F4FA;
 }
 
-/* 导航栏 */
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.nav-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.back-arrow {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-placeholder {
-  width: 64rpx;
-}
-
-/* 滚动内容 */
 .scroll-content {
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-/* 投稿须知卡片 */
 .tips-card {
   margin: 24rpx 24rpx 0;
   background: linear-gradient(135deg, #E8F0FE 0%, #D4E4FC 100%);
@@ -341,7 +275,6 @@ function goBack() {
   line-height: 1.6;
 }
 
-/* 表单卡片 */
 .form-card {
   margin: 24rpx 24rpx 0;
   background: #FFFFFF;
@@ -350,7 +283,6 @@ function goBack() {
   box-shadow: 0 4rpx 24rpx rgba(43, 111, 240, 0.06);
 }
 
-/* 表单区块 */
 .form-section {
   padding: 24rpx 0;
   border-bottom: 1rpx solid #F2F3F5;
@@ -381,7 +313,6 @@ function goBack() {
   margin-left: 4rpx;
 }
 
-/* 输入框 */
 .input-wrap {
   display: flex;
   align-items: center;
@@ -414,7 +345,6 @@ function goBack() {
   flex-shrink: 0;
 }
 
-/* 分类选择 */
 .category-list {
   display: flex;
   flex-wrap: wrap;
@@ -446,7 +376,6 @@ function goBack() {
   font-weight: 700;
 }
 
-/* 文本域 */
 .textarea-wrap {
   background: #F7F8FA;
   border-radius: 16rpx;
@@ -477,7 +406,6 @@ function goBack() {
   color: #C9CDD4;
 }
 
-/* 封面图上传 */
 .upload-area {
   margin-top: 4rpx;
 }
@@ -552,7 +480,6 @@ function goBack() {
   font-weight: 700;
 }
 
-/* 提交按钮 */
 .submit-area {
   padding: 40rpx 24rpx 0;
 }
@@ -585,7 +512,6 @@ function goBack() {
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* 底部安全区 */
 .bottom-safe {
   height: 60rpx;
 }
