@@ -46,7 +46,3 @@ export function listHealthReports() {
 export function getHealthReport(id: string) {
   return request<HealthReportResponse>(`/api/v1/health-reports/${encodeURIComponent(id)}`)
 }
-
-export function deleteHealthReport(id: string) {
-  return request<void>(`/api/v1/health-reports/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
