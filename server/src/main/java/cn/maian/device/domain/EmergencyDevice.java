@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -70,6 +71,18 @@ public class EmergencyDevice {
     @Column(length = 500)
     private String instructions;
 
+    private Instant lastLocationAt;
+
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 36)
+    private UUID reservedForCallId;
+
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 36)
+    private UUID registeredByUserId;
+
+    private Instant reservedAt;
+
     @ElementCollection
     @CollectionTable(
         name = "emergency_device_images",
@@ -90,6 +103,10 @@ public class EmergencyDevice {
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     protected EmergencyDevice() {
     }
@@ -117,6 +134,9 @@ public class EmergencyDevice {
         device.createdAt = Instant.now();
         device.update(type, category, name, address, longitude, latitude, ownerPhone, serviceTime,
             expireDate, owner, vehicleInfo, serviceRange, instructions, imageUrls, vehicleImageUrls);
+        if (type == DeviceType.MOBILE) {
+            device.lastLocationAt = device.createdAt;
+        }
         return device;
     }
 
@@ -137,6 +157,7 @@ public class EmergencyDevice {
         List<String> imageUrls,
         List<String> vehicleImageUrls
     ) {
+        DeviceType previousType = this.type;
         this.type = type;
         this.category = category;
         this.name = name;
@@ -152,10 +173,38 @@ public class EmergencyDevice {
         this.instructions = instructions;
         this.imageUrls = new ArrayList<>(imageUrls);
         this.vehicleImageUrls = new ArrayList<>(vehicleImageUrls);
+        if (type == DeviceType.MOBILE && previousType != DeviceType.MOBILE) {
+            this.lastLocationAt = Instant.now();
+        } else if (type == DeviceType.FIXED) {
+            this.lastLocationAt = null;
+        }
     }
 
     public void changeStatus(DeviceStatus status) {
         this.status = status;
+    }
+
+    public void registerTo(UUID userId) {
+        if (this.registeredByUserId != null && !this.registeredByUserId.equals(userId)) {
+            throw new IllegalStateException("设备已绑定其他用户");
+        }
+        this.registeredByUserId = userId;
+    }
+
+    public void updateLocation(double longitude, double latitude, String address, Instant updatedAt) {
+        this.longitude = longitude;
+        this.latitude = latitude;
+        this.address = address;
+        this.lastLocationAt = updatedAt;
+    }
+
+    public void releaseReservation(UUID rescueCallId) {
+        if (!rescueCallId.equals(this.reservedForCallId)) {
+            return;
+        }
+        this.status = DeviceStatus.AVAILABLE;
+        this.reservedForCallId = null;
+        this.reservedAt = null;
     }
 
     public UUID getId() {
@@ -228,5 +277,25 @@ public class EmergencyDevice {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getLastLocationAt() {
+        return lastLocationAt;
+    }
+
+    public UUID getReservedForCallId() {
+        return reservedForCallId;
+    }
+
+    public Instant getReservedAt() {
+        return reservedAt;
+    }
+
+    public long getVersion() {
+        return version;
+    }
+
+    public UUID getRegisteredByUserId() {
+        return registeredByUserId;
     }
 }

@@ -57,6 +57,10 @@ export function request<T>(
         'Content-Type': 'application/json'
       },
       success(response: UniNamespace.RequestSuccessCallbackResult) {
+        if (response.statusCode === 204) {
+          resolve(undefined as T)
+          return
+        }
         const body = response.data as unknown as ApiResponse<T>
         if (response.statusCode >= 200 && response.statusCode < 300 && body.success && body.data !== undefined) {
           resolve(body.data)

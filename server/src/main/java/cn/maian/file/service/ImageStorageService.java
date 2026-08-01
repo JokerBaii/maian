@@ -11,7 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.UUID;
 
@@ -58,8 +58,12 @@ public class ImageStorageService {
         var target = storageDirectory.resolve(filename).normalize();
         ensureInsideStorage(target);
 
-        try (var inputStream = file.getInputStream()) {
-            Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
+        try {
+            byte[] content = file.getBytes();
+            if (!hasExpectedSignature(content, imageType.extension())) {
+                throw new IllegalArgumentException("图片内容与文件类型不匹配");
+            }
+            Files.write(target, content, StandardOpenOption.CREATE_NEW);
             return filename;
         } catch (IOException exception) {
             throw new IllegalStateException("图片保存失败", exception);
@@ -95,6 +99,34 @@ public class ImageStorageService {
         if (!path.startsWith(storageDirectory)) {
             throw new IllegalArgumentException("图片地址无效");
         }
+    }
+
+    private boolean hasExpectedSignature(byte[] content, String extension) {
+        return switch (extension) {
+            case "jpg" -> content.length >= 3
+                && (content[0] & 0xFF) == 0xFF
+                && (content[1] & 0xFF) == 0xD8
+                && (content[2] & 0xFF) == 0xFF;
+            case "png" -> content.length >= 8
+                && (content[0] & 0xFF) == 0x89
+                && content[1] == 0x50
+                && content[2] == 0x4E
+                && content[3] == 0x47
+                && content[4] == 0x0D
+                && content[5] == 0x0A
+                && content[6] == 0x1A
+                && content[7] == 0x0A;
+            case "webp" -> content.length >= 12
+                && content[0] == 'R'
+                && content[1] == 'I'
+                && content[2] == 'F'
+                && content[3] == 'F'
+                && content[8] == 'W'
+                && content[9] == 'E'
+                && content[10] == 'B'
+                && content[11] == 'P';
+            default -> false;
+        };
     }
 
     private record StoredImageType(String extension, MediaType mediaType) {

@@ -82,6 +82,14 @@ public class ScienceSubmission {
         return category;
     }
 
+    public String getContent() {
+        return content;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
     public SubmissionStatus getStatus() {
         return status;
     }

@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <scroll-view class="scroll-content" scroll-y>
+    <view class="scroll-content">
       <view class="page-actions">
         <view class="page-add-action" @tap="goAdd">
           <app-icon name="plus" :size="18" color="#FFFFFF" />
@@ -26,125 +26,25 @@
         </view>
       </view>
 
-      <view v-if="activeTab === 'fixed'" class="device-list">
-        <view v-if="fixedDevices.length > 0">
+      <view class="device-list">
+        <view v-if="currentDevices.length > 0">
           <view
-            v-for="device in fixedDevices"
+            v-for="device in currentDevices"
             :key="device.id"
             class="device-card"
           >
             <view class="card-header">
               <view class="card-header-left">
-                <view class="device-icon-wrap device-icon-fixed">
-                  <text class="device-icon-text">{{ device.category === 'AED' ? 'AED' : '急救' }}</text>
-                </view>
                 <view class="card-header-info">
                   <text class="card-name">{{ device.name }}</text>
                   <view class="card-meta-row">
-                    <view class="card-category-tag">
-                      <text class="category-tag-text">{{ device.category }}</text>
-                    </view>
-                    <view class="card-type-tag card-type-fixed">
-                      <text class="type-tag-text">固定</text>
-                    </view>
+                    <text class="category-tag-text">{{ device.category }}</text>
+                    <text class="card-meta-separator">·</text>
+                    <text class="type-tag-text">{{ device.type === 'FIXED' ? '固定设备' : '移动设备' }}</text>
                   </view>
                 </view>
               </view>
-              <view class="card-status-toggle" @tap="toggleDeviceStatus(device)">
-                <view
-                  class="status-switch"
-                  :class="{ 'status-switch-on': device.status === 'AVAILABLE' }"
-                >
-                  <view class="status-switch-thumb"></view>
-                </view>
-                <text class="status-switch-label">{{ device.status === 'AVAILABLE' ? '在线' : '离线' }}</text>
-              </view>
-            </view>
-
-            <view class="card-body">
-              <view class="card-info-item">
-                <app-icon class="info-icon" name="location-filled" :size="16" color="#8994A8" />
-                <text class="info-text">{{ device.address }}</text>
-              </view>
-              <view class="card-info-item">
-                <app-icon class="info-icon" name="calendar" :size="16" color="#8994A8" />
-                <text class="info-text">
-                  {{ device.expireDate ? `有效期至 ${device.expireDate}` : '未设置有效期' }}
-                </text>
-              </view>
-              <view class="card-info-item">
-                <app-icon class="info-icon" name="shop-filled" :size="16" color="#8994A8" />
-                <text class="info-text">{{ device.owner || '未登记所有方' }}</text>
-              </view>
-              <view v-if="deviceImages(device).length" class="card-image-strip">
-                <image
-                  v-for="(imageUrl, index) in deviceImages(device)"
-                  :key="imageUrl"
-                  class="card-image"
-                  :src="resolveApiUrl(imageUrl)"
-                  mode="aspectFill"
-                  @tap="previewDeviceImage(device, index)"
-                />
-              </view>
-            </view>
-
-            <view class="card-footer">
-              <view class="card-status-badge" :class="'badge-' + (device.status === 'AVAILABLE' ? 'online' : 'offline')">
-                <view class="badge-dot"></view>
-                <text class="badge-text">{{ device.status === 'AVAILABLE' ? '可用' : '维护中' }}</text>
-              </view>
-              <view class="card-actions">
-                <view class="card-btn card-btn-detail" @tap="viewDetail(device)">
-                  <text class="card-btn-text">详情</text>
-                </view>
-                <view class="card-btn card-btn-edit" @tap="editDevice(device)">
-                  <text class="card-btn-text card-btn-text-edit">编辑</text>
-                </view>
-                <view class="card-btn card-btn-delete" @tap="confirmDelete(device)">
-                  <text class="card-btn-text card-btn-text-delete">删除</text>
-                </view>
-              </view>
-            </view>
-          </view>
-        </view>
-
-        <view v-else class="empty-state">
-          <view class="empty-icon-wrap">
-            <app-icon class="empty-icon" name="cart" :size="44" color="#8994A8" />
-          </view>
-          <text class="empty-title">暂无固定设备</text>
-          <text class="empty-desc">您还没有录入固定急救设备</text>
-          <view class="empty-btn" @tap="goAdd">
-            <text class="empty-btn-text">录入设备</text>
-          </view>
-        </view>
-      </view>
-
-      <view v-if="activeTab === 'mobile'" class="device-list">
-        <view v-if="mobileDevices.length > 0">
-          <view
-            v-for="device in mobileDevices"
-            :key="device.id"
-            class="device-card"
-          >
-            <view class="card-header">
-              <view class="card-header-left">
-                <view class="device-icon-wrap device-icon-mobile">
-                  <text class="device-icon-text">{{ device.category === 'AED' ? 'AED' : '急救' }}</text>
-                </view>
-                <view class="card-header-info">
-                  <text class="card-name">{{ device.name }}</text>
-                  <view class="card-meta-row">
-                    <view class="card-category-tag">
-                      <text class="category-tag-text">{{ device.category }}</text>
-                    </view>
-                    <view class="card-type-tag card-type-mobile">
-                      <text class="type-tag-text">移动</text>
-                    </view>
-                  </view>
-                </view>
-              </view>
-              <view class="card-status-toggle" @tap="toggleMobileStatus(device)">
+              <view class="card-status-toggle" @tap="toggleCurrentStatus(device)">
                 <view
                   class="status-switch"
                   :class="{ 'status-switch-on': device.online }"
@@ -157,18 +57,28 @@
 
             <view class="card-body">
               <view class="card-info-item">
-                <app-icon class="info-icon" name="navigate-filled" :size="16" color="#8994A8" />
-                <text class="info-text">{{ device.vehicleInfo || '未填写车辆信息' }}</text>
-              </view>
-              <view class="card-info-item">
                 <app-icon class="info-icon" name="location-filled" :size="16" color="#8994A8" />
                 <text class="info-text">{{ device.address }}</text>
               </view>
-              <view class="card-info-item">
-                <app-icon class="info-icon" name="calendar-filled" :size="16" color="#8994A8" />
-                <text class="info-text">{{ device.serviceTime }}</text>
+              <view v-if="device.type === 'FIXED'" class="card-info-item">
+                <app-icon class="info-icon" name="calendar" :size="16" color="#8994A8" />
+                <text class="info-text">
+                  {{ device.expireDate ? `有效期至 ${device.expireDate}` : '未设置有效期' }}
+                </text>
               </view>
-              <view class="card-info-item">
+              <view v-if="device.type === 'FIXED'" class="card-info-item">
+                <app-icon class="info-icon" name="shop-filled" :size="16" color="#8994A8" />
+                <text class="info-text">{{ device.owner || '未登记所有方' }}</text>
+              </view>
+              <view v-if="device.type === 'MOBILE'" class="card-info-item">
+                <app-icon class="info-icon" name="navigate-filled" :size="16" color="#8994A8" />
+                <text class="info-text">{{ device.vehicleInfo || '未填写车辆信息' }}</text>
+              </view>
+              <view v-if="device.type === 'MOBILE'" class="card-info-item">
+                <app-icon class="info-icon" name="calendar-filled" :size="16" color="#8994A8" />
+                <text class="info-text">{{ device.serviceTime || '未设置服务时间' }}</text>
+              </view>
+              <view v-if="device.type === 'MOBILE'" class="card-info-item">
                 <app-icon class="info-icon" name="map-pin-ellipse" :size="16" color="#8994A8" />
                 <text class="info-text">
                   {{ device.serviceRange ? `服务范围 ${device.serviceRange}km` : '服务范围未设置' }}
@@ -189,7 +99,7 @@
             <view class="card-footer">
               <view class="card-status-badge" :class="'badge-' + (device.online ? 'online' : 'offline')">
                 <view class="badge-dot"></view>
-                <text class="badge-text">{{ device.online ? '在线' : '离线' }}</text>
+                <text class="badge-text">{{ device.online ? (device.type === 'FIXED' ? '可用' : '在线') : (device.type === 'FIXED' ? '维护中' : '离线') }}</text>
               </view>
               <view class="card-actions">
                 <view class="card-btn card-btn-detail" @tap="viewDetail(device)">
@@ -207,11 +117,14 @@
         </view>
 
         <view v-else class="empty-state">
-          <view class="empty-icon-wrap">
-            <app-icon class="empty-icon" name="navigate" :size="44" color="#8994A8" />
-          </view>
-          <text class="empty-title">暂无移动设备</text>
-          <text class="empty-desc">您还没有录入移动急救设备</text>
+          <app-icon-tile
+            class="empty-icon"
+            :name="activeTab === 'fixed' ? 'fixed-device' : 'mobile-device'"
+            :tone="activeTab === 'fixed' ? 'blue' : 'green'"
+            size="large"
+          />
+          <text class="empty-title">{{ activeTab === 'fixed' ? '暂无固定设备' : '暂无移动设备' }}</text>
+          <text class="empty-desc">还没有录入这类急救设备</text>
           <view class="empty-btn" @tap="goAdd">
             <text class="empty-btn-text">录入设备</text>
           </view>
@@ -219,19 +132,22 @@
       </view>
 
       <view class="bottom-safe"></view>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { computed, ref } from 'vue'
+import { onHide, onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
+import { getCurrentGcj02Location } from '@/utils/location'
 import { resolveApiUrl } from '@/api/http'
 import {
-  listEmergencyDevices,
+  listMyEmergencyDevices,
   deleteEmergencyDevice,
   updateEmergencyDeviceStatus,
+  updateEmergencyDeviceLocation,
   type EmergencyDeviceResponse
 } from '@/api/devices'
 
@@ -243,6 +159,11 @@ type DeviceView = EmergencyDeviceResponse & {
 
 const fixedDevices = ref<DeviceView[]>([])
 const mobileDevices = ref<DeviceView[]>([])
+const currentDevices = computed(() => (
+  activeTab.value === 'fixed' ? fixedDevices.value : mobileDevices.value
+))
+let locationSyncTimer: ReturnType<typeof setInterval> | null = null
+let syncingLocation = false
 
 function toView(device: EmergencyDeviceResponse): DeviceView {
   return {
@@ -262,7 +183,7 @@ function previewDeviceImage(device: DeviceView, index: number) {
 
 async function loadDevices() {
   try {
-    const page = await listEmergencyDevices()
+    const page = await listMyEmergencyDevices()
     const devices = page.content.map(toView)
     fixedDevices.value = devices.filter(device => device.type === 'FIXED')
     mobileDevices.value = devices.filter(device => device.type === 'MOBILE')
@@ -272,6 +193,10 @@ async function loadDevices() {
 }
 
 async function toggleDeviceStatus(device: DeviceView) {
+  if (device.status === 'RESERVED') {
+    uni.showToast({ title: '设备正在执行救援', icon: 'none' })
+    return
+  }
   const nextStatus = device.status === 'AVAILABLE' ? 'MAINTENANCE' : 'AVAILABLE'
   try {
     const updated = await updateEmergencyDeviceStatus(device.id, nextStatus)
@@ -283,13 +208,69 @@ async function toggleDeviceStatus(device: DeviceView) {
 }
 
 async function toggleMobileStatus(device: DeviceView) {
+  if (device.status === 'RESERVED') {
+    uni.showToast({ title: '设备正在执行救援', icon: 'none' })
+    return
+  }
   const nextStatus = device.status === 'AVAILABLE' ? 'OFFLINE' : 'AVAILABLE'
   try {
+    if (nextStatus === 'AVAILABLE') {
+      const location = await getCurrentLocation()
+      await updateEmergencyDeviceLocation(device.id, {
+        ...location,
+        address: `实时位置 · ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
+      })
+    }
     const updated = await updateEmergencyDeviceStatus(device.id, nextStatus)
     Object.assign(device, toView(updated))
     uni.showToast({ title: nextStatus === 'AVAILABLE' ? '设备已上线' : '设备已离线', icon: 'none' })
   } catch {
     uni.showToast({ title: '状态更新失败', icon: 'none' })
+  }
+}
+
+function toggleCurrentStatus(device: DeviceView) {
+  return device.type === 'FIXED'
+    ? toggleDeviceStatus(device)
+    : toggleMobileStatus(device)
+}
+
+function getCurrentLocation(): Promise<{ longitude: number; latitude: number }> {
+  return getCurrentGcj02Location()
+}
+
+async function syncAvailableMobileLocations() {
+  if (syncingLocation) return
+  const availableDevices = mobileDevices.value.filter(device => device.status === 'AVAILABLE')
+  if (!availableDevices.length) return
+  syncingLocation = true
+  try {
+    const location = await getCurrentLocation()
+    const address = `实时位置 · ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
+    const updatedDevices = await Promise.all(availableDevices.map(device =>
+      updateEmergencyDeviceLocation(device.id, { ...location, address })
+    ))
+    updatedDevices.forEach(updated => {
+      const target = mobileDevices.value.find(device => device.id === updated.id)
+      if (target) Object.assign(target, toView(updated))
+    })
+  } catch {
+    // 位置权限被拒绝时保留原状态，由 120 秒新鲜度门禁自动停止派单。
+  } finally {
+    syncingLocation = false
+  }
+}
+
+function startLocationSync() {
+  stopLocationSync()
+  syncAvailableMobileLocations()
+  locationSyncTimer = setInterval(syncAvailableMobileLocations, 15_000)
+}
+
+function stopLocationSync() {
+  if (locationSyncTimer) {
+    clearInterval(locationSyncTimer)
+    locationSyncTimer = null
   }
 }
 
@@ -332,14 +313,19 @@ function confirmDelete(device: DeviceView) {
   })
 }
 
-onShow(loadDevices)
+onShow(async () => {
+  await loadDevices()
+  startLocationSync()
+})
+
+onHide(stopLocationSync)
 
 </script>
 
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
 }
 
 .scroll-content {
@@ -359,7 +345,7 @@ onShow(loadDevices)
   min-height: 68rpx;
   padding: 0 24rpx;
   border-radius: 18rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
   box-shadow: 0 8rpx 20rpx rgba(43, 111, 240, 0.2);
   font-size: 26rpx;
   font-weight: 600;
@@ -387,7 +373,7 @@ onShow(loadDevices)
   transition: all 0.3s ease;
 }
 .tab-active .tab-text {
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 700;
 }
 .tab-indicator {
@@ -398,19 +384,24 @@ onShow(loadDevices)
   width: 48rpx;
   height: 6rpx;
   border-radius: 3rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
 }
 
 .device-list {
-  padding: 24rpx 24rpx 0;
+  margin: 24rpx 24rpx 0;
+  overflow: hidden;
+  border: 1rpx solid var(--network-line);
+  border-radius: var(--network-radius-section);
+  background: var(--network-paper);
 }
 
 .device-card {
-  background: #FFFFFF;
-  border-radius: 24rpx;
-  padding: 28rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.05);
+  padding: 28rpx 24rpx;
+  border-bottom: 1rpx solid var(--network-line);
+  background: var(--network-paper);
+}
+.device-card:last-child {
+  border-bottom: 0;
 }
 
 .card-header {
@@ -424,27 +415,6 @@ onShow(loadDevices)
   flex: 1;
   min-width: 0;
 }
-.device-icon-wrap {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 20rpx;
-  flex-shrink: 0;
-}
-.device-icon-fixed {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.device-icon-mobile {
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 100%);
-}
-.device-icon-text {
-  font-size: 24rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
 .card-header-info {
   flex: 1;
   min-width: 0;
@@ -452,7 +422,7 @@ onShow(loadDevices)
 .card-name {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -464,34 +434,17 @@ onShow(loadDevices)
   gap: 8rpx;
   margin-top: 8rpx;
 }
-.card-category-tag {
-  padding: 2rpx 12rpx;
-  background: #F2F3F5;
-  border-radius: 6rpx;
-}
 .category-tag-text {
   font-size: 20rpx;
-  color: #4E5969;
+  color: var(--network-muted);
 }
-.card-type-tag {
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-}
-.card-type-fixed {
-  background: rgba(43, 111, 240, 0.1);
-}
-.card-type-mobile {
-  background: rgba(0, 180, 42, 0.1);
+.card-meta-separator {
+  color: var(--network-faint);
+  font-size: 20rpx;
 }
 .type-tag-text {
   font-size: 20rpx;
-  font-weight: 600;
-}
-.card-type-fixed .type-tag-text {
-  color: #2B6FF0;
-}
-.card-type-mobile .type-tag-text {
-  color: #00B42A;
+  color: var(--network-muted);
 }
 
 .card-status-toggle {
@@ -511,7 +464,7 @@ onShow(loadDevices)
   padding: 4rpx;
 }
 .status-switch-on {
-  background: #2B6FF0;
+  background: #2E6DD1;
 }
 .status-switch-thumb {
   width: 40rpx;
@@ -582,14 +535,6 @@ onShow(loadDevices)
   display: flex;
   align-items: center;
   gap: 8rpx;
-  padding: 6rpx 16rpx;
-  border-radius: 20rpx;
-}
-.badge-online {
-  background: rgba(0, 180, 42, 0.08);
-}
-.badge-offline {
-  background: rgba(201, 205, 212, 0.15);
 }
 .badge-dot {
   width: 12rpx;
@@ -597,7 +542,7 @@ onShow(loadDevices)
   border-radius: 50%;
 }
 .badge-online .badge-dot {
-  background: #00B42A;
+  background: #23956A;
   box-shadow: 0 0 8rpx rgba(0, 180, 42, 0.4);
 }
 .badge-offline .badge-dot {
@@ -608,31 +553,21 @@ onShow(loadDevices)
   font-weight: 500;
 }
 .badge-online .badge-text {
-  color: #00B42A;
+  color: #23956A;
 }
 .badge-offline .badge-text {
   color: #C9CDD4;
 }
 .card-actions {
   display: flex;
-  gap: 12rpx;
+  gap: 26rpx;
 }
 .card-btn {
-  padding: 10rpx 28rpx;
-  border-radius: 24rpx;
-  transition: all 0.3s ease;
+  padding: 8rpx 0;
+  transition: opacity 150ms ease;
 }
 .card-btn:active {
-  transform: scale(0.95);
-}
-.card-btn-detail {
-  background: #F2F3F5;
-}
-.card-btn-edit {
-  background: rgba(43, 111, 240, 0.08);
-}
-.card-btn-delete {
-  background: rgba(214, 75, 75, 0.08);
+  opacity: 0.55;
 }
 .card-btn-text {
   font-size: 24rpx;
@@ -640,7 +575,7 @@ onShow(loadDevices)
   font-weight: 500;
 }
 .card-btn-text-edit {
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 600;
 }
 .card-btn-text-delete {
@@ -654,23 +589,13 @@ onShow(loadDevices)
   align-items: center;
   padding: 120rpx 0;
 }
-.empty-icon-wrap {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 50%;
-  background: #F2F3F5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 32rpx;
-}
 .empty-icon {
-  font-size: 64rpx;
+  margin-bottom: 32rpx;
 }
 .empty-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
   margin-bottom: 12rpx;
 }
 .empty-desc {
@@ -680,7 +605,7 @@ onShow(loadDevices)
 }
 .empty-btn {
   padding: 20rpx 64rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   border-radius: 40rpx;
   box-shadow: 0 6rpx 24rpx rgba(43, 111, 240, 0.3);
 }

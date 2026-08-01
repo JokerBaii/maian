@@ -1,14 +1,12 @@
 <template>
   <view class="page">
-    <scroll-view class="settings-scroll" scroll-y>
+    <view class="settings-scroll">
       <view class="settings-section">
         <text class="section-title">通知设置</text>
         <view class="settings-list">
           <view class="settings-item">
             <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-red">
-                <app-icon name="notification-filled" :size="19" color="#FFFFFF" />
-              </view>
+              <app-icon-tile class="settings-icon" name="rescue-notice" tone="coral" />
               <text class="settings-label">呼救推送</text>
             </view>
             <view class="toggle-wrap" @tap="settings.rescuePush = !settings.rescuePush">
@@ -19,9 +17,7 @@
           </view>
           <view class="settings-item">
             <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-orange">
-                <app-icon name="notification-filled" :size="19" color="#FFFFFF" />
-              </view>
+              <app-icon-tile class="settings-icon" name="health-alert" tone="coral" />
               <text class="settings-label">健康预警</text>
             </view>
             <view class="toggle-wrap" @tap="settings.healthAlert = !settings.healthAlert">
@@ -32,9 +28,7 @@
           </view>
           <view class="settings-item settings-item-last">
             <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-blue">
-                <app-icon name="sound-filled" :size="19" color="#FFFFFF" />
-              </view>
+              <app-icon-tile class="settings-icon" name="science-update" tone="cyan" />
               <text class="settings-label">科普更新</text>
             </view>
             <view class="toggle-wrap" @tap="settings.scienceUpdate = !settings.scienceUpdate">
@@ -51,9 +45,7 @@
         <view class="settings-list">
           <view class="settings-item">
             <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-green">
-                <app-icon name="location-filled" :size="19" color="#FFFFFF" />
-              </view>
+              <app-icon-tile class="settings-icon" name="location-filled" tone="blue" />
               <text class="settings-label">位置共享</text>
             </view>
             <view class="toggle-wrap" @tap="settings.locationShare = !settings.locationShare">
@@ -64,9 +56,7 @@
           </view>
           <view class="settings-item settings-item-last">
             <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-purple">
-                <app-icon name="bars" :size="19" color="#FFFFFF" />
-              </view>
+              <app-icon-tile class="settings-icon" name="bars" tone="cyan" />
               <text class="settings-label">健康数据共享</text>
             </view>
             <view class="toggle-wrap" @tap="settings.healthDataShare = !settings.healthDataShare">
@@ -83,9 +73,7 @@
         <view class="settings-list">
           <view class="settings-item">
             <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-red">
-                <app-icon name="arrow-up" :size="19" color="#FFFFFF" />
-              </view>
+              <app-icon-tile class="settings-icon" name="arrow-up" tone="coral" />
               <text class="settings-label">最高心率</text>
             </view>
             <view class="threshold-wrap" @tap="editThreshold('max')">
@@ -96,9 +84,7 @@
           </view>
           <view class="settings-item settings-item-last">
             <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-blue">
-                <app-icon name="arrow-down" :size="19" color="#FFFFFF" />
-              </view>
+              <app-icon-tile class="settings-icon" name="arrow-down" tone="blue" />
               <text class="settings-label">最低心率</text>
             </view>
             <view class="threshold-wrap" @tap="editThreshold('min')">
@@ -115,18 +101,14 @@
         <view class="settings-list">
           <view class="settings-item" @tap="clearCache">
             <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-grey">
-                <app-icon name="trash-filled" :size="19" color="#FFFFFF" />
-              </view>
+              <app-icon-tile class="settings-icon" name="trash-filled" tone="slate" />
               <text class="settings-label">清除缓存</text>
             </view>
             <text class="settings-extra">{{ cacheSizeText }}</text>
           </view>
           <view class="settings-item" @tap="goAbout">
             <view class="settings-item-left">
-              <view class="settings-icon-wrap settings-icon-cyan">
-                <app-icon name="info-filled" :size="19" color="#FFFFFF" />
-              </view>
+              <app-icon-tile class="settings-icon" name="info-filled" tone="blue" />
               <text class="settings-label">关于我们</text>
             </view>
             <app-icon name="right" :size="14" color="#A8B2C1" />
@@ -139,7 +121,7 @@
       </view>
 
       <view class="bottom-safe"></view>
-    </scroll-view>
+    </view>
 
     <view v-if="thresholdPopupVisible" class="popup-mask" @tap="thresholdPopupVisible = false">
       <view class="popup-content" @tap.stop>
@@ -168,8 +150,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
+import { getUserSettings, updateUserSettings } from '@/api/user'
 
 const SETTINGS_STORAGE_KEY = 'maian:user-settings'
 const settings = reactive({
@@ -186,23 +170,57 @@ const thresholdPopupVisible = ref(false)
 const editingMax = ref(true)
 const thresholdInput = ref('')
 const cacheSizeKb = ref(0)
+const settingsReady = ref(false)
+let saveTimer: ReturnType<typeof setTimeout> | null = null
 const cacheSizeText = computed(() => (
   cacheSizeKb.value >= 1024
     ? `${(cacheSizeKb.value / 1024).toFixed(1)}MB`
     : `${cacheSizeKb.value}KB`
 ))
 
-onMounted(() => {
+function applySettings(value: typeof settings) {
+  settings.rescuePush = value.rescuePush
+  settings.healthAlert = value.healthAlert
+  settings.scienceUpdate = value.scienceUpdate
+  settings.locationShare = value.locationShare
+  settings.healthDataShare = value.healthDataShare
+  settings.maxHeartRate = value.maxHeartRate
+  settings.minHeartRate = value.minHeartRate
+}
+
+onMounted(async () => {
   const saved = uni.getStorageSync(SETTINGS_STORAGE_KEY)
   if (saved && typeof saved === 'object') {
     Object.assign(settings, saved)
+  }
+  try {
+    const remote = await getUserSettings()
+    applySettings(remote)
+  } catch {
+    uni.showToast({ title: '设置同步失败，已使用本机设置', icon: 'none' })
+  } finally {
+    settingsReady.value = true
   }
   cacheSizeKb.value = uni.getStorageInfoSync().currentSize || 0
 })
 
 watch(settings, (value) => {
   uni.setStorageSync(SETTINGS_STORAGE_KEY, { ...value })
+  if (!settingsReady.value) return
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(async () => {
+    try {
+      const remote = await updateUserSettings({ ...settings })
+      applySettings(remote)
+    } catch (error: any) {
+      uni.showToast({ title: error?.message || '设置保存失败', icon: 'none' })
+    }
+  }, 350)
 }, { deep: true })
+
+onUnmounted(() => {
+  if (saveTimer) clearTimeout(saveTimer)
+})
 
 function editThreshold(type: string) {
   editingMax.value = type === 'max'
@@ -235,7 +253,7 @@ function clearCache() {
   uni.showModal({
     title: '清除缓存',
     content: '确定清除所有缓存数据吗？',
-    confirmColor: '#2B6FF0',
+    confirmColor: '#2E6DD1',
     success: (res) => {
       if (res.confirm) {
         try {
@@ -263,11 +281,11 @@ function goAbout() {
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
 }
 
 .settings-scroll {
-  height: 100vh;
+  min-height: 100vh;
   box-sizing: border-box;
 }
 
@@ -283,9 +301,9 @@ function goAbout() {
 }
 .settings-list {
   background: #FFFFFF;
-  border-radius: 20rpx;
+  border: 1rpx solid var(--network-line);
+  border-radius: var(--network-radius-section);
   overflow: hidden;
-  box-shadow: 0 4rpx 16rpx rgba(43, 111, 240, 0.06);
 }
 .settings-item {
   display: flex;
@@ -305,47 +323,12 @@ function goAbout() {
   align-items: center;
   flex: 1;
 }
-.settings-icon-wrap {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 14rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 16rpx;
-  flex-shrink: 0;
-}
-.settings-icon-red {
-  background: linear-gradient(135deg, #F53F3F 0%, #FF7D7D 100%);
-  box-shadow: 0 4rpx 12rpx rgba(245, 63, 63, 0.15);
-}
-.settings-icon-orange {
-  background: linear-gradient(135deg, #FF9A2E 0%, #FFCF8B 100%);
-  box-shadow: 0 4rpx 12rpx rgba(255, 154, 46, 0.15);
-}
-.settings-icon-blue {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-  box-shadow: 0 4rpx 12rpx rgba(43, 111, 240, 0.15);
-}
-.settings-icon-green {
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 100%);
-  box-shadow: 0 4rpx 12rpx rgba(0, 180, 42, 0.15);
-}
-.settings-icon-purple {
-  background: linear-gradient(135deg, #722ED1 0%, #B37FEB 100%);
-  box-shadow: 0 4rpx 12rpx rgba(114, 46, 209, 0.15);
-}
-.settings-icon-cyan {
-  background: linear-gradient(135deg, #0FC6C2 0%, #5CE0DB 100%);
-  box-shadow: 0 4rpx 12rpx rgba(15, 198, 194, 0.15);
-}
-.settings-icon-grey {
-  background: linear-gradient(135deg, #86909C 0%, #C9CDD4 100%);
-  box-shadow: 0 4rpx 12rpx rgba(134, 144, 156, 0.15);
+.settings-icon {
+  margin-right: 18rpx;
 }
 .settings-label {
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   font-weight: 500;
 }
 
@@ -363,7 +346,7 @@ function goAbout() {
   box-sizing: border-box;
 }
 .toggle-on {
-  background: #2B6FF0;
+  background: #2E6DD1;
 }
 .toggle-thumb {
   width: 40rpx;
@@ -386,7 +369,7 @@ function goAbout() {
 }
 .threshold-value {
   font-size: 28rpx;
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 700;
 }
 .threshold-unit {
@@ -440,7 +423,7 @@ function goAbout() {
 .popup-title {
   font-size: 32rpx;
   font-weight: 700;
-  color: #1D2129;
+  color: #20364D;
 }
 .popup-close {
   width: 48rpx;
@@ -461,7 +444,7 @@ function goAbout() {
   border-radius: 16rpx;
   padding: 0 24rpx;
   font-size: 30rpx;
-  color: #1D2129;
+  color: #20364D;
   font-weight: 600;
   box-sizing: border-box;
 }
@@ -477,7 +460,7 @@ function goAbout() {
   display: block;
 }
 .popup-submit {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   border-radius: 48rpx;
   padding: 24rpx 0;
   text-align: center;

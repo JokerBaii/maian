@@ -16,6 +16,7 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import cn.maian.user.service.UserProfileService;
 
 @Service
 public class RescueCallService {
@@ -30,13 +31,27 @@ public class RescueCallService {
     );
 
     private final RescueCallRepository rescueCallRepository;
+    private final AedDispatchService aedDispatchService;
 
-    public RescueCallService(RescueCallRepository rescueCallRepository) {
+    public RescueCallService(
+        RescueCallRepository rescueCallRepository,
+        AedDispatchService aedDispatchService
+    ) {
         this.rescueCallRepository = rescueCallRepository;
+        this.aedDispatchService = aedDispatchService;
     }
 
     @Transactional
     public RescueCallResponse create(CreateRescueCallRequest request) {
+        if (request.clientRequestId() != null && !request.clientRequestId().isBlank()) {
+            var existing = rescueCallRepository.findByClientRequestIdAndRequestedByUserId(
+                request.clientRequestId(),
+                UserProfileService.CURRENT_USER_ID
+            );
+            if (existing.isPresent()) {
+                return RescueCallResponse.from(existing.orElseThrow());
+            }
+        }
         RescueCall rescueCall = RescueCall.create(
             request.urgency(),
             request.latitude(),
@@ -44,9 +59,28 @@ public class RescueCallService {
             request.address(),
             request.description(),
             request.symptoms(),
-            request.imageUrls()
+            request.imageUrls(),
+            request.clientRequestId()
         );
-        return RescueCallResponse.from(rescueCallRepository.save(rescueCall));
+        rescueCall.requestBy(UserProfileService.CURRENT_USER_ID);
+        rescueCall.beginMatching();
+        rescueCall = rescueCallRepository.saveAndFlush(rescueCall);
+        matchAndAssign(rescueCall);
+        return RescueCallResponse.from(rescueCall);
+    }
+
+    @Transactional
+    public RescueCallResponse retryMatching(UUID id) {
+        RescueCall rescueCall = rescueCallRepository.findOwnedForMatchingById(
+                id,
+                UserProfileService.CURRENT_USER_ID
+            )
+            .orElseThrow(() -> new ResourceNotFoundException("未找到救援请求：" + id));
+        if (rescueCall.getMatchedDevice() != null || rescueCall.getStatus() != RescueStatus.MATCHING) {
+            return RescueCallResponse.from(rescueCall);
+        }
+        matchAndAssign(rescueCall);
+        return RescueCallResponse.from(rescueCall);
     }
 
     @Transactional(readOnly = true)
@@ -56,7 +90,9 @@ public class RescueCallService {
 
     @Transactional(readOnly = true)
     public Page<RescueCallResponse> findAll(Pageable pageable) {
-        return rescueCallRepository.findAll(pageable).map(RescueCallResponse::from);
+        return rescueCallRepository
+            .findAllOwnedDetailed(UserProfileService.CURRENT_USER_ID, pageable)
+            .map(RescueCallResponse::from);
     }
 
     @Transactional
@@ -72,11 +108,25 @@ public class RescueCallService {
             );
         }
         rescueCall.transitionTo(nextStatus);
+        if ((nextStatus == RescueStatus.COMPLETED || nextStatus == RescueStatus.CANCELLED)
+            && rescueCall.getMatchedDevice() != null) {
+            rescueCall.getMatchedDevice().releaseReservation(rescueCall.getId());
+        }
         return RescueCallResponse.from(rescueCall);
     }
 
     private RescueCall findEntity(UUID id) {
-        return rescueCallRepository.findById(id)
+        return rescueCallRepository.findOwnedDetailedById(id, UserProfileService.CURRENT_USER_ID)
             .orElseThrow(() -> new ResourceNotFoundException("未找到救援请求：" + id));
+    }
+
+    private void matchAndAssign(RescueCall rescueCall) {
+        aedDispatchService.matchFastest(rescueCall).ifPresent(match -> rescueCall.assignDevice(
+            match.device(),
+            match.matchedAt(),
+            match.score().distanceMeters(),
+            match.score().estimatedArrivalSeconds(),
+            match.score().strategy()
+        ));
     }
 }

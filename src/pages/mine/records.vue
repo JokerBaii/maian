@@ -19,7 +19,7 @@
       </view>
     </view>
 
-    <scroll-view v-if="currentTab === 'initiated'" class="record-scroll" scroll-y>
+    <view v-if="currentTab === 'initiated'" class="record-scroll">
       <view v-if="initiatedRecords.length > 0" class="record-list">
         <view
           v-for="record in initiatedRecords"
@@ -61,13 +61,13 @@
         </view>
       </view>
       <view v-else class="empty-state">
-        <app-icon class="empty-icon" name="close" :size="42" color="#8994A8" />
+        <app-icon-tile class="empty-icon" name="rescue-notice" tone="coral" size="large" />
         <text class="empty-text">暂无发起的救援记录</text>
         <text class="empty-hint">遇到紧急情况可一键呼救</text>
       </view>
-    </scroll-view>
+    </view>
 
-    <scroll-view v-if="currentTab === 'participated'" class="record-scroll" scroll-y>
+    <view v-if="currentTab === 'participated'" class="record-scroll">
       <view v-if="participatedRecords.length > 0" class="record-list">
         <view
           v-for="record in participatedRecords"
@@ -109,11 +109,11 @@
         </view>
       </view>
       <view v-else class="empty-state">
-        <app-icon class="empty-icon" name="staff" :size="42" color="#8994A8" />
+        <app-icon-tile class="empty-icon" name="volunteer" tone="green" size="large" />
         <text class="empty-text">暂无参与的救援记录</text>
         <text class="empty-hint">参与救援可积累志愿时长</text>
       </view>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
@@ -121,6 +121,7 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { listRescueCalls, type RescueCallResponse } from '@/api/rescue'
 
 const currentTab = ref<'initiated' | 'participated'>('initiated')
@@ -192,7 +193,7 @@ onShow(loadRecords)
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
 }
 
 .tab-bar {
@@ -219,7 +220,7 @@ onShow(loadRecords)
   transition: all 0.2s ease;
 }
 .tab-text-active {
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 700;
 }
 .tab-indicator {
@@ -228,11 +229,11 @@ onShow(loadRecords)
   width: 48rpx;
   height: 6rpx;
   border-radius: 3rpx;
-  background: linear-gradient(90deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(90deg, #2E6DD1 0%, #2E6DD1 100%);
 }
 
 .record-scroll {
-  height: calc(100vh - 120rpx);
+  min-height: calc(100vh - 120rpx);
   box-sizing: border-box;
 }
 .record-list {
@@ -275,16 +276,16 @@ onShow(loadRecords)
   font-weight: 600;
 }
 .urgency-critical .urgency-text {
-  color: #F53F3F;
+  color: #C93D46;
 }
 .urgency-high .urgency-text {
   color: #FF9A2E;
 }
 .urgency-medium .urgency-text {
-  color: #2B6FF0;
+  color: #2E6DD1;
 }
 .urgency-low .urgency-text {
-  color: #00B42A;
+  color: #23956A;
 }
 .status-badge {
   padding: 4rpx 16rpx;
@@ -307,10 +308,10 @@ onShow(loadRecords)
   font-weight: 600;
 }
 .status-completed .status-text {
-  color: #00B42A;
+  color: #23956A;
 }
 .status-rescuing .status-text {
-  color: #2B6FF0;
+  color: #2E6DD1;
 }
 .status-pending .status-text {
   color: #FF9A2E;
@@ -326,7 +327,7 @@ onShow(loadRecords)
 }
 .record-desc {
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   font-weight: 600;
   line-height: 1.5;
 }
@@ -383,7 +384,6 @@ onShow(loadRecords)
   padding: 160rpx 0;
 }
 .empty-icon {
-  font-size: 80rpx;
   margin-bottom: 24rpx;
 }
 .empty-text {

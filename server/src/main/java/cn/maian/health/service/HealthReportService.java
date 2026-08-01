@@ -58,4 +58,11 @@ public class HealthReportService {
             .orElseThrow(() -> new ResourceNotFoundException("体检报告不存在"));
         return HealthReportResponse.from(report);
     }
+
+    @Transactional
+    public void delete(UUID id) {
+        var report = healthReportRepository.findByIdAndUserId(id, UserProfileService.CURRENT_USER_ID)
+            .orElseThrow(() -> new ResourceNotFoundException("体检报告不存在"));
+        healthReportRepository.delete(report);
+    }
 }

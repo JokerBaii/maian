@@ -28,7 +28,7 @@
           x5-playsinline
         ></video>
         <view class="video-badge" :class="{ 'video-badge-playing': videoStarted }">
-          <app-icon name="videocam-filled" :size="16" color="#2B6FF0" />
+          <app-icon name="videocam-filled" :size="16" color="#2E6DD1" />
           <text class="video-badge-text">视频教程</text>
         </view>
       </view>
@@ -51,9 +51,7 @@
       <view class="article-header">
         <text class="article-title">{{ article.title }}</text>
         <view class="author-row">
-          <view class="author-avatar">
-            <app-icon name="person-filled" :size="22" color="#2B6FF0" />
-          </view>
+          <app-icon-tile name="author" tone="cyan" />
           <view class="author-info">
             <text class="author-name">{{ article.author }}</text>
             <view class="meta-row">
@@ -138,9 +136,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import { scienceArticles } from '@/data/editorial'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
+import {
+  getScienceArticleInteraction,
+  updateScienceArticleInteraction
+} from '@/api/science'
 
 const articleId = ref('S001')
 const pages = getCurrentPages()
@@ -154,26 +157,38 @@ const article = computed(() => {
   return found || scienceArticles[0]
 })
 
-const INTERACTION_STORAGE_KEY = 'maian:science-interactions'
-type ArticleInteraction = { liked?: boolean; collected?: boolean }
-type ArticleInteractions = Record<string, ArticleInteraction>
+const isLiked = ref(article.value.isLiked)
+const isCollected = ref(article.value.isCollected)
+const interactionSaving = ref(false)
 
-function getStoredInteractions(): ArticleInteractions {
-  const stored = uni.getStorageSync(INTERACTION_STORAGE_KEY)
-  return stored && typeof stored === 'object' ? stored as ArticleInteractions : {}
+async function loadInteraction() {
+  try {
+    const interaction = await getScienceArticleInteraction(articleId.value)
+    isLiked.value = interaction.liked
+    isCollected.value = interaction.collected
+  } catch {
+    uni.showToast({ title: '互动状态加载失败', icon: 'none' })
+  }
 }
 
-const storedInteraction = getStoredInteractions()[articleId.value] || {}
-const isLiked = ref(storedInteraction.liked ?? article.value.isLiked)
-const isCollected = ref(storedInteraction.collected ?? article.value.isCollected)
-
-function persistInteraction() {
-  const interactions = getStoredInteractions()
-  interactions[articleId.value] = {
-    liked: isLiked.value,
-    collected: isCollected.value
+async function saveInteraction(previousLiked: boolean, previousCollected: boolean) {
+  interactionSaving.value = true
+  try {
+    const interaction = await updateScienceArticleInteraction(articleId.value, {
+      liked: isLiked.value,
+      collected: isCollected.value
+    })
+    isLiked.value = interaction.liked
+    isCollected.value = interaction.collected
+    return true
+  } catch {
+    isLiked.value = previousLiked
+    isCollected.value = previousCollected
+    uni.showToast({ title: '操作失败，请稍后重试', icon: 'none' })
+    return false
+  } finally {
+    interactionSaving.value = false
   }
-  uni.setStorageSync(INTERACTION_STORAGE_KEY, interactions)
 }
 
 const contentParagraphs = computed(() => {
@@ -198,24 +213,32 @@ function formatViewCount(count: number) {
   return count.toString()
 }
 
-function toggleLike() {
+async function toggleLike() {
+  if (interactionSaving.value) return
+  const previousLiked = isLiked.value
+  const previousCollected = isCollected.value
   isLiked.value = !isLiked.value
-  persistInteraction()
-  uni.showToast({
-    title: isLiked.value ? '已点赞' : '已取消点赞',
-    icon: 'none',
-    duration: 1000
-  })
+  if (await saveInteraction(previousLiked, previousCollected)) {
+    uni.showToast({
+      title: isLiked.value ? '已点赞' : '已取消点赞',
+      icon: 'none',
+      duration: 1000
+    })
+  }
 }
 
-function toggleCollect() {
+async function toggleCollect() {
+  if (interactionSaving.value) return
+  const previousLiked = isLiked.value
+  const previousCollected = isCollected.value
   isCollected.value = !isCollected.value
-  persistInteraction()
-  uni.showToast({
-    title: isCollected.value ? '已收藏' : '已取消收藏',
-    icon: 'none',
-    duration: 1000
-  })
+  if (await saveInteraction(previousLiked, previousCollected)) {
+    uni.showToast({
+      title: isCollected.value ? '已收藏' : '已取消收藏',
+      icon: 'none',
+      duration: 1000
+    })
+  }
 }
 
 function handleShare() {
@@ -234,12 +257,14 @@ function previewImage(idx: number) {
   }
 }
 
+onMounted(loadInteraction)
+
 </script>
 
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F5F7FA;
+  background: #F3F7FA;
 }
 
 .cover-area {
@@ -295,7 +320,7 @@ function previewImage(idx: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #2B6FF0;
+  background: #2E6DD1;
   box-shadow: 0 14rpx 34rpx rgba(43, 111, 240, 0.3);
 }
 .video-play::before {
@@ -380,7 +405,7 @@ function previewImage(idx: number) {
 .article-title {
   font-size: 40rpx;
   font-weight: 800;
-  color: #1D2129;
+  color: #20364D;
   line-height: 1.4;
   letter-spacing: 1rpx;
 }
@@ -391,17 +416,6 @@ function previewImage(idx: number) {
   padding-bottom: 28rpx;
   border-bottom: 1rpx solid #F2F3F5;
 }
-.author-avatar {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 50%;
-  border: 3rpx solid #E8F0FE;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #F2F7FF;
-}
 .author-info {
   margin-left: 16rpx;
   display: flex;
@@ -411,7 +425,7 @@ function previewImage(idx: number) {
 .author-name {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .meta-row {
   display: flex;
@@ -455,13 +469,13 @@ function previewImage(idx: number) {
   width: 6rpx;
   height: 28rpx;
   border-radius: 3rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
   margin-right: 12rpx;
 }
 .gallery-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .gallery-count {
   font-size: 22rpx;
@@ -534,7 +548,7 @@ function previewImage(idx: number) {
   transition: color 0.3s ease;
 }
 .action-icon-active .action-icon {
-  color: #F53F3F;
+  color: #C93D46;
 }
 .action-label {
   font-size: 20rpx;
@@ -543,6 +557,6 @@ function previewImage(idx: number) {
   transition: color 0.3s ease;
 }
 .action-label-active {
-  color: #F53F3F;
+  color: #C93D46;
 }
 </style>

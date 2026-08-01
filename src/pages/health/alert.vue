@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <scroll-view class="scroll-content" scroll-y>
+    <view class="scroll-content">
       <view v-if="!heartRateData.wearable.connected" class="sample-note">
         <app-icon name="info-filled" :size="15" color="#1F63D5" />
         <text>示例数据 · 连接设备后显示真实预警</text>
@@ -21,9 +21,7 @@
           </view>
           <view class="summary-divider"></view>
           <view class="summary-latest">
-            <view class="latest-icon">
-              <app-icon class="latest-icon-text" name="notification-filled" :size="20" color="#FFFFFF" />
-            </view>
+            <app-icon-tile name="notification-filled" tone="coral" />
             <view class="latest-info">
               <text class="latest-label">最近预警</text>
               <text class="latest-msg">{{ latestAlert.message }}</text>
@@ -80,25 +78,24 @@
 
       <view class="card settings-card" @tap="goSettings">
         <view class="settings-left">
-          <view class="settings-icon">
-            <app-icon class="settings-icon-text" name="settings-filled" :size="21" color="#1F63D5" />
-          </view>
+          <app-icon-tile name="settings-filled" tone="slate" />
           <view class="settings-info">
             <text class="settings-title">预警阈值设置</text>
             <text class="settings-desc">自定义心率预警上下限</text>
           </view>
         </view>
-        <app-icon class="settings-arrow" name="right" :size="17" color="#96A1B3" />
+        <app-icon class="settings-arrow" name="right" :size="14" color="#96A1B3" />
       </view>
 
       <view class="bottom-safe"></view>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 
 const { monitoring: heartRateData, loadMonitoring } = useHealthMonitoring()
@@ -133,7 +130,7 @@ onMounted(async () => {
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
 }
 
 .sample-note {
@@ -167,7 +164,7 @@ onMounted(async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #2B6FF0 0%, #1A4FD0 50%, #0D3AAF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #1A4FD0 50%, #0D3AAF 100%);
   opacity: 0.04;
 }
 .summary-content {
@@ -188,12 +185,12 @@ onMounted(async () => {
 .summary-count {
   font-size: 72rpx;
   font-weight: 800;
-  color: #2B6FF0;
+  color: #2E6DD1;
   line-height: 1;
 }
 .summary-unit {
   font-size: 24rpx;
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 600;
 }
 .summary-info {
@@ -220,21 +217,6 @@ onMounted(async () => {
   align-items: center;
   gap: 16rpx;
 }
-.latest-icon {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 50%;
-  background: rgba(245, 63, 63, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.latest-icon-text {
-  font-size: 28rpx;
-  color: #F53F3F;
-  font-weight: 700;
-}
 .latest-info {
   display: flex;
   flex-direction: column;
@@ -248,7 +230,7 @@ onMounted(async () => {
 }
 .latest-msg {
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   font-weight: 600;
 }
 .latest-time {
@@ -277,13 +259,13 @@ onMounted(async () => {
   width: 6rpx;
   height: 28rpx;
   border-radius: 3rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
   margin-right: 12rpx;
 }
 .card-title {
   font-size: 30rpx;
   font-weight: 700;
-  color: #1D2129;
+  color: #20364D;
 }
 
 .timeline {
@@ -315,8 +297,8 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 .dot-high {
-  background: #F53F3F;
-  box-shadow: 0 0 8rpx rgba(245, 63, 63, 0.3), 0 0 0 2rpx #F53F3F;
+  background: #C93D46;
+  box-shadow: 0 0 8rpx rgba(245, 63, 63, 0.3), 0 0 0 2rpx #C93D46;
 }
 .dot-low {
   background: #FF9A2E;
@@ -357,7 +339,7 @@ onMounted(async () => {
   font-weight: 600;
 }
 .badge-high .badge-text {
-  color: #F53F3F;
+  color: #C93D46;
 }
 .badge-low .badge-text {
   color: #FF9A2E;
@@ -385,7 +367,7 @@ onMounted(async () => {
   line-height: 1;
 }
 .value-high {
-  color: #F53F3F;
+  color: #C93D46;
 }
 .value-low {
   color: #FF9A2E;
@@ -428,20 +410,6 @@ onMounted(async () => {
   align-items: center;
   gap: 20rpx;
 }
-.settings-icon {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 20rpx;
-  background: linear-gradient(135deg, #86909C 0%, #C9CDD4 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4rpx 16rpx rgba(134, 144, 156, 0.2);
-}
-.settings-icon-text {
-  font-size: 36rpx;
-  color: #FFFFFF;
-}
 .settings-info {
   display: flex;
   flex-direction: column;
@@ -450,7 +418,7 @@ onMounted(async () => {
 .settings-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .settings-desc {
   font-size: 22rpx;

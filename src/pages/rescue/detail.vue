@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <scroll-view class="page-scroll" scroll-y>
+    <view class="page-scroll">
       <view v-if="loading" class="state-card">
         <view class="loading-ring"></view>
         <text class="state-title">正在同步救援状态</text>
@@ -8,9 +8,7 @@
       </view>
 
       <view v-else-if="errorMessage" class="state-card">
-        <view class="state-icon">
-          <app-icon name="info-filled" :size="26" color="#D6424B" />
-        </view>
+        <app-icon-tile class="state-icon" name="info-filled" tone="coral" size="large" />
         <text class="state-title">{{ errorMessage }}</text>
         <view class="state-action" @tap="loadDetail">
           <text>重新加载</text>
@@ -47,6 +45,57 @@
               </view>
               <text>{{ step }}</text>
             </view>
+          </view>
+        </view>
+
+        <view v-if="rescueCall.matchedAed" class="match-card">
+          <view class="section-head">
+            <view>
+              <text class="section-kicker">FASTEST AED</text>
+              <text class="section-title">已锁定最快到达资源</text>
+            </view>
+            <view class="eta-badge">
+              <text class="eta-value">{{ formatEta(rescueCall.matchedAed.estimatedArrivalSeconds) }}</text>
+              <text class="eta-label">预计到达</text>
+            </view>
+          </view>
+          <view class="match-resource">
+            <app-icon-tile
+              :name="rescueCall.matchedAed.type === 'MOBILE' ? 'mobile-device' : 'fixed-device'"
+              :tone="rescueCall.matchedAed.type === 'MOBILE' ? 'green' : 'blue'"
+            />
+            <view class="match-copy">
+              <text class="match-name">{{ rescueCall.matchedAed.name }}</text>
+              <text class="match-meta">
+                {{ rescueCall.matchedAed.type === 'MOBILE' ? '移动 AED 车辆' : '固定 AED 取送' }}
+                · {{ formatDistance(rescueCall.matchedAed.distanceMeters) }}
+              </text>
+              <text v-if="rescueCall.matchedAed.vehicleInfo" class="match-vehicle">
+                {{ rescueCall.matchedAed.vehicleInfo }}
+              </text>
+            </view>
+          </view>
+          <view class="match-actions">
+            <view
+              v-if="rescueCall.matchedAed.ownerPhone"
+              class="match-action match-action-secondary"
+              @tap="callMatchedDevice"
+            >
+              <app-icon name="phone-filled" :size="16" color="#1F63D5" />
+              <text>联系资源方</text>
+            </view>
+            <view class="match-action match-action-primary" @tap="openMatchedDevice">
+              <app-icon name="navigate-filled" :size="16" color="#FFFFFF" />
+              <text>查看设备位置</text>
+            </view>
+          </view>
+        </view>
+
+        <view v-else class="waiting-card">
+          <view class="waiting-pulse"></view>
+          <view>
+            <text class="waiting-title">正在扩大范围匹配 AED</text>
+            <text class="waiting-desc">系统会持续检查新上线的移动车辆与固定设备</text>
           </view>
         </view>
 
@@ -141,9 +190,7 @@
         </view>
 
         <view class="safety-card">
-          <view class="safety-icon">
-            <app-icon name="phone-filled" :size="20" color="#FFFFFF" />
-          </view>
+          <app-icon-tile name="phone-filled" tone="coral" />
           <view class="safety-copy">
             <text class="safety-title">危及生命请立即拨打 120</text>
             <text class="safety-desc">平台协同不能替代专业急救，请遵循调度人员指导</text>
@@ -155,7 +202,7 @@
 
         <view class="bottom-space"></view>
       </template>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
@@ -166,8 +213,14 @@ import { onLoad } from '@dcloudio/uni-app'
 import 'leaflet/dist/leaflet.css'
 // #endif
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { resolveApiUrl } from '@/api/http'
-import { getRescueCall, type RescueCallResponse, type RescueStatus } from '@/api/rescue'
+import {
+  getRescueCall,
+  retryRescueMatch,
+  type RescueCallResponse,
+  type RescueStatus
+} from '@/api/rescue'
 
 const rescueId = ref('')
 const rescueCall = ref<RescueCallResponse | null>(null)
@@ -175,6 +228,8 @@ const loading = ref(true)
 const errorMessage = ref('')
 const mapUnavailable = ref(false)
 let mapInstance: any = null
+let mapDataLayer: any = null
+let pollingTimer: ReturnType<typeof setInterval> | null = null
 
 const progressSteps = ['已呼救', '匹配中', '救援中', '已完成']
 const statusMap: Record<RescueStatus, { label: string; description: string; step: number }> = {
@@ -199,7 +254,7 @@ const displayImageUrls = computed(() => (
 
 const nativeMarkers = computed(() => {
   if (!rescueCall.value) return []
-  return [{
+  const markers: any[] = [{
     id: 1,
     longitude: rescueCall.value.longitude,
     latitude: rescueCall.value.latitude,
@@ -216,33 +271,68 @@ const nativeMarkers = computed(() => {
       display: 'ALWAYS'
     }
   }]
+  const matched = rescueCall.value.matchedAed
+  if (matched) {
+    markers.push({
+      id: 2,
+      longitude: matched.longitude,
+      latitude: matched.latitude,
+      iconPath: matched.type === 'MOBILE'
+        ? '/static/map/marker-mobile.png'
+        : '/static/map/marker-fixed.png',
+      width: 34,
+      height: 42,
+      callout: {
+        content: `已匹配·${formatEta(matched.estimatedArrivalSeconds)}`,
+        color: '#1F63D5',
+        fontSize: 13,
+        borderRadius: 8,
+        bgColor: '#FFFFFF',
+        padding: 7,
+        display: 'ALWAYS'
+      }
+    })
+  }
+  return markers
 })
 
 onLoad((query) => {
   rescueId.value = typeof query?.id === 'string' ? query.id : ''
   loadDetail()
+  if (rescueId.value) {
+    pollingTimer = setInterval(() => loadDetail(false), 3000)
+  }
 })
 
-async function loadDetail() {
+async function loadDetail(showLoading = true) {
   if (!rescueId.value) {
     loading.value = false
     errorMessage.value = '缺少呼救编号'
     return
   }
 
-  loading.value = true
+  if (showLoading) loading.value = true
   errorMessage.value = ''
   try {
-    rescueCall.value = await getRescueCall(rescueId.value)
+    let latest = await getRescueCall(rescueId.value)
+    if (!latest.matchedAed && latest.status === 'MATCHING' && !showLoading) {
+      latest = await retryRescueMatch(rescueId.value)
+    }
+    rescueCall.value = latest
     loading.value = false
     await nextTick()
     // #ifdef H5
     await initMap()
     // #endif
+    if (['COMPLETED', 'CANCELLED'].includes(rescueCall.value.status)) {
+      stopPolling()
+    }
   } catch (error: any) {
-    errorMessage.value = error?.message || '救援状态加载失败'
+    if (showLoading) {
+      errorMessage.value = error?.message || '救援状态加载失败'
+    }
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
   }
 }
 
@@ -250,28 +340,47 @@ async function loadDetail() {
 async function initMap() {
   if (!rescueCall.value) return
   try {
-    if (mapInstance) {
-      mapInstance.remove()
-      mapInstance = null
-    }
     const module = await import('leaflet')
     const Leaflet = module.default || module
     const { latitude, longitude } = rescueCall.value
-    mapInstance = Leaflet.map('rescue-detail-map', {
-      zoomControl: false,
-      attributionControl: true
-    }).setView([latitude, longitude], 15)
-    Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap'
-    }).addTo(mapInstance)
+    if (!mapInstance) {
+      mapInstance = Leaflet.map('rescue-detail-map', {
+        zoomControl: false,
+        attributionControl: true
+      }).setView([latitude, longitude], 15)
+      Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(mapInstance)
+      mapDataLayer = Leaflet.layerGroup().addTo(mapInstance)
+    }
+    mapDataLayer.clearLayers()
     const marker = Leaflet.divIcon({
       className: 'rescue-location-marker',
       html: '<span><i></i></span>',
       iconSize: [38, 48],
       iconAnchor: [19, 44]
     })
-    Leaflet.marker([latitude, longitude], { icon: marker }).addTo(mapInstance)
+    Leaflet.marker([latitude, longitude], { icon: marker }).addTo(mapDataLayer)
+    const matched = rescueCall.value.matchedAed
+    if (matched) {
+      const deviceMarker = Leaflet.divIcon({
+        className: 'matched-aed-marker',
+        html: '<span>AED</span>',
+        iconSize: [42, 42],
+        iconAnchor: [21, 21]
+      })
+      Leaflet.marker([matched.latitude, matched.longitude], { icon: deviceMarker })
+        .addTo(mapDataLayer)
+      Leaflet.polyline(
+        [[latitude, longitude], [matched.latitude, matched.longitude]],
+        { color: '#2F73E8', weight: 3, opacity: 0.72, dashArray: '8 8' }
+      ).addTo(mapDataLayer)
+      mapInstance.fitBounds(
+        [[latitude, longitude], [matched.latitude, matched.longitude]],
+        { padding: [42, 42], maxZoom: 15 }
+      )
+    }
     mapUnavailable.value = false
   } catch {
     mapUnavailable.value = true
@@ -302,6 +411,40 @@ function callEmergency() {
   uni.makePhoneCall({ phoneNumber: '120' })
 }
 
+function callMatchedDevice() {
+  const phoneNumber = rescueCall.value?.matchedAed?.ownerPhone
+  if (phoneNumber) uni.makePhoneCall({ phoneNumber })
+}
+
+function openMatchedDevice() {
+  const device = rescueCall.value?.matchedAed
+  if (!device) return
+  uni.openLocation({
+    latitude: device.latitude,
+    longitude: device.longitude,
+    name: device.name,
+    address: device.address,
+    scale: 16,
+    fail: () => uni.showToast({ title: '无法打开系统地图', icon: 'none' })
+  })
+}
+
+function formatEta(seconds: number) {
+  if (seconds < 60) return `${seconds}秒`
+  return `${Math.ceil(seconds / 60)}分钟`
+}
+
+function formatDistance(meters: number) {
+  return meters < 1000 ? `${meters}米` : `${(meters / 1000).toFixed(1)}公里`
+}
+
+function stopPolling() {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
+  }
+}
+
 function previewSceneImage(index: number) {
   uni.previewImage({
     current: displayImageUrls.value[index],
@@ -310,6 +453,7 @@ function previewSceneImage(index: number) {
 }
 
 onUnmounted(() => {
+  stopPolling()
   if (mapInstance) {
     mapInstance.remove()
     mapInstance = null
@@ -340,6 +484,24 @@ onUnmounted(() => {
   border-radius: 50%;
   background: #FFFFFF;
 }
+.matched-aed-marker {
+  background: transparent;
+  border: 0;
+}
+.matched-aed-marker span {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid #FFFFFF;
+  border-radius: 50%;
+  background: #16855D;
+  box-shadow: 0 6px 16px rgba(22, 133, 93, 0.28);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 800;
+}
 /* #endif */
 </style>
 
@@ -351,7 +513,7 @@ onUnmounted(() => {
 }
 
 .page-scroll {
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .state-card {
@@ -364,13 +526,6 @@ onUnmounted(() => {
 }
 
 .state-icon {
-  width: 88rpx;
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 28rpx;
-  background: #FFFFFF;
   box-shadow: 0 12rpx 34rpx rgba(35, 65, 112, 0.1);
 }
 
@@ -552,11 +707,78 @@ onUnmounted(() => {
 }
 
 .map-card,
-.detail-card {
+.detail-card,
+.match-card {
   padding: 28rpx;
   background: #FFFFFF;
   box-shadow: 0 10rpx 28rpx rgba(38, 63, 103, 0.07);
 }
+
+.match-resource {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin-top: 24rpx;
+  padding: 20rpx;
+  border-radius: 18rpx;
+  background: #F3F7FC;
+}
+
+.match-copy { min-width: 0; flex: 1; }
+.match-name,
+.match-meta,
+.match-vehicle { display: block; }
+.match-name { font-size: 27rpx; font-weight: 800; }
+.match-meta { margin-top: 6rpx; color: #53647E; font-size: 22rpx; }
+.match-vehicle { margin-top: 6rpx; color: #7A889D; font-size: 21rpx; }
+
+.eta-badge { text-align: right; }
+.eta-value { display: block; color: #16855D; font-size: 32rpx; font-weight: 900; }
+.eta-label { display: block; margin-top: 2rpx; color: #7A889D; font-size: 19rpx; }
+
+.match-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14rpx;
+  margin-top: 20rpx;
+}
+
+.match-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  min-height: 64rpx;
+  padding: 0 20rpx;
+  border-radius: 15rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+.match-action-secondary { background: #EDF4FF; color: #1F63D5; }
+.match-action-primary { background: #1F63D5; color: #FFFFFF; }
+
+.waiting-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin: 24rpx 24rpx 0;
+  padding: 24rpx 28rpx;
+  border: 1rpx solid #DDE7F5;
+  border-radius: 22rpx;
+  background: #FFFFFF;
+}
+.waiting-pulse {
+  width: 18rpx;
+  height: 18rpx;
+  flex: none;
+  border-radius: 50%;
+  background: #2F73E8;
+  box-shadow: 0 0 0 10rpx rgba(47, 115, 232, 0.12);
+}
+.waiting-title,
+.waiting-desc { display: block; }
+.waiting-title { font-size: 25rpx; font-weight: 800; }
+.waiting-desc { margin-top: 6rpx; color: #75839A; font-size: 21rpx; line-height: 1.45; }
 
 .section-kicker {
   color: #7A8AA3;
@@ -751,17 +973,6 @@ onUnmounted(() => {
   padding: 24rpx;
   background: #FFF2F2;
   border: 1rpx solid #FAD6D8;
-}
-
-.safety-icon {
-  flex: none;
-  width: 60rpx;
-  height: 60rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 18rpx;
-  background: #C22936;
 }
 
 .safety-copy {

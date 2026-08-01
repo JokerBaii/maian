@@ -17,6 +17,7 @@
     {
       "path": "pages/health/index",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "健康监测"
       }
     },
@@ -141,18 +142,18 @@
   "globalStyle": {
     "navigationBarTextStyle": "white",
     "navigationBarTitleText": "脉安驰援",
-    "navigationBarBackgroundColor": "#2B6FF0",
-    "backgroundColor": "#F5F7FA",
+    "navigationBarBackgroundColor": "#2E6DD1",
+    "backgroundColor": "#F3F7FA",
     "app-plus": {
       "titleNView": {
         "titleColor": "#ffffff",
-        "backgroundColor": "#2B6FF0"
+        "backgroundColor": "#2E6DD1"
       }
     }
   },
   "tabBar": {
     "color": "#86909C",
-    "selectedColor": "#2B6FF0",
+    "selectedColor": "#2E6DD1",
     "borderStyle": "black",
     "backgroundColor": "#FFFFFF",
     "list": [

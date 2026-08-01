@@ -1,10 +1,8 @@
 <template>
   <view class="page">
-    <scroll-view class="page-scroll" scroll-y>
+    <view class="page-scroll">
       <view class="intro-card">
-        <view class="intro-icon">
-          <app-icon name="folder-add-filled" :size="25" color="#FFFFFF" />
-        </view>
+        <app-icon-tile name="folder-add-filled" tone="violet" size="large" />
         <view class="intro-copy">
           <text class="intro-kicker">HEALTH REPORT</text>
           <text class="intro-title">录入体检报告</text>
@@ -48,9 +46,7 @@
             <text class="field-hint">可选，最大 5MB</text>
           </view>
           <view v-if="!imagePath" class="image-upload" @tap="chooseImage">
-            <view class="upload-icon">
-              <app-icon name="camera-filled" :size="23" color="#1F63D5" />
-            </view>
+            <app-icon-tile name="camera" tone="blue" />
             <view>
               <text class="upload-title">拍照或从相册选择</text>
               <text class="upload-desc">支持 JPG、PNG、WebP</text>
@@ -158,13 +154,14 @@
         <text class="disclaimer">分析仅用于健康信息整理，不能替代医生诊断</text>
       </view>
       <view class="bottom-space"></view>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { uploadImage } from '@/api/files'
 import { createHealthReport } from '@/api/reports'
 
@@ -280,7 +277,7 @@ async function submitReport() {
 }
 
 .page-scroll {
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .intro-card,
@@ -299,18 +296,6 @@ async function submitReport() {
     linear-gradient(135deg, #285FBF 0%, #3B7CE7 100%);
   color: #FFFFFF;
   box-shadow: 0 16rpx 38rpx rgba(40, 99, 198, 0.2);
-}
-
-.intro-icon {
-  flex: none;
-  width: 84rpx;
-  height: 84rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1rpx solid rgba(255, 255, 255, 0.22);
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.14);
 }
 
 .intro-copy {
@@ -420,16 +405,6 @@ async function submitReport() {
   border: 1rpx dashed #B7C7DD;
   border-radius: 18rpx;
   background: #F7FAFF;
-}
-
-.upload-icon {
-  width: 68rpx;
-  height: 68rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 19rpx;
-  background: #E8F1FF;
 }
 
 .upload-title,

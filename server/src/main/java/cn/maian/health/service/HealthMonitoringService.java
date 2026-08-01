@@ -1,119 +1,159 @@
 package cn.maian.health.service;
 
+import cn.maian.health.domain.HeartRateReading;
 import cn.maian.health.dto.HealthMonitoringResponse;
+import cn.maian.health.repository.HeartRateReadingRepository;
+import cn.maian.health.repository.WearableDeviceRepository;
+import cn.maian.user.service.UserProfileService;
+import cn.maian.user.service.UserSettingsService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.IntSummaryStatistics;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class HealthMonitoringService {
 
-    private static final int[] HALF_HOUR_VALUES = {
-        62, 60, 58, 56, 55, 54, 53, 55, 57, 58, 60, 63,
-        65, 68, 72, 76, 78, 82, 85, 98, 112, 125, 95, 88,
-        80, 78, 75, 73, 72, 70, 70, 69, 68, 75, 82, 95,
-        90, 85, 76, 74, 74, 72, 72, 70, 68, 66, 65, 63
-    };
-
+    private static final ZoneId USER_ZONE = ZoneId.of("Asia/Shanghai");
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("MM-dd");
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter ALERT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    public HealthMonitoringResponse currentSummary() {
-        var month = buildMonthData();
-        return new HealthMonitoringResponse(
-            72,
-            48,
-            142,
-            73,
-            "normal",
-            "resting",
-            buildTodayData(),
-            month.subList(month.size() - 7, month.size()),
-            month,
-            buildAlerts(),
-            new HealthMonitoringResponse.WearableDevice(
-                "未绑定设备",
-                "none",
-                false,
-                0
-            )
-        );
-    }
+    private final HeartRateReadingRepository heartRateReadingRepository;
+    private final WearableDeviceRepository wearableDeviceRepository;
+    private final UserSettingsService userSettingsService;
 
-    private List<HealthMonitoringResponse.HeartRatePoint> buildTodayData() {
-        var points = new ArrayList<HealthMonitoringResponse.HeartRatePoint>(HALF_HOUR_VALUES.length);
-        for (int index = 0; index < HALF_HOUR_VALUES.length; index++) {
-            int hour = index / 2;
-            int minute = index % 2 == 0 ? 0 : 30;
-            String scene = sceneFor(hour, minute);
-            points.add(new HealthMonitoringResponse.HeartRatePoint(
-                "%02d:%02d".formatted(hour, minute),
-                HALF_HOUR_VALUES[index],
-                scene
-            ));
-        }
-        return points;
-    }
-
-    private String sceneFor(int hour, int minute) {
-        if (hour < 5 || hour >= 22) {
-            return "sleeping";
-        }
-        double time = hour + minute / 60.0;
-        if ((time >= 9 && time <= 11) || (time >= 17 && time <= 18.5)) {
-            return "exercise";
-        }
-        return "resting";
-    }
-
-    private List<HealthMonitoringResponse.DailyHeartRate> buildMonthData() {
-        LocalDate today = LocalDate.now();
-        var result = new ArrayList<HealthMonitoringResponse.DailyHeartRate>(30);
-        for (int offset = 29; offset >= 0; offset--) {
-            LocalDate date = today.minusDays(offset);
-            int sequence = 29 - offset;
-            int average = 71 + (sequence * 5 % 7);
-            int minimum = 49 + (sequence * 3 % 9);
-            int maximum = 104 + (sequence * 7 % 18);
-            if (sequence == 7) maximum = 142;
-            if (sequence == 20) maximum = 135;
-            if (sequence == 25) minimum = 48;
-            result.add(new HealthMonitoringResponse.DailyHeartRate(
-                date.format(DAY_FORMAT),
-                average,
-                minimum,
-                maximum
-            ));
-        }
-        return result;
-    }
-
-    private List<HealthMonitoringResponse.HeartRateAlert> buildAlerts() {
-        LocalDateTime now = LocalDateTime.now();
-        return List.of(
-            alert(now.minusDays(2).withHour(10).withMinute(15), 118, "high", "心率偏高，请注意休息"),
-            alert(now.minusDays(4).withHour(6).withMinute(30), 48, "low", "心率偏低，如持续请就医"),
-            alert(now.minusDays(8).withHour(9).withMinute(45), 135, "high", "运动中心率过高，请降低运动强度"),
-            alert(now.minusDays(15).withHour(17).withMinute(20), 122, "high", "心率偏高，建议停止运动休息"),
-            alert(now.minusDays(21).withHour(10).withMinute(30), 142, "high", "心率严重偏高，请立即停止活动并休息")
-        );
-    }
-
-    private HealthMonitoringResponse.HeartRateAlert alert(
-        LocalDateTime time,
-        int value,
-        String type,
-        String message
+    public HealthMonitoringService(
+        HeartRateReadingRepository heartRateReadingRepository,
+        WearableDeviceRepository wearableDeviceRepository,
+        UserSettingsService userSettingsService
     ) {
-        return new HealthMonitoringResponse.HeartRateAlert(
-            time.format(ALERT_FORMAT),
-            value,
-            type,
-            message
+        this.heartRateReadingRepository = heartRateReadingRepository;
+        this.wearableDeviceRepository = wearableDeviceRepository;
+        this.userSettingsService = userSettingsService;
+    }
+
+    @Transactional
+    public HealthMonitoringResponse currentSummary() {
+        Instant now = Instant.now();
+        LocalDate today = LocalDate.now(USER_ZONE);
+        Instant monthStart = today.minusDays(29).atStartOfDay(USER_ZONE).toInstant();
+        List<HeartRateReading> readings = heartRateReadingRepository
+            .findAllByUserIdAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(
+                UserProfileService.CURRENT_USER_ID,
+                monthStart
+            );
+        var settings = userSettingsService.findOrCreate();
+        var wearable = wearableDeviceRepository.findByUserId(UserProfileService.CURRENT_USER_ID);
+
+        List<HeartRateReading> todayReadings = readings.stream()
+            .filter(reading -> toDate(reading).equals(today))
+            .toList();
+        IntSummaryStatistics todayStats = todayReadings.stream()
+            .mapToInt(HeartRateReading::getBpm)
+            .summaryStatistics();
+        HeartRateReading latest = readings.isEmpty() ? null : readings.get(readings.size() - 1);
+
+        List<HealthMonitoringResponse.DailyHeartRate> month = buildDaily(readings);
+        List<HealthMonitoringResponse.DailyHeartRate> week = month.stream()
+            .filter(point -> !parseMonthDay(point.date(), today).isBefore(today.minusDays(6)))
+            .toList();
+
+        return new HealthMonitoringResponse(
+            latest == null ? 0 : latest.getBpm(),
+            todayStats.getCount() == 0 ? 0 : todayStats.getMin(),
+            todayStats.getCount() == 0 ? 0 : todayStats.getMax(),
+            todayStats.getCount() == 0 ? 0 : (int) Math.round(todayStats.getAverage()),
+            statusFor(latest, settings.getMinHeartRate(), settings.getMaxHeartRate()),
+            latest == null ? "resting" : latest.getScene(),
+            todayReadings.stream().map(this::toPoint).toList(),
+            week,
+            month,
+            settings.isHealthAlert()
+                ? buildAlerts(readings, settings.getMinHeartRate(), settings.getMaxHeartRate())
+                : List.of(),
+            wearable
+                .map(device -> new HealthMonitoringResponse.WearableDevice(
+                    device.getName(),
+                    device.getType(),
+                    device.isConnected(),
+                    device.getBattery() == null ? 0 : device.getBattery()
+                ))
+                .orElseGet(() -> new HealthMonitoringResponse.WearableDevice(
+                    "未绑定设备", "none", false, 0
+                ))
         );
+    }
+
+    private List<HealthMonitoringResponse.DailyHeartRate> buildDaily(List<HeartRateReading> readings) {
+        Map<LocalDate, IntSummaryStatistics> byDay = new LinkedHashMap<>();
+        readings.forEach(reading -> byDay
+            .computeIfAbsent(toDate(reading), ignored -> new IntSummaryStatistics())
+            .accept(reading.getBpm()));
+        return byDay.entrySet().stream()
+            .map(entry -> new HealthMonitoringResponse.DailyHeartRate(
+                entry.getKey().format(DAY_FORMAT),
+                (int) Math.round(entry.getValue().getAverage()),
+                entry.getValue().getMin(),
+                entry.getValue().getMax()
+            ))
+            .toList();
+    }
+
+    private List<HealthMonitoringResponse.HeartRateAlert> buildAlerts(
+        List<HeartRateReading> readings,
+        int minimum,
+        int maximum
+    ) {
+        var alerts = new ArrayList<HealthMonitoringResponse.HeartRateAlert>();
+        readings.stream()
+            .filter(reading -> reading.getBpm() < minimum || reading.getBpm() > maximum)
+            .sorted(Comparator.comparing(HeartRateReading::getRecordedAt).reversed())
+            .limit(50)
+            .forEach(reading -> {
+                boolean high = reading.getBpm() > maximum;
+                alerts.add(new HealthMonitoringResponse.HeartRateAlert(
+                    ALERT_FORMAT.format(reading.getRecordedAt().atZone(USER_ZONE)),
+                    reading.getBpm(),
+                    high ? "high" : "low",
+                    high ? "心率超过预警阈值，请停止活动并休息"
+                        : "心率低于预警阈值，如持续不适请及时就医"
+                ));
+            });
+        return alerts;
+    }
+
+    private HealthMonitoringResponse.HeartRatePoint toPoint(HeartRateReading reading) {
+        return new HealthMonitoringResponse.HeartRatePoint(
+            TIME_FORMAT.format(reading.getRecordedAt().atZone(USER_ZONE)),
+            reading.getBpm(),
+            reading.getScene()
+        );
+    }
+
+    private String statusFor(HeartRateReading reading, int minimum, int maximum) {
+        if (reading == null) return "no_data";
+        if (reading.getBpm() < minimum) return "low";
+        if (reading.getBpm() > maximum) return "high";
+        return "normal";
+    }
+
+    private LocalDate toDate(HeartRateReading reading) {
+        return reading.getRecordedAt().atZone(USER_ZONE).toLocalDate();
+    }
+
+    private LocalDate parseMonthDay(String monthDay, LocalDate today) {
+        String[] parts = monthDay.split("-");
+        LocalDate parsed = LocalDate.of(today.getYear(), Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
+        return parsed.isAfter(today) ? parsed.minusYears(1) : parsed;
     }
 }

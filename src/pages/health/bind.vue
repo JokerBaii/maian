@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <scroll-view class="scroll-content" scroll-y>
+    <view class="scroll-content">
       <view v-if="boundDevice" class="card bound-card">
         <view class="card-header">
           <view class="card-title-wrap">
@@ -11,12 +11,10 @@
             <view class="connected-dot"></view>
             <text class="connected-text">已连接</text>
           </view>
-        </view>
-        <view class="bound-info">
+          </view>
+          <view class="bound-info">
           <view class="bound-left">
-            <view class="device-avatar">
-              <app-icon class="device-avatar-icon" name="heart-filled" :size="26" color="#1F63D5" />
-            </view>
+            <app-icon-tile name="wearable" tone="coral" status="online" />
             <view class="bound-detail">
               <text class="bound-name">{{ boundDevice.name }}</text>
               <view class="bound-meta">
@@ -38,9 +36,13 @@
       </view>
 
       <view v-if="!boundDevice" class="empty-bound">
-        <view class="empty-icon">
-          <app-icon class="empty-icon-text" name="heart-filled" :size="30" color="#7E8DA6" />
-        </view>
+        <app-icon-tile
+          class="empty-icon"
+          name="wearable"
+          tone="slate"
+          status="offline"
+          size="large"
+        />
         <text class="empty-title">暂无绑定设备</text>
         <text class="empty-desc">请扫描并绑定可穿戴设备以开始健康监测</text>
       </view>
@@ -58,7 +60,7 @@
               class="scan-icon-text"
               name="search"
               :size="22"
-              color="#1F63D5"
+              color="#FFFFFF"
             />
             <view v-if="isScanning" class="scan-spinner"></view>
           </view>
@@ -81,9 +83,7 @@
             class="device-item"
           >
             <view class="device-item-left">
-              <view class="device-item-avatar" :style="{ background: device.avatarBg }">
-                <text class="device-item-icon">{{ device.icon }}</text>
-              </view>
+              <app-icon-tile name="wearable" tone="coral" />
               <view class="device-item-info">
                 <text class="device-item-name">{{ device.name }}</text>
                 <view class="signal-bars">
@@ -122,14 +122,21 @@
       </view>
 
       <view class="bottom-safe"></view>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { onUnmounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
+import {
+  createHeartRateReading,
+  deleteWearableDevice,
+  getWearableDevice,
+  saveWearableDevice
+} from '@/api/monitoring'
 
 const { updateWearable } = useHealthMonitoring()
 
@@ -141,6 +148,7 @@ const boundDevice = ref<{
 } | null>(null)
 const connectedDeviceId = ref('')
 let scanTimer: ReturnType<typeof setTimeout> | null = null
+let lastReadingUploadAt = 0
 
 const isScanning = ref(false)
 const showBindSuccess = ref(false)
@@ -157,6 +165,24 @@ interface DiscoveredDevice {
 }
 
 const discoveredDevices = reactive<DiscoveredDevice[]>([])
+
+onMounted(async () => {
+  try {
+    const device = await getWearableDevice()
+    if (device.type !== 'none') {
+      connectedDeviceId.value = device.deviceIdentifier || ''
+      boundDevice.value = {
+        name: device.name,
+        type: device.type,
+        connected: device.connected,
+        battery: device.battery
+      }
+      updateWearable(device)
+    }
+  } catch {
+    uni.showToast({ title: '绑定设备信息加载失败', icon: 'none' })
+  }
+})
 
 function toggleScan() {
   if (isScanning.value) {
@@ -181,7 +207,7 @@ function toggleScan() {
 function startBluetoothScan() {
   discoveredDevices.length = 0
   uni.openBluetoothAdapter({
-    success: () => {
+    success: async () => {
       uni.onBluetoothDeviceFound(handleBluetoothDevicesFound)
       uni.startBluetoothDevicesDiscovery({
         allowDuplicatesKey: false,
@@ -214,7 +240,7 @@ function handleBluetoothDevicesFound(result: any) {
       id: rawDevice.deviceId,
       name,
       icon: name.charAt(0).toUpperCase(),
-      avatarBg: 'linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%)',
+      avatarBg: 'linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%)',
       signal,
       binding: false,
       bound: false
@@ -235,6 +261,60 @@ function showBluetoothError(error: any) {
     ? '请先开启手机蓝牙'
     : '蓝牙扫描失败，请检查系统权限'
   uni.showToast({ title: message, icon: 'none' })
+}
+
+function containsBluetoothUuid(value: string, shortUuid: string) {
+  return value.toLowerCase().replace(/-/g, '').includes(shortUuid.toLowerCase())
+}
+
+function startHeartRateNotifications(deviceId: string) {
+  uni.getBLEDeviceServices({
+    deviceId,
+    success: (serviceResult: any) => {
+      const service = (serviceResult.services || []).find((item: any) => (
+        containsBluetoothUuid(item.uuid || '', '180d')
+      ))
+      if (!service) return
+      uni.getBLEDeviceCharacteristics({
+        deviceId,
+        serviceId: service.uuid,
+        success: (characteristicResult: any) => {
+          const characteristic = (characteristicResult.characteristics || []).find((item: any) => (
+            containsBluetoothUuid(item.uuid || '', '2a37')
+            && (item.properties?.notify || item.properties?.indicate)
+          ))
+          if (!characteristic) return
+          uni.onBLECharacteristicValueChange(handleHeartRateValue)
+          uni.notifyBLECharacteristicValueChange({
+            deviceId,
+            serviceId: service.uuid,
+            characteristicId: characteristic.uuid,
+            state: true
+          })
+        }
+      })
+    }
+  })
+}
+
+function handleHeartRateValue(result: any) {
+  if (!result?.value) return
+  const view = new DataView(result.value)
+  if (view.byteLength < 2) return
+  const usesSixteenBits = (view.getUint8(0) & 0x01) === 0x01
+  const bpm = usesSixteenBits && view.byteLength >= 3
+    ? view.getUint16(1, true)
+    : view.getUint8(1)
+  const now = Date.now()
+  if (bpm < 25 || bpm > 250 || now - lastReadingUploadAt < 15000) return
+  lastReadingUploadAt = now
+  createHeartRateReading({
+    bpm,
+    scene: 'resting',
+    recordedAt: new Date(now).toISOString()
+  }).catch(() => {
+    lastReadingUploadAt = 0
+  })
 }
 // #endif
 
@@ -271,7 +351,7 @@ function handleBind(device: DiscoveredDevice) {
   uni.createBLEConnection({
     deviceId: device.id,
     timeout: 10000,
-    success: () => {
+    success: async () => {
       device.binding = false
       device.bound = true
       connectedDeviceId.value = device.id
@@ -288,6 +368,21 @@ function handleBind(device: DiscoveredDevice) {
         connected: true,
         battery: 0
       })
+      try {
+        const saved = await saveWearableDevice({
+          deviceIdentifier: device.id,
+          name: device.name,
+          type: 'bluetooth',
+          connected: true,
+          battery: 0
+        })
+        updateWearable(saved)
+        // #ifdef APP-PLUS
+        startHeartRateNotifications(device.id)
+        // #endif
+      } catch {
+        uni.showToast({ title: '设备已连接，但同步绑定信息失败', icon: 'none' })
+      }
       showBindSuccess.value = true
       setTimeout(() => {
         showBindSuccess.value = false
@@ -309,10 +404,10 @@ function handleDisconnect() {
   uni.showModal({
     title: '断开设备',
     content: '确定要断开当前设备连接吗？',
-    confirmColor: '#F53F3F',
+    confirmColor: '#C93D46',
     success: (res) => {
       if (res.confirm) {
-        const clearDevice = () => {
+        const clearDevice = async () => {
           discoveredDevices.forEach(device => {
             device.bound = false
             device.binding = false
@@ -325,6 +420,11 @@ function handleDisconnect() {
             connected: false,
             battery: 0
           })
+          try {
+            await deleteWearableDevice()
+          } catch {
+            uni.showToast({ title: '设备已断开，服务端解绑失败', icon: 'none' })
+          }
         }
         // #ifdef APP-PLUS
         if (connectedDeviceId.value) {
@@ -351,7 +451,7 @@ onUnmounted(stopScan)
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
 }
 
 .scroll-content {
@@ -380,13 +480,13 @@ onUnmounted(stopScan)
   width: 6rpx;
   height: 28rpx;
   border-radius: 3rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
   margin-right: 12rpx;
 }
 .card-title {
   font-size: 30rpx;
   font-weight: 700;
-  color: #1D2129;
+  color: #20364D;
 }
 
 .connected-badge {
@@ -401,12 +501,12 @@ onUnmounted(stopScan)
   width: 12rpx;
   height: 12rpx;
   border-radius: 50%;
-  background: #00B42A;
+  background: #23956A;
   box-shadow: 0 0 8rpx rgba(0, 180, 42, 0.4);
 }
 .connected-text {
   font-size: 22rpx;
-  color: #00B42A;
+  color: #23956A;
   font-weight: 600;
 }
 .bound-info {
@@ -419,20 +519,6 @@ onUnmounted(stopScan)
   align-items: center;
   gap: 20rpx;
 }
-.device-avatar {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 24rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4rpx 16rpx rgba(43, 111, 240, 0.2);
-}
-.device-avatar-icon {
-  font-size: 44rpx;
-  color: #FFFFFF;
-}
 .bound-detail {
   display: flex;
   flex-direction: column;
@@ -441,7 +527,7 @@ onUnmounted(stopScan)
 .bound-name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .bound-meta {
   display: flex;
@@ -472,7 +558,7 @@ onUnmounted(stopScan)
 .battery-level-mini {
   height: 100%;
   border-radius: 1rpx;
-  background: #00B42A;
+  background: #23956A;
 }
 .battery-text-mini {
   font-size: 20rpx;
@@ -481,12 +567,12 @@ onUnmounted(stopScan)
 .disconnect-btn {
   padding: 12rpx 28rpx;
   border-radius: 24rpx;
-  border: 2rpx solid #F53F3F;
+  border: 2rpx solid #C93D46;
   background: rgba(245, 63, 63, 0.04);
 }
 .disconnect-text {
   font-size: 24rpx;
-  color: #F53F3F;
+  color: #C93D46;
   font-weight: 600;
 }
 
@@ -497,18 +583,7 @@ onUnmounted(stopScan)
   padding: 64rpx 32rpx 32rpx;
 }
 .empty-icon {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 50%;
-  background: rgba(43, 111, 240, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   margin-bottom: 20rpx;
-}
-.empty-icon-text {
-  font-size: 56rpx;
-  opacity: 0.5;
 }
 .empty-title {
   font-size: 30rpx;
@@ -532,7 +607,7 @@ onUnmounted(stopScan)
   width: 240rpx;
   height: 240rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -639,20 +714,6 @@ onUnmounted(stopScan)
   align-items: center;
   gap: 20rpx;
 }
-.device-item-avatar {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
-}
-.device-item-icon {
-  font-size: 32rpx;
-  color: #FFFFFF;
-  font-weight: 800;
-}
 .device-item-info {
   display: flex;
   flex-direction: column;
@@ -661,7 +722,7 @@ onUnmounted(stopScan)
 .device-item-name {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .signal-bars {
   display: flex;
@@ -678,7 +739,7 @@ onUnmounted(stopScan)
 .signal-bar:nth-child(3) { height: 22rpx; }
 .signal-bar:nth-child(4) { height: 28rpx; }
 .signal-active {
-  background: #00B42A;
+  background: #23956A;
 }
 .signal-text {
   font-size: 20rpx;
@@ -688,7 +749,7 @@ onUnmounted(stopScan)
 .bind-btn {
   padding: 10rpx 28rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   box-shadow: 0 4rpx 12rpx rgba(43, 111, 240, 0.2);
   transition: all 0.3s ease;
 }
@@ -709,7 +770,7 @@ onUnmounted(stopScan)
   color: #86909C;
 }
 .bind-btn-bound .bind-btn-text {
-  color: #00B42A;
+  color: #23956A;
 }
 
 .success-overlay {
@@ -754,7 +815,7 @@ onUnmounted(stopScan)
   width: 120rpx;
   height: 120rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 100%);
+  background: linear-gradient(135deg, #23956A 0%, #4DC580 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -780,7 +841,7 @@ onUnmounted(stopScan)
 .success-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: #1D2129;
+  color: #20364D;
   margin-bottom: 12rpx;
 }
 .success-desc {

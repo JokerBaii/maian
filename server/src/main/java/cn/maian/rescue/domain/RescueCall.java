@@ -1,5 +1,6 @@
 package cn.maian.rescue.domain;
 
+import cn.maian.device.domain.EmergencyDevice;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -9,6 +10,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -73,6 +75,26 @@ public class RescueCall {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "matched_device_id")
+    private EmergencyDevice matchedDevice;
+
+    private Instant matchedAt;
+
+    private Integer matchedDistanceMeters;
+
+    private Integer estimatedArrivalSeconds;
+
+    @Column(length = 40)
+    private String matchStrategy;
+
+    @Column(length = 64, unique = true)
+    private String clientRequestId;
+
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 36)
+    private UUID requestedByUserId;
+
     protected RescueCall() {
     }
 
@@ -84,7 +106,8 @@ public class RescueCall {
         String address,
         String description,
         Set<String> symptoms,
-        List<String> imageUrls
+        List<String> imageUrls,
+        String clientRequestId
     ) {
         this.id = id;
         this.urgency = urgency;
@@ -95,6 +118,7 @@ public class RescueCall {
         this.description = description;
         this.symptoms = new LinkedHashSet<>(symptoms);
         this.imageUrls = new ArrayList<>(imageUrls);
+        this.clientRequestId = clientRequestId;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
     }
@@ -106,7 +130,8 @@ public class RescueCall {
         String address,
         String description,
         Set<String> symptoms,
-        List<String> imageUrls
+        List<String> imageUrls,
+        String clientRequestId
     ) {
         return new RescueCall(
             UUID.randomUUID(),
@@ -116,13 +141,40 @@ public class RescueCall {
             address,
             description,
             symptoms,
-            imageUrls
+            imageUrls,
+            clientRequestId
         );
     }
 
     public void transitionTo(RescueStatus nextStatus) {
         this.status = nextStatus;
         this.updatedAt = Instant.now();
+    }
+
+    public void requestBy(UUID userId) {
+        if (this.requestedByUserId != null && !this.requestedByUserId.equals(userId)) {
+            throw new IllegalStateException("救援请求已绑定其他用户");
+        }
+        this.requestedByUserId = userId;
+    }
+
+    public void beginMatching() {
+        transitionTo(RescueStatus.MATCHING);
+    }
+
+    public void assignDevice(
+        EmergencyDevice device,
+        Instant matchedAt,
+        int distanceMeters,
+        int estimatedArrivalSeconds,
+        String strategy
+    ) {
+        this.matchedDevice = device;
+        this.matchedAt = matchedAt;
+        this.matchedDistanceMeters = distanceMeters;
+        this.estimatedArrivalSeconds = estimatedArrivalSeconds;
+        this.matchStrategy = strategy;
+        this.updatedAt = matchedAt;
     }
 
     public UUID getId() {
@@ -167,5 +219,33 @@ public class RescueCall {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public EmergencyDevice getMatchedDevice() {
+        return matchedDevice;
+    }
+
+    public Instant getMatchedAt() {
+        return matchedAt;
+    }
+
+    public Integer getMatchedDistanceMeters() {
+        return matchedDistanceMeters;
+    }
+
+    public Integer getEstimatedArrivalSeconds() {
+        return estimatedArrivalSeconds;
+    }
+
+    public String getMatchStrategy() {
+        return matchStrategy;
+    }
+
+    public String getClientRequestId() {
+        return clientRequestId;
+    }
+
+    public UUID getRequestedByUserId() {
+        return requestedByUserId;
     }
 }

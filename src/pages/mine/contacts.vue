@@ -29,7 +29,7 @@
       </view>
 
       <view v-if="contacts.length === 0" class="empty-state">
-        <app-icon class="empty-icon" name="phone" :size="44" color="#8994A8" />
+        <app-icon-tile class="empty-icon" name="phone-filled" tone="green" size="large" />
         <text class="empty-text">暂无紧急联系人</text>
         <text class="empty-hint">添加联系人以便在紧急情况下快速通知</text>
       </view>
@@ -98,6 +98,7 @@
 import { ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import {
   createEmergencyContact,
   deleteEmergencyContact,
@@ -144,7 +145,7 @@ function deleteContact(idx: number) {
   uni.showModal({
     title: '确认删除',
     content: `确定要删除联系人“${contact.name}”吗？`,
-    confirmColor: '#F53F3F',
+    confirmColor: '#C93D46',
     success: async (res) => {
       if (res.confirm) {
         try {
@@ -206,7 +207,7 @@ onShow(loadContacts)
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
   padding: 24rpx 32rpx;
   box-sizing: border-box;
   padding-bottom: 160rpx;
@@ -229,7 +230,7 @@ onShow(loadContacts)
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -255,7 +256,7 @@ onShow(loadContacts)
 .contact-name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .relation-tag {
   background: rgba(43, 111, 240, 0.08);
@@ -264,7 +265,7 @@ onShow(loadContacts)
 }
 .relation-tag-text {
   font-size: 20rpx;
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 500;
 }
 .contact-phone {
@@ -286,7 +287,7 @@ onShow(loadContacts)
 }
 .action-btn-text {
   font-size: 24rpx;
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 500;
 }
 .action-delete {
@@ -294,7 +295,7 @@ onShow(loadContacts)
 }
 .action-delete-text {
   font-size: 24rpx;
-  color: #F53F3F;
+  color: #C93D46;
   font-weight: 500;
 }
 
@@ -305,7 +306,6 @@ onShow(loadContacts)
   padding: 120rpx 0;
 }
 .empty-icon {
-  font-size: 80rpx;
   margin-bottom: 24rpx;
 }
 .empty-text {
@@ -328,7 +328,7 @@ onShow(loadContacts)
   align-items: center;
   justify-content: center;
   gap: 8rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   border-radius: 48rpx;
   padding: 28rpx 0;
   box-shadow: 0 8rpx 32rpx rgba(43, 111, 240, 0.3);
@@ -376,7 +376,7 @@ onShow(loadContacts)
 .popup-title {
   font-size: 34rpx;
   font-weight: 700;
-  color: #1D2129;
+  color: #20364D;
 }
 .popup-close {
   width: 56rpx;
@@ -409,7 +409,7 @@ onShow(loadContacts)
 }
 .popup-form-input {
   font-size: 30rpx;
-  color: #1D2129;
+  color: #20364D;
   font-weight: 500;
   width: 100%;
 }
@@ -437,7 +437,7 @@ onShow(loadContacts)
 }
 .relation-option-active {
   background: rgba(43, 111, 240, 0.08);
-  border-color: #2B6FF0;
+  border-color: #2E6DD1;
 }
 .relation-option-text {
   font-size: 26rpx;
@@ -445,13 +445,13 @@ onShow(loadContacts)
   font-weight: 500;
 }
 .relation-option-text-active {
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 600;
 }
 
 .popup-submit {
   margin-top: 40rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   border-radius: 48rpx;
   padding: 28rpx 0;
   text-align: center;

@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <scroll-view class="scroll-content" scroll-y>
+    <view class="scroll-content">
       <view class="form-section">
         <view class="form-label">
           <view class="label-bar"></view>
@@ -12,9 +12,7 @@
             :class="{ 'type-option-active': deviceType === 'fixed' }"
             @tap="deviceType = 'fixed'"
           >
-            <view class="type-option-icon type-icon-fixed">
-              <app-icon class="type-icon-text" name="cart-filled" :size="28" color="#1F63D5" />
-            </view>
+            <app-icon-tile class="type-pictogram" name="fixed-device" tone="blue" size="large" />
             <text class="type-option-label">固定设备</text>
             <text class="type-option-desc">放置在固定位置</text>
             <view v-if="deviceType === 'fixed'" class="type-check">
@@ -26,9 +24,7 @@
             :class="{ 'type-option-active': deviceType === 'mobile' }"
             @tap="deviceType = 'mobile'"
           >
-            <view class="type-option-icon type-icon-mobile">
-              <app-icon class="type-icon-text" name="navigate-filled" :size="28" color="#158F63" />
-            </view>
+            <app-icon-tile class="type-pictogram" name="mobile-device" tone="green" size="large" />
             <text class="type-option-label">移动设备</text>
             <text class="type-option-desc">车载便携设备</text>
             <view v-if="deviceType === 'mobile'" class="type-check">
@@ -51,7 +47,7 @@
             :class="{ 'category-option-active': category === cat.value }"
             @tap="category = cat.value"
           >
-            <text class="category-emoji">{{ cat.icon }}</text>
+            <app-icon-tile :name="cat.icon" :tone="cat.tone" />
             <text class="category-label">{{ cat.label }}</text>
           </view>
         </view>
@@ -327,7 +323,7 @@
       </view>
 
       <view class="bottom-safe"></view>
-    </scroll-view>
+    </view>
 
     <!-- #ifdef H5 -->
     <view v-if="showLocationPicker" class="location-picker-overlay">
@@ -400,6 +396,8 @@
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
+import { getCurrentGcj02Location } from '@/utils/location'
 // #ifdef H5
 import { loadAMap } from '@/common/amap'
 // #endif
@@ -419,10 +417,15 @@ statusBarHeight.value = systemInfo.statusBarHeight || 20
 const deviceType = ref<'fixed' | 'mobile'>('fixed')
 
 const category = ref('AED')
-const categoryOptions = [
-  { value: 'AED', label: 'AED', icon: 'AED' },
-  { value: '急救箱', label: '急救箱', icon: '急救' },
-  { value: '急救包', label: '急救包', icon: '急救' }
+const categoryOptions: Array<{
+  value: string
+  label: string
+  icon: string
+  tone: 'coral' | 'green' | 'amber'
+}> = [
+  { value: 'AED', label: 'AED', icon: 'aed', tone: 'coral' },
+  { value: '急救箱', label: '急救箱', icon: 'rescue-kit', tone: 'green' },
+  { value: '急救包', label: '急救包', icon: 'rescue-bag', tone: 'amber' }
 ]
 
 const fixedForm = ref({
@@ -557,17 +560,14 @@ async function initPickerMap() {
       uni.showToast({ title: '已使用当前位置', icon: 'none' })
       cancelLocationPicker()
     }
-    uni.getLocation({
-      type: 'gcj02',
-      isHighAccuracy: true,
-      success: (location) => {
+    getCurrentGcj02Location()
+      .then((location) => {
         useLocation(location.longitude, location.latitude)
-      },
-      fail: () => {
+      })
+      .catch(() => {
         uni.showToast({ title: '请授权定位后重试', icon: 'none' })
         cancelLocationPicker()
-      }
-    })
+      })
     return
   }
   const AMap = (window as any).AMap
@@ -708,14 +708,7 @@ function removeVehicleImage(idx: number) {
 }
 
 function getCurrentLocation() {
-  return new Promise<{ longitude: number; latitude: number }>((resolve, reject) => {
-    uni.getLocation({
-      type: 'gcj02',
-      isHighAccuracy: true,
-      success: ({ longitude, latitude }) => resolve({ longitude, latitude }),
-      fail: () => reject(new Error('无法获取当前位置，请授权定位后重试'))
-    })
-  })
+  return getCurrentGcj02Location()
 }
 
 async function loadEditingDevice(id: string) {
@@ -851,7 +844,7 @@ async function handleSubmit() {
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
 }
 
 .scroll-content {
@@ -871,17 +864,17 @@ async function handleSubmit() {
   width: 6rpx;
   height: 28rpx;
   border-radius: 3rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
   margin-right: 12rpx;
 }
 .label-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .label-required {
   font-size: 28rpx;
-  color: #F53F3F;
+  color: #C93D46;
   margin-left: 4rpx;
 }
 .label-hint {
@@ -903,38 +896,23 @@ async function handleSubmit() {
   padding: 32rpx 24rpx;
   background: #FFFFFF;
   border-radius: 20rpx;
-  border: 2rpx solid #E5E6EB;
-  transition: all 0.3s ease;
+  border: 1rpx solid #DDE5EF;
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
 .type-option-active {
-  border-color: #2B6FF0;
-  background: linear-gradient(135deg, rgba(43, 111, 240, 0.06) 0%, rgba(43, 111, 240, 0.02) 100%);
+  border-color: #2E6DD1;
+  background: #F0F6FF;
 }
-.type-option-icon {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.type-pictogram {
   margin-bottom: 16rpx;
-}
-.type-icon-fixed {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-}
-.type-icon-mobile {
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 100%);
-}
-.type-icon-text {
-  font-size: 36rpx;
 }
 .type-option-label {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .type-option-active .type-option-label {
-  color: #2B6FF0;
+  color: #2E6DD1;
 }
 .type-option-desc {
   font-size: 22rpx;
@@ -948,7 +926,7 @@ async function handleSubmit() {
   width: 48rpx;
   height: 48rpx;
   border-radius: 0 18rpx 0 18rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -968,24 +946,16 @@ async function handleSubmit() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24rpx 16rpx;
+  gap: 10rpx;
+  padding: 20rpx 12rpx;
   background: #FFFFFF;
   border-radius: 16rpx;
-  border: 2rpx solid #E5E6EB;
-  transition: all 0.3s ease;
+  border: 1rpx solid #DDE5EF;
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
 .category-option-active {
-  border-color: #2B6FF0;
+  border-color: #2E6DD1;
   background: rgba(43, 111, 240, 0.06);
-}
-.category-emoji {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #2B6FF0;
-  margin-bottom: 8rpx;
-}
-.category-option-active .category-emoji {
-  color: #2B6FF0;
 }
 .category-label {
   font-size: 26rpx;
@@ -993,7 +963,7 @@ async function handleSubmit() {
   font-weight: 500;
 }
 .category-option-active .category-label {
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 600;
 }
 
@@ -1008,7 +978,7 @@ async function handleSubmit() {
   height: 88rpx;
   padding: 0 24rpx;
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   box-sizing: border-box;
 }
 .input-placeholder {
@@ -1030,7 +1000,7 @@ async function handleSubmit() {
 }
 .location-text {
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   font-weight: 500;
 }
 .location-placeholder {
@@ -1039,7 +1009,7 @@ async function handleSubmit() {
 }
 .location-btn {
   padding: 12rpx 28rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   border-radius: 24rpx;
   margin-left: 16rpx;
 }
@@ -1058,7 +1028,7 @@ async function handleSubmit() {
 }
 .picker-value {
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
 }
 .picker-placeholder {
   font-size: 28rpx;
@@ -1080,7 +1050,7 @@ async function handleSubmit() {
   width: 100%;
   height: 200rpx;
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   line-height: 1.6;
 }
 .textarea-count {
@@ -1161,7 +1131,7 @@ async function handleSubmit() {
   transition: all 0.3s ease;
 }
 .range-option-active {
-  border-color: #2B6FF0;
+  border-color: #2E6DD1;
   background: rgba(43, 111, 240, 0.06);
 }
 .range-label {
@@ -1170,7 +1140,7 @@ async function handleSubmit() {
   font-weight: 500;
 }
 .range-option-active .range-label {
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 600;
 }
 
@@ -1187,7 +1157,7 @@ async function handleSubmit() {
   transition: all 0.3s ease;
 }
 .time-option-active {
-  border-color: #2B6FF0;
+  border-color: #2E6DD1;
   background: rgba(43, 111, 240, 0.06);
 }
 .time-label {
@@ -1196,7 +1166,7 @@ async function handleSubmit() {
   font-weight: 500;
 }
 .time-option-active .time-label {
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 600;
 }
 
@@ -1207,7 +1177,7 @@ async function handleSubmit() {
   width: 100%;
   height: 96rpx;
   border-radius: 48rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1246,7 +1216,7 @@ async function handleSubmit() {
 }
 .picked-address-text {
   font-size: 24rpx;
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 500;
 }
 
@@ -1258,12 +1228,12 @@ async function handleSubmit() {
   right: 0;
   bottom: 0;
   z-index: 9999;
-  background: #F5F7FA;
+  background: #F3F7FA;
   display: flex;
   flex-direction: column;
 }
 .lp-header {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   padding-bottom: 16rpx;
   z-index: 10;
 }
@@ -1373,7 +1343,7 @@ async function handleSubmit() {
 .poi-item-name {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1392,7 +1362,7 @@ async function handleSubmit() {
   width: 40rpx;
   height: 40rpx;
   border-radius: 50%;
-  background: #2B6FF0;
+  background: #2E6DD1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1431,7 +1401,7 @@ async function handleSubmit() {
   width: 24px;
   height: 24px;
   border-radius: 50% 50% 50% 0;
-  background: #F53F3F;
+  background: #C93D46;
   transform: translateX(-50%) rotate(-45deg);
   box-shadow: 0 2px 6px rgba(245, 63, 63, 0.4);
 }
@@ -1473,7 +1443,7 @@ async function handleSubmit() {
 .lp-info-addr {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
   line-height: 1.5;
 }
 .lp-info-placeholder {

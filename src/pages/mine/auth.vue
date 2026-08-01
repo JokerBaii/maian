@@ -30,9 +30,7 @@
 
     <view v-else class="form-section">
       <view class="form-header">
-        <view class="form-header-icon">
-          <app-icon class="form-header-icon-text" name="auth-filled" :size="26" color="#1F63D5" />
-        </view>
+        <app-icon-tile class="form-header-icon" name="auth-filled" tone="green" />
         <text class="form-header-title">身份信息校验</text>
         <text class="form-header-desc">校验身份证号码格式，信息将脱敏保存</text>
       </view>
@@ -72,6 +70,7 @@
 import { reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { getCurrentProfile, verifyIdentity } from '@/api/user'
 
 const user = reactive({
@@ -125,7 +124,7 @@ onShow(loadProfile)
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
   padding: 24rpx 32rpx;
   box-sizing: border-box;
 }
@@ -146,7 +145,7 @@ onShow(loadProfile)
   left: 0;
   right: 0;
   height: 200rpx;
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 50%, #7BE0A2 100%);
+  background: linear-gradient(135deg, #23956A 0%, #4DC580 50%, #7BE0A2 100%);
 }
 .verified-content {
   position: relative;
@@ -203,7 +202,7 @@ onShow(loadProfile)
 }
 .info-value {
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   font-weight: 600;
 }
 .info-divider {
@@ -245,24 +244,12 @@ onShow(loadProfile)
   padding: 40rpx 0 32rpx;
 }
 .form-header-icon {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 24rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(43, 111, 240, 0.25);
   margin-bottom: 20rpx;
-}
-.form-header-icon-text {
-  font-size: 48rpx;
-  color: #FFFFFF;
 }
 .form-header-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: #1D2129;
+  color: #20364D;
   margin-bottom: 8rpx;
 }
 .form-header-desc {
@@ -288,7 +275,7 @@ onShow(loadProfile)
 }
 .form-input {
   font-size: 30rpx;
-  color: #1D2129;
+  color: #20364D;
   font-weight: 500;
   width: 100%;
 }
@@ -303,7 +290,7 @@ onShow(loadProfile)
 
 .submit-btn {
   margin-top: 48rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   border-radius: 48rpx;
   padding: 28rpx 0;
   text-align: center;

@@ -1,11 +1,9 @@
 <template>
   <view class="page">
-    <scroll-view class="scroll-content" scroll-y>
+    <view class="scroll-content">
       <view class="tips-card">
         <view class="tips-header">
-          <view class="tips-icon-wrap">
-            <app-icon class="tips-icon" name="compose" :size="22" color="#1F63D5" />
-          </view>
+          <app-icon-tile name="science-update" tone="cyan" />
           <text class="tips-title">投稿须知</text>
         </view>
         <view class="tips-list">
@@ -121,13 +119,14 @@
       </view>
 
       <view class="bottom-safe"></view>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { createScienceSubmission } from '@/api/science'
 import { uploadImage } from '@/api/files'
 
@@ -213,7 +212,7 @@ async function handleSubmit() {
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
 }
 
 .scroll-content {
@@ -234,22 +233,10 @@ async function handleSubmit() {
   gap: 12rpx;
   margin-bottom: 20rpx;
 }
-.tips-icon-wrap {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 12rpx;
-  background: rgba(43, 111, 240, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tips-icon {
-  font-size: 28rpx;
-}
 .tips-title {
   font-size: 28rpx;
   font-weight: 700;
-  color: #2B6FF0;
+  color: #2E6DD1;
 }
 .tips-list {
   display: flex;
@@ -265,7 +252,7 @@ async function handleSubmit() {
   width: 10rpx;
   height: 10rpx;
   border-radius: 50%;
-  background: #2B6FF0;
+  background: #2E6DD1;
   margin-top: 12rpx;
   flex-shrink: 0;
 }
@@ -299,17 +286,17 @@ async function handleSubmit() {
   width: 6rpx;
   height: 24rpx;
   border-radius: 3rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
   margin-right: 10rpx;
 }
 .form-label {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .form-required {
   font-size: 28rpx;
-  color: #F53F3F;
+  color: #C93D46;
   margin-left: 4rpx;
 }
 
@@ -324,14 +311,14 @@ async function handleSubmit() {
   transition: all 0.3s ease;
 }
 .input-wrap:focus-within {
-  border-color: #2B6FF0;
+  border-color: #2E6DD1;
   background: #FFFFFF;
   box-shadow: 0 0 0 4rpx rgba(43, 111, 240, 0.08);
 }
 .form-input {
   flex: 1;
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   height: 88rpx;
 }
 .input-placeholder {
@@ -362,7 +349,7 @@ async function handleSubmit() {
 }
 .category-active {
   background: rgba(43, 111, 240, 0.06);
-  border-color: #2B6FF0;
+  border-color: #2E6DD1;
   box-shadow: 0 2rpx 12rpx rgba(43, 111, 240, 0.12);
 }
 .category-item-text {
@@ -372,7 +359,7 @@ async function handleSubmit() {
   transition: color 0.3s ease;
 }
 .category-item-text-active {
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 700;
 }
 
@@ -384,7 +371,7 @@ async function handleSubmit() {
   transition: all 0.3s ease;
 }
 .textarea-wrap:focus-within {
-  border-color: #2B6FF0;
+  border-color: #2E6DD1;
   background: #FFFFFF;
   box-shadow: 0 0 0 4rpx rgba(43, 111, 240, 0.08);
 }
@@ -392,7 +379,7 @@ async function handleSubmit() {
   width: 100%;
   min-height: 280rpx;
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   line-height: 1.7;
   box-sizing: border-box;
 }
@@ -423,7 +410,7 @@ async function handleSubmit() {
   background: #FAFBFC;
 }
 .upload-slot:active {
-  border-color: #2B6FF0;
+  border-color: #2E6DD1;
   background: rgba(43, 111, 240, 0.02);
 }
 .upload-icon-wrap {
@@ -437,7 +424,7 @@ async function handleSubmit() {
 }
 .upload-icon {
   font-size: 36rpx;
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 700;
 }
 .upload-text {
@@ -486,7 +473,7 @@ async function handleSubmit() {
 .submit-btn {
   height: 96rpx;
   border-radius: 48rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   display: flex;
   align-items: center;
   justify-content: center;

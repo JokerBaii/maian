@@ -11,10 +11,16 @@
 
 ## 本地启动
 
+先安装并启动 MySQL 8，创建 `maian` 数据库和开发账号，然后执行：
+
 ```bash
-docker compose up -d
+export MYSQL_URL='jdbc:mysql://127.0.0.1:3306/maian?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai'
+export MYSQL_USER=maian
+export MYSQL_PASSWORD=maian_dev
 mvn spring-boot:run
 ```
+
+Flyway 会自动执行全部数据库迁移，不依赖 Docker。
 
 默认地址：`http://localhost:8080`
 
@@ -60,21 +66,47 @@ curl -X POST http://localhost:8080/api/v1/health-reports \
 
 ```text
 GET/POST        /api/v1/emergency-devices
+GET             /api/v1/emergency-devices/mine
 GET/PUT/DELETE  /api/v1/emergency-devices/{id}
 PATCH           /api/v1/emergency-devices/{id}/status
+PATCH           /api/v1/emergency-devices/{id}/location
 GET/POST        /api/v1/rescue-calls
 GET             /api/v1/rescue-calls/{id}
 PATCH           /api/v1/rescue-calls/{id}/status
+POST            /api/v1/rescue-calls/{id}/match-attempts
 GET/POST        /api/v1/health-reports
-GET             /api/v1/health-reports/{id}
+GET/DELETE      /api/v1/health-reports/{id}
 GET             /api/v1/health-monitoring
+POST            /api/v1/heart-rate-readings
+GET/PUT/DELETE  /api/v1/wearable-device
+GET/PUT         /api/v1/settings
 GET/POST        /api/v1/emergency-contacts
 PUT/DELETE      /api/v1/emergency-contacts/{id}
 GET             /api/v1/profile
 POST            /api/v1/profile/identity-verification
-POST            /api/v1/science-submissions
+GET/POST        /api/v1/science-submissions
+GET/DELETE      /api/v1/science-submissions/{id}
 GET             /api/v1/science-submissions/count
+GET/PUT         /api/v1/science-articles/{articleId}/interaction
 GET/POST        /api/v1/files/images
 ```
 
 所有接口使用统一 `ApiResponse` 包装，实体不会直接暴露给前端。
+
+## AED 快速匹配
+
+创建呼救后会在同一个事务中立即匹配 AED：
+
+1. MySQL 通过 `category + status + latitude + longitude` 索引和地理包围盒快速缩小候选集；
+2. 剔除超过 120 秒未上报位置的移动设备、超过车主服务半径的设备；
+3. 用 Haversine 精确距离计算 ETA。移动 AED 按车辆送达时间计算，固定 AED 按往返取送时间计算；
+4. 按 ETA 而非单纯直线距离排序，并用条件 `UPDATE` 原子占用设备，避免并发重复派单；
+5. 暂无候选时，救援详情页每 3 秒发起一次受锁保护的重试。
+
+调度参数可通过 `DISPATCH_*` 环境变量调整，默认搜索半径 15km、候选上限 80、移动位置有效期 120 秒。
+
+当前 Java 评分器的回归性能门禁为 25 万候选不超过 2 秒；本地测试约 52ms。当前耗时主要在数据库候选检索与网络 I/O，因此暂不引入 JNI/Rust FFI。候选规模达到百万级或接入大规模路网矩阵后，再考虑将纯计算评分内核迁移到 Rust。
+
+## 数据真实性
+
+健康监测、穿戴设备绑定、提醒设置、科普投稿、体检报告、设备与救援记录均已由 MySQL 持久化。没有心率记录时接口返回空数据状态，不再生成模拟读数。设备修改、救援查询和投稿管理均按当前用户隔离。

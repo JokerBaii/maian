@@ -1,9 +1,19 @@
-$bg-color: #F5F7FA;
-$text-primary: #1D2129;
+$network-canvas: #F3F7FA;
+$network-paper: #FFFFFF;
+$network-ink: #20364D;
+$network-muted: #728296;
+$network-line: #E1E9F0;
+$network-action: #2E6DD1;
+$network-rescue: #C93D46;
+$network-online: #23956A;
+$network-warning: #C98327;
 
-$uni-color-primary: #2B6FF0;
-$uni-color-success: #00B42A;
-$uni-color-warning: #FF7D00;
-$uni-color-error: #F53F3F;
-$uni-text-color: #1D2129;
-$uni-bg-color: #F5F7FA;
+$bg-color: $network-canvas;
+$text-primary: $network-ink;
+
+$uni-color-primary: $network-action;
+$uni-color-success: $network-online;
+$uni-color-warning: $network-warning;
+$uni-color-error: $network-rescue;
+$uni-text-color: $network-ink;
+$uni-bg-color: $network-canvas;

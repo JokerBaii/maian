@@ -38,7 +38,7 @@
       </view>
     </scroll-view>
 
-    <scroll-view scroll-y class="content-list" :style="{ height: listHeight + 'px' }">
+    <view class="content-list">
       <view
         v-for="item in filteredContents"
         :key="item.id"
@@ -72,9 +72,7 @@
       </view>
 
       <view class="quiz-entry" @tap="goQuiz">
-        <view class="quiz-icon-wrap">
-          <app-icon class="quiz-icon-text" name="compose" :size="26" color="#1F63D5" />
-        </view>
+        <app-icon-tile class="quiz-icon" name="science-update" tone="violet" size="large" />
         <view class="quiz-info">
           <text class="quiz-title">急救知识自测</text>
           <text class="quiz-desc">检验你的急救知识水平</text>
@@ -85,20 +83,19 @@
       <view class="list-bottom">
         <text class="list-bottom-text">— 已经到底了 —</text>
       </view>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { scienceArticles, scienceCategories } from '@/data/editorial'
 
 const statusBarHeight = ref(0)
-const listHeight = ref(600)
 const systemInfo = uni.getSystemInfoSync()
 statusBarHeight.value = systemInfo.statusBarHeight || 20
-listHeight.value = systemInfo.windowHeight - statusBarHeight.value - 44 - 52 - 48
 
 const searchText = ref('')
 const activeCategory = ref('all')
@@ -145,11 +142,11 @@ function goContribute() {
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F5F7FA;
+  background: #F3F7FA;
 }
 
 .nav-bar {
-  background: linear-gradient(135deg, #2B6FF0, #4A9BFF);
+  background: linear-gradient(135deg, #2E6DD1, #4A9BFF);
 }
 
 .nav-bar-content {
@@ -199,7 +196,7 @@ function goContribute() {
 .search-bar {
   display: flex;
   align-items: center;
-  background: #F5F7FA;
+  background: #F3F7FA;
   border-radius: 36rpx;
   padding: 16rpx 24rpx;
 }
@@ -212,7 +209,7 @@ function goContribute() {
 .search-input {
   flex: 1;
   font-size: 26rpx;
-  color: #1D2129;
+  color: #20364D;
 }
 
 .search-placeholder {
@@ -239,7 +236,7 @@ function goContribute() {
 }
 
 .category-active {
-  background: #2B6FF0;
+  background: #2E6DD1;
 }
 
 .category-text {
@@ -293,7 +290,7 @@ function goContribute() {
 .card-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
   lines: 2;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -340,9 +337,9 @@ function goContribute() {
   border-radius: 8rpx;
 }
 
-.tag-device { background: #E8F3FF; color: #2B6FF0; }
-.tag-emergency { background: #FFECE8; color: #F53F3F; }
-.tag-health { background: #E8FFEA; color: #00B42A; }
+.tag-device { background: #E8F3FF; color: #2E6DD1; }
+.tag-emergency { background: #FFECE8; color: #C93D46; }
+.tag-health { background: #E8FFEA; color: #23956A; }
 .tag-exercise { background: #FFF7E8; color: #FF7D00; }
 
 .meta-right {
@@ -358,25 +355,14 @@ function goContribute() {
 .quiz-entry {
   display: flex;
   align-items: center;
-  background: linear-gradient(135deg, #2B6FF0, #4A9BFF);
+  background: linear-gradient(135deg, #2E6DD1, #4A9BFF);
   border-radius: 20rpx;
   padding: 28rpx 24rpx;
   margin-bottom: 20rpx;
 }
 
-.quiz-icon-wrap {
-  width: 72rpx;
-  height: 72rpx;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.quiz-icon {
   margin-right: 20rpx;
-}
-
-.quiz-icon-text {
-  font-size: 36rpx;
 }
 
 .quiz-info {

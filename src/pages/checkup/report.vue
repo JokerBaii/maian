@@ -1,15 +1,13 @@
 <template>
   <view class="page">
-    <scroll-view class="page-scroll" scroll-y>
+    <view class="page-scroll">
       <view v-if="loading" class="state-card">
         <view class="loading-ring"></view>
         <text class="state-title">正在加载健康分析</text>
       </view>
 
       <view v-else-if="!report" class="state-card">
-        <view class="state-icon">
-          <app-icon name="info-filled" :size="28" color="#65758D" />
-        </view>
+        <app-icon-tile class="state-icon" name="info-filled" tone="slate" size="large" />
         <text class="state-title">{{ errorMessage || '暂无体检报告' }}</text>
         <view class="state-button" @tap="goUpload">录入报告</view>
       </view>
@@ -54,9 +52,7 @@
             <text class="report-date">{{ report.checkupDate }}</text>
           </view>
           <view class="hospital-row">
-            <view class="hospital-icon">
-              <app-icon name="staff-filled" :size="20" color="#1F63D5" />
-            </view>
+            <app-icon-tile name="hospital" tone="blue" />
             <text>{{ report.hospital }}</text>
           </view>
           <image
@@ -94,10 +90,10 @@
                 <text v-if="indicator.unit" class="indicator-unit">{{ indicator.unit }}</text>
               </view>
               <view class="indicator-status" :class="{ abnormal: indicator.abnormal }">
-                <app-icon
-                  :name="indicator.abnormal ? 'notification-filled' : 'checkmarkempty'"
-                  :size="13"
-                  :color="indicator.abnormal ? '#CF3F4A' : '#19845A'"
+                <app-icon-tile
+                  :name="indicator.abnormal ? 'health-alert' : 'check'"
+                  :tone="indicator.abnormal ? 'coral' : 'green'"
+                  size="small"
                 />
                 <text>{{ indicator.abnormal ? '异常' : '正常' }}</text>
               </view>
@@ -135,7 +131,7 @@
         </view>
         <view class="bottom-space"></view>
       </template>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
@@ -143,6 +139,7 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { resolveApiUrl } from '@/api/http'
 import {
   getHealthReport,
@@ -208,7 +205,7 @@ function goUpload() {
 }
 
 .page-scroll {
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .state-card {
@@ -416,16 +413,6 @@ function goUpload() {
   font-weight: 700;
 }
 
-.hospital-icon {
-  width: 58rpx;
-  height: 58rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 17rpx;
-  background: #EAF2FF;
-}
-
 .source-image {
   width: 100%;
   height: 260rpx;
@@ -489,8 +476,8 @@ function goUpload() {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 4rpx;
-  padding: 7rpx 10rpx;
+  gap: 7rpx;
+  padding: 5rpx 10rpx 5rpx 6rpx;
   border-radius: 10rpx;
   background: #EAF8F2;
   color: #19845A;

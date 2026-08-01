@@ -48,6 +48,11 @@ public class RescueCallController {
         return ApiResponse.ok(PageResponse.from(rescueCallService.findAll(pageable)));
     }
 
+    @PostMapping("/{id}/match-attempts")
+    public ApiResponse<RescueCallResponse> retryMatching(@PathVariable UUID id) {
+        return ApiResponse.ok(rescueCallService.retryMatching(id));
+    }
+
     @PatchMapping("/{id}/status")
     public ApiResponse<RescueCallResponse> updateStatus(
         @PathVariable UUID id,

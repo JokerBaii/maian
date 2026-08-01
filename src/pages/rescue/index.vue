@@ -10,9 +10,8 @@
       </view>
     </view>
 
-    <scroll-view
+    <view
       class="scroll-content"
-      scroll-y
       :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
     >
       <view class="sos-hero">
@@ -121,7 +120,7 @@
       </view>
 
       <view class="bottom-safe"></view>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
@@ -131,6 +130,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import { uploadImage } from '@/api/files'
 import { ApiRequestError } from '@/api/http'
 import { createRescueCall, type RescueUrgency } from '@/api/rescue'
+import { getCurrentGcj02Location } from '@/utils/location'
 
 const statusBarHeight = ref(0)
 const systemInfo = uni.getSystemInfoSync()
@@ -143,26 +143,24 @@ const selectedUrgency = ref('critical')
 const selectedSymptoms = ref<string[]>([])
 const description = ref('')
 const photoList = ref<string[]>([])
+const clientRequestId = `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
 
 const locationText = ref('正在获取当前位置')
 const rescueCoordinates = ref<{ latitude: number; longitude: number } | null>(null)
 
 function refreshLocation() {
-  uni.getLocation({
-    type: 'gcj02',
-    isHighAccuracy: true,
-    success: (result) => {
+  getCurrentGcj02Location()
+    .then((result) => {
       rescueCoordinates.value = {
         latitude: result.latitude,
         longitude: result.longitude
       }
       locationText.value = `当前位置 · ${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}`
-    },
-    fail: () => {
+    })
+    .catch(() => {
       rescueCoordinates.value = null
       locationText.value = '定位失败，点击重新获取'
-    }
-  })
+    })
 }
 
 onMounted(refreshLocation)
@@ -244,7 +242,8 @@ async function submitRescue() {
       address: locationText.value,
       description: description.value.trim() || undefined,
       symptoms: selectedSymptoms.value,
-      imageUrls: uploadedImages.map((image) => image.url)
+      imageUrls: uploadedImages.map((image) => image.url),
+      clientRequestId
     })
     uni.navigateTo({
       url: `/pages/rescue/detail?id=${encodeURIComponent(rescueCall.id)}`
@@ -427,7 +426,7 @@ function goBack() {
 .label-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .label-hint {
   font-size: 22rpx;
@@ -472,13 +471,13 @@ function goBack() {
   border-radius: 50%;
 }
 .urgency-critical .urgency-dot {
-  background: #F53F3F;
+  background: #C93D46;
 }
 .urgency-high .urgency-dot {
   background: #FF9A2E;
 }
 .urgency-medium .urgency-dot {
-  background: #2B6FF0;
+  background: #2E6DD1;
 }
 .urgency-label {
   font-size: 28rpx;
@@ -489,13 +488,13 @@ function goBack() {
   font-weight: 700;
 }
 .urgency-critical.urgency-active .urgency-label {
-  color: #F53F3F;
+  color: #C93D46;
 }
 .urgency-high.urgency-active .urgency-label {
   color: #FF9A2E;
 }
 .urgency-medium.urgency-active .urgency-label {
-  color: #2B6FF0;
+  color: #2E6DD1;
 }
 
 .symptom-tags {
@@ -535,7 +534,7 @@ function goBack() {
   width: 100%;
   height: 200rpx;
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
   line-height: 1.6;
 }
 .desc-placeholder {

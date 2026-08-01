@@ -25,6 +25,17 @@ export interface SaveEmergencyContactRequest {
   relation: string
 }
 
+export interface UserSettingsResponse {
+  rescuePush: boolean
+  healthAlert: boolean
+  scienceUpdate: boolean
+  locationShare: boolean
+  healthDataShare: boolean
+  maxHeartRate: number
+  minHeartRate: number
+  updatedAt: string
+}
+
 export function getCurrentProfile() {
   return request<UserProfileResponse>('/api/v1/profile')
 }
@@ -57,5 +68,16 @@ export function updateEmergencyContact(id: string, data: SaveEmergencyContactReq
 export function deleteEmergencyContact(id: string) {
   return request<boolean>(`/api/v1/emergency-contacts/${id}`, {
     method: 'DELETE'
+  })
+}
+
+export function getUserSettings() {
+  return request<UserSettingsResponse>('/api/v1/settings')
+}
+
+export function updateUserSettings(data: Omit<UserSettingsResponse, 'updatedAt'>) {
+  return request<UserSettingsResponse>('/api/v1/settings', {
+    method: 'PUT',
+    data
   })
 }

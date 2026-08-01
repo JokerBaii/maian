@@ -6,6 +6,7 @@ import cn.maian.device.domain.DeviceType;
 import cn.maian.device.dto.EmergencyDeviceResponse;
 import cn.maian.device.dto.SaveEmergencyDeviceRequest;
 import cn.maian.device.dto.UpdateDeviceStatusRequest;
+import cn.maian.device.dto.UpdateDeviceLocationRequest;
 import cn.maian.device.service.EmergencyDeviceService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +43,14 @@ public class EmergencyDeviceController {
         return ApiResponse.ok(PageResponse.from(emergencyDeviceService.findAll(type, pageable)));
     }
 
+    @GetMapping("/mine")
+    public ApiResponse<PageResponse<EmergencyDeviceResponse>> findMine(
+        @RequestParam(required = false) DeviceType type,
+        Pageable pageable
+    ) {
+        return ApiResponse.ok(PageResponse.from(emergencyDeviceService.findMine(type, pageable)));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<EmergencyDeviceResponse> findById(@PathVariable UUID id) {
         return ApiResponse.ok(emergencyDeviceService.findById(id));
@@ -69,6 +78,14 @@ public class EmergencyDeviceController {
         @Valid @RequestBody UpdateDeviceStatusRequest request
     ) {
         return ApiResponse.ok(emergencyDeviceService.updateStatus(id, request.status()));
+    }
+
+    @PatchMapping("/{id}/location")
+    public ApiResponse<EmergencyDeviceResponse> updateLocation(
+        @PathVariable UUID id,
+        @Valid @RequestBody UpdateDeviceLocationRequest request
+    ) {
+        return ApiResponse.ok(emergencyDeviceService.updateLocation(id, request));
     }
 
     @DeleteMapping("/{id}")

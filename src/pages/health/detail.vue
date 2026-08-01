@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <scroll-view class="scroll-content" scroll-y>
+    <view class="scroll-content">
       <view class="tab-switcher">
         <view
           class="tab-item"
@@ -54,27 +54,21 @@
         </view>
         <view class="scene-labels">
           <view class="scene-label-item">
-            <view class="scene-icon scene-icon-sleep">
-              <app-icon name="cloud-filled" :size="13" color="#7657D6" />
-            </view>
+            <app-icon-tile name="cloud-filled" tone="violet" />
             <view>
               <text class="scene-label-text">睡眠</text>
               <text class="scene-label-time">00:00–05:00</text>
             </view>
           </view>
           <view class="scene-label-item">
-            <view class="scene-icon scene-icon-rest">
-              <app-icon name="heart-filled" :size="13" color="#22A06B" />
-            </view>
+            <app-icon-tile name="heart-filled" tone="green" />
             <view>
               <text class="scene-label-text">静息</text>
               <text class="scene-label-time">06:00–16:00</text>
             </view>
           </view>
           <view class="scene-label-item">
-            <view class="scene-icon scene-icon-exercise">
-              <app-icon name="fire-filled" :size="13" color="#F08C2E" />
-            </view>
+            <app-icon-tile name="fire-filled" tone="amber" />
             <view>
               <text class="scene-label-text">运动</text>
               <text class="scene-label-time">17:00–18:00</text>
@@ -149,9 +143,7 @@
         <view class="scene-breakdown">
           <view class="scene-row">
             <view class="scene-row-left">
-              <view class="scene-row-icon scene-icon-blue">
-                <app-icon name="heart-filled" :size="16" color="#2B6FF0" />
-              </view>
+              <app-icon-tile name="heart-filled" tone="green" />
               <view class="scene-row-info">
                 <text class="scene-row-label">静息心率</text>
                 <text class="scene-row-desc">日常活动期间</text>
@@ -164,9 +156,7 @@
           </view>
           <view class="scene-row">
             <view class="scene-row-left">
-              <view class="scene-row-icon scene-icon-orange">
-                <app-icon name="fire-filled" :size="16" color="#F08C2E" />
-              </view>
+              <app-icon-tile name="fire-filled" tone="amber" />
               <view class="scene-row-info">
                 <text class="scene-row-label">运动心率</text>
                 <text class="scene-row-desc">运动期间</text>
@@ -179,9 +169,7 @@
           </view>
           <view class="scene-row">
             <view class="scene-row-left">
-              <view class="scene-row-icon scene-icon-purple">
-                <app-icon name="cloud-filled" :size="16" color="#7657D6" />
-              </view>
+              <app-icon-tile name="cloud-filled" tone="violet" />
               <view class="scene-row-info">
                 <text class="scene-row-label">睡眠心率</text>
                 <text class="scene-row-desc">睡眠期间</text>
@@ -225,13 +213,14 @@
       </view>
 
       <view class="bottom-safe"></view>
-    </scroll-view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 
 const { monitoring: heartRateData, loadMonitoring } = useHealthMonitoring()
@@ -268,8 +257,8 @@ const weekBars = computed(() => {
     const rangeHeight = rangeBottom - rangeTop
     const avgTop = ((globalMax - item.avg) / range) * chartHeight
 
-    let barColor = 'linear-gradient(180deg, #2B6FF0 0%, #5B8DEF 100%)'
-    if (item.max > 110) barColor = 'linear-gradient(180deg, #F53F3F 0%, #FF7D7D 100%)'
+    let barColor = 'linear-gradient(180deg, #2E6DD1 0%, #2E6DD1 100%)'
+    if (item.max > 110) barColor = 'linear-gradient(180deg, #C93D46 0%, #FF7D7D 100%)'
     else if (item.max > 100) barColor = 'linear-gradient(180deg, #FF9A2E 0%, #FFCF8B 100%)'
 
     return {
@@ -408,7 +397,7 @@ watch(activeTab, () => {
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F0F4FA;
+  background: #F3F7FA;
 }
 
 .sample-note {
@@ -454,7 +443,7 @@ watch(activeTab, () => {
   transition: color 0.3s ease;
 }
 .tab-active .tab-text {
-  color: #2B6FF0;
+  color: #2E6DD1;
 }
 .tab-indicator {
   position: absolute;
@@ -556,24 +545,6 @@ watch(activeTab, () => {
   border-radius: 16rpx;
   background: #F7F9FC;
 }
-.scene-icon {
-  width: 42rpx;
-  height: 42rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.scene-icon-sleep {
-  background: #F0ECFF;
-}
-.scene-icon-rest {
-  background: #E8F7F0;
-}
-.scene-icon-exercise {
-  background: #FFF2E5;
-}
 .scene-label-text {
   display: block;
   font-size: 22rpx;
@@ -621,7 +592,7 @@ watch(activeTab, () => {
   width: 52rpx;
   height: 6rpx;
   border-radius: 3rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
   box-shadow: 0 2rpx 8rpx rgba(43, 111, 240, 0.3);
 }
 .week-bar-label {
@@ -651,7 +622,7 @@ watch(activeTab, () => {
   background: rgba(43, 111, 240, 0.3);
 }
 .legend-bar-avg {
-  background: #2B6FF0;
+  background: #2E6DD1;
 }
 .legend-text {
   font-size: 22rpx;
@@ -676,14 +647,14 @@ watch(activeTab, () => {
 .stat-value {
   font-size: 48rpx;
   font-weight: 800;
-  color: #2B6FF0;
+  color: #2E6DD1;
   line-height: 1.1;
 }
 .stat-value-green {
-  color: #00B42A;
+  color: #23956A;
 }
 .stat-value-red {
-  color: #F53F3F;
+  color: #C93D46;
 }
 .stat-value-orange {
   color: #FF9A2E;
@@ -719,16 +690,16 @@ watch(activeTab, () => {
   width: 6rpx;
   height: 28rpx;
   border-radius: 3rpx;
-  background: #2B6FF0;
+  background: #2E6DD1;
   margin-right: 12rpx;
 }
 .alert-bar {
-  background: #F53F3F;
+  background: #C93D46;
 }
 .card-title {
   font-size: 30rpx;
   font-weight: 700;
-  color: #1D2129;
+  color: #20364D;
 }
 
 .scene-breakdown {
@@ -752,36 +723,6 @@ watch(activeTab, () => {
   align-items: center;
   gap: 16rpx;
 }
-.scene-row-icon {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.scene-icon-blue {
-  background: rgba(43, 111, 240, 0.1);
-}
-.scene-icon-orange {
-  background: rgba(255, 154, 46, 0.1);
-}
-.scene-icon-purple {
-  background: rgba(114, 46, 209, 0.1);
-}
-.scene-icon-text {
-  font-size: 28rpx;
-  font-weight: 700;
-}
-.scene-icon-blue .scene-icon-text {
-  color: #2B6FF0;
-}
-.scene-icon-orange .scene-icon-text {
-  color: #FF9A2E;
-}
-.scene-icon-purple .scene-icon-text {
-  color: #722ED1;
-}
 .scene-row-info {
   display: flex;
   flex-direction: column;
@@ -790,7 +731,7 @@ watch(activeTab, () => {
 .scene-row-label {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1D2129;
+  color: #20364D;
 }
 .scene-row-desc {
   font-size: 22rpx;
@@ -804,7 +745,7 @@ watch(activeTab, () => {
 .scene-row-number {
   font-size: 40rpx;
   font-weight: 800;
-  color: #2B6FF0;
+  color: #2E6DD1;
   line-height: 1;
 }
 .scene-row-number-high {
@@ -840,7 +781,7 @@ watch(activeTab, () => {
   z-index: 2;
 }
 .dot-high {
-  background: #F53F3F;
+  background: #C93D46;
   box-shadow: 0 0 8rpx rgba(245, 63, 63, 0.4);
 }
 .dot-low {
@@ -870,7 +811,7 @@ watch(activeTab, () => {
   font-weight: 600;
 }
 .type-high {
-  color: #F53F3F;
+  color: #C93D46;
 }
 .type-low {
   color: #FF9A2E;
@@ -878,7 +819,7 @@ watch(activeTab, () => {
 .timeline-value {
   font-size: 28rpx;
   font-weight: 700;
-  color: #1D2129;
+  color: #20364D;
 }
 .timeline-msg {
   font-size: 24rpx;

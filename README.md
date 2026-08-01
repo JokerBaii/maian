@@ -20,13 +20,18 @@ npm install
 npm run dev:h5
 ```
 
-另开终端启动后端及其基础设施：
+本机安装并启动 MySQL 8，创建开发库后另开终端启动后端：
 
 ```bash
+mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS maian CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS 'maian'@'localhost' IDENTIFIED BY 'maian_dev'; GRANT ALL PRIVILEGES ON maian.* TO 'maian'@'localhost';"
 cd server
-docker compose up -d
+export MYSQL_URL='jdbc:mysql://127.0.0.1:3306/maian?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai'
+export MYSQL_USER=maian
+export MYSQL_PASSWORD=maian_dev
 mvn spring-boot:run
 ```
+
+数据库账号可按本机实际配置调整；Flyway 会在首次启动时自动完成表结构和演示数据初始化，不依赖 Docker。
 
 H5 开发服务器会把 `/api` 代理到 `http://localhost:8080`。
 
@@ -36,8 +41,11 @@ H5 开发服务器会把 `/api` 代理到 `http://localhost:8080`。
 npm run type-check
 npm run build:ios
 npm run build:h5
+npm run build:mp-weixin
 cd server && mvn package
 ```
+
+iOS App 资源位于 `dist/build/app`；微信小程序构建结果位于 `dist/build/mp-weixin`，可直接导入微信开发者工具。
 
 iOS App 资源位于 `dist/build/app`，需要使用 HBuilderX 云端打包或原生工程离线打包生成 IPA。发布前需要：
 

@@ -58,7 +58,7 @@
           :style="{ left: node.left, top: node.top }"
         >
           <view class="radar-node-core">
-            <app-icon :name="node.icon" :size="15" color="#FFFFFF" />
+            <image class="radar-node-glyph" :src="node.glyph" mode="aspectFit" />
           </view>
           <text class="radar-node-label">{{ node.label }}</text>
         </view>
@@ -130,48 +130,69 @@
 
     <view
       class="bottom-drawer"
+      :class="{
+        'bottom-drawer-expanded': drawerExpanded,
+        'bottom-drawer-dragging': drawerDragging
+      }"
       :style="{ transform: 'translateY(' + drawerOffset + 'rpx)' }"
-      @touchstart="onDrawerTouchStart"
-      @touchmove="onDrawerTouchMove"
-      @touchend="onDrawerTouchEnd"
     >
-      <view class="drawer-handle">
-        <view class="drawer-handle-bar"></view>
-      </view>
-      <view class="drawer-header">
-        <text class="drawer-title">附近设备</text>
-        <text class="drawer-count">{{ filteredDevices.length }}台</text>
-      </view>
-      <scroll-view class="drawer-list" scroll-y>
-        <view
-          v-for="device in filteredDevices"
-          :key="device.id"
-          class="device-card"
-          @tap="selectDevice(device)"
-        >
-          <view class="device-card-left">
-            <view class="device-icon-wrap" :class="'device-icon-' + device.type">
-              <app-icon
-                :name="device.category === 'AED' ? 'heart-filled' : 'plus-filled'"
-                :size="20"
-                :color="deviceStatusClass(device) === 'online'
-                  ? (device.type === 'mobile' ? '#16855D' : '#2367D8')
-                  : '#7B8796'"
-              />
+      <view
+        class="drawer-drag-zone"
+        @tap="toggleDrawer"
+        @touchstart.stop="onDrawerTouchStart"
+        @touchmove.stop.prevent="onDrawerTouchMove"
+        @touchend.stop="onDrawerTouchEnd"
+        @touchcancel.stop="onDrawerTouchEnd"
+      >
+        <view class="drawer-handle">
+          <view class="drawer-handle-bar"></view>
+        </view>
+        <view class="drawer-header">
+          <view class="drawer-heading">
+            <view class="drawer-title-row">
+              <text class="drawer-title">附近设备</text>
+              <text class="drawer-count">{{ filteredDevices.length }}台</text>
+            </view>
+            <view class="drawer-summary">
+              <view class="drawer-live-dot"></view>
+              <text>{{ availableDeviceCount }}台可调度 · 已按距离由近到远排序</text>
             </view>
           </view>
+          <view class="drawer-toggle">
+            <text>{{ drawerExpanded ? '收起' : '展开' }}</text>
+            <app-icon
+              :name="drawerExpanded ? 'down' : 'up'"
+              :size="15"
+              color="#2E6DD1"
+            />
+          </view>
+        </view>
+      </view>
+      <scroll-view
+        class="drawer-list"
+        scroll-y
+        :show-scrollbar="false"
+        :enhanced="true"
+        :bounces="true"
+        @touchstart.stop
+        @touchmove.stop
+      >
+        <view
+          v-for="(device, index) in filteredDevices"
+          :key="device.id"
+          class="device-card"
+          :class="'device-row-' + deviceStatusClass(device)"
+          @tap="selectDevice(device)"
+        >
+          <view class="device-status-rail"></view>
           <view class="device-card-center">
             <view class="device-card-name-row">
               <text class="device-card-name">{{ device.name }}</text>
-              <view class="device-type-mini" :class="'type-mini-' + device.type">
-                <text class="type-mini-text">{{ device.type === 'fixed' ? '固定' : '移动' }}</text>
+              <view v-if="index === 0 && deviceStatusClass(device) === 'online'" class="nearest-tag">
+                <text>距你最近</text>
               </view>
             </view>
             <view class="device-card-meta">
-              <view class="device-card-category">
-                <text class="category-text">{{ device.category }}</text>
-              </view>
-              <text class="device-card-dot">·</text>
               <text class="device-card-addr">{{ device.address }}</text>
             </view>
             <view class="device-card-bottom">
@@ -179,12 +200,15 @@
                 <view class="card-status-dot"></view>
                 <text class="card-status-text">{{ deviceStatusLabel(device) }}</text>
               </view>
-              <text class="device-card-distance">{{ device._distance || '--' }}</text>
+              <text class="device-card-separator">·</text>
+              <text class="device-card-kind">{{ device.category }} / {{ device.type === 'fixed' ? '固定设备' : '移动设备' }}</text>
             </view>
           </view>
           <view class="device-card-right">
+            <text class="device-card-distance">{{ device._distance || '待定位' }}</text>
             <view class="nav-btn" @tap.stop="handleNavigate(device)">
-              <app-icon class="nav-btn-icon" name="navigate-filled" :size="18" color="#FFFFFF" />
+              <text>导航</text>
+              <app-icon class="nav-btn-icon" name="right" :size="13" color="#2E6DD1" />
             </view>
           </view>
         </view>
@@ -208,6 +232,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import 'leaflet/dist/leaflet.css'
 // #endif
 import AppIcon from '@/components/AppIcon.vue'
+import { getCurrentGcj02Location } from '@/utils/location'
 import { loadAMap } from '@/common/amap'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
 
@@ -224,10 +249,10 @@ const filterTabs = [
   { key: 'mobile', label: '移动设备' }
 ]
 const radarNodes = [
-  { label: 'AED', icon: 'heart-filled', type: 'device', left: '18%', top: '58%' },
-  { label: '急救箱', icon: 'plus-filled', type: 'kit', left: '70%', top: '24%' },
-  { label: '志愿者', icon: 'staff-filled', type: 'volunteer', left: '75%', top: '70%' },
-  { label: 'AED', icon: 'heart-filled', type: 'device', left: '30%', top: '19%' }
+  { label: 'AED', glyph: '/static/icons/entry/aed.png', type: 'device', left: '18%', top: '58%' },
+  { label: '急救箱', glyph: '/static/icons/entry/rescue-kit.png', type: 'kit', left: '70%', top: '24%' },
+  { label: '志愿者', glyph: '/static/icons/entry/volunteer.png', type: 'volunteer', left: '75%', top: '70%' },
+  { label: 'AED', glyph: '/static/icons/entry/aed.png', type: 'device', left: '30%', top: '19%' }
 ]
 
 let mapInstance: any = null
@@ -314,6 +339,10 @@ const filteredDevices = computed(() => {
   return list
 })
 
+const availableDeviceCount = computed(() => (
+  filteredDevices.value.filter(device => deviceStatusClass(device) === 'online').length
+))
+
 const nativeMarkers = computed(() => filteredDevices.value.map((device, index) => ({
   id: index + 1,
   longitude: device.longitude,
@@ -334,11 +363,9 @@ const nativeMarkers = computed(() => filteredDevices.value.map((device, index) =
 
 function markerAsset(device: any, png = false) {
   const extension = png ? 'png' : 'svg'
-  const filename = deviceStatusClass(device) !== 'online'
-    ? `marker-offline.${extension}`
-    : device.type === 'mobile'
-      ? `marker-mobile.${extension}`
-      : `marker-fixed.${extension}`
+  const type = device.type === 'mobile' ? 'mobile' : 'fixed'
+  const state = deviceStatusClass(device) === 'online' ? '' : '-offline'
+  const filename = `marker-${type}${state}.${extension}`
   // #ifdef H5
   const baseUrl = ((import.meta as any).env?.BASE_URL || '/').replace(/\/?$/, '/')
   return `${baseUrl}static/map/${filename}`
@@ -353,10 +380,13 @@ const popupVisible = ref(false)
 
 const drawerExpanded = ref(false)
 const drawerOffset = ref(420)
+const drawerDragging = ref(false)
 const touchStartY = ref(0)
 const touchCurrentY = ref(0)
+const drawerRpxRatio = 750 / Math.max(systemInfo.windowWidth || 375, 1)
 
 function deviceStatusClass(device: any) {
+  if (device.status === 'reserved') return 'reserved'
   if (device.type === 'fixed') {
     return device.status === 'available' ? 'online' : 'offline'
   }
@@ -364,6 +394,7 @@ function deviceStatusClass(device: any) {
 }
 
 function deviceStatusLabel(device: any) {
+  if (device.status === 'reserved') return '救援占用中'
   if (device.type === 'fixed') {
     return device.status === 'available' ? '可用' : '维护中'
   }
@@ -538,29 +569,27 @@ function locateMe(showResult = true) {
     if (showResult) uni.showToast({ title: '定位已更新', icon: 'success' })
   }
 
-  uni.getLocation({
-    type: 'gcj02',
-    isHighAccuracy: true,
-    success: (result) => {
+  getCurrentGcj02Location()
+    .then((result) => {
       applyLocation(result.longitude, result.latitude)
-    },
-    fail: () => {
+    })
+    .catch(() => {
       locationReady.value = false
       if (showResult) {
         uni.showToast({ title: '请授权使用位置信息', icon: 'none' })
       }
-    }
-  })
+    })
 }
 
 function onDrawerTouchStart(e: any) {
+  drawerDragging.value = true
   touchStartY.value = e.touches[0].clientY
   touchCurrentY.value = e.touches[0].clientY
 }
 
 function onDrawerTouchMove(e: any) {
   touchCurrentY.value = e.touches[0].clientY
-  const diff = touchCurrentY.value - touchStartY.value
+  const diff = (touchCurrentY.value - touchStartY.value) * drawerRpxRatio
   const base = drawerExpanded.value ? 0 : 420
   let offset = base + diff
   if (offset < 0) offset = 0
@@ -569,6 +598,7 @@ function onDrawerTouchMove(e: any) {
 }
 
 function onDrawerTouchEnd() {
+  drawerDragging.value = false
   const diff = touchCurrentY.value - touchStartY.value
   if (drawerExpanded.value) {
     if (diff > 60) {
@@ -585,6 +615,12 @@ function onDrawerTouchEnd() {
       drawerOffset.value = 420
     }
   }
+}
+
+function toggleDrawer() {
+  if (Math.abs(touchCurrentY.value - touchStartY.value) > 8) return
+  drawerExpanded.value = !drawerExpanded.value
+  drawerOffset.value = drawerExpanded.value ? 0 : 420
 }
 
 onMounted(() => {
@@ -631,7 +667,7 @@ onUnmounted(() => {
 .map-page {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px));
   overflow: hidden;
   background: #EDF5FB;
 }
@@ -667,7 +703,7 @@ onUnmounted(() => {
   flex: 1;
   height: 80rpx;
   font-size: 28rpx;
-  color: #1D2129;
+  color: #20364D;
 }
 .search-placeholder {
   color: #C9CDD4;
@@ -869,6 +905,11 @@ onUnmounted(() => {
   border-radius: 50%;
 }
 
+.radar-node-glyph {
+  width: 25rpx;
+  height: 25rpx;
+}
+
 .radar-self-core {
   width: 50rpx;
   height: 50rpx;
@@ -945,10 +986,10 @@ onUnmounted(() => {
   font-weight: 600;
 }
 .popup-type-fixed .popup-type-text {
-  color: #2B6FF0;
+  color: #2E6DD1;
 }
 .popup-type-mobile .popup-type-text {
-  color: #00B42A;
+  color: #23956A;
 }
 .popup-category-tag {
   padding: 4rpx 16rpx;
@@ -976,7 +1017,7 @@ onUnmounted(() => {
 .popup-name {
   font-size: 30rpx;
   font-weight: 700;
-  color: #1D2129;
+  color: #20364D;
   display: block;
   line-height: 1.4;
 }
@@ -1004,7 +1045,7 @@ onUnmounted(() => {
   border-radius: 50%;
 }
 .popup-status-online .popup-status-dot {
-  background: #00B42A;
+  background: #23956A;
   box-shadow: 0 0 8rpx rgba(0, 180, 42, 0.4);
 }
 .popup-status-offline .popup-status-dot {
@@ -1016,7 +1057,7 @@ onUnmounted(() => {
 }
 .popup-distance {
   font-size: 26rpx;
-  color: #2B6FF0;
+  color: #2E6DD1;
   font-weight: 600;
 }
 .popup-vehicle {
@@ -1059,7 +1100,7 @@ onUnmounted(() => {
   background: #F2F3F5;
 }
 .popup-btn-nav {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
   box-shadow: 0 6rpx 24rpx rgba(43, 111, 240, 0.3);
 }
 .popup-btn-icon {
@@ -1082,75 +1123,127 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   z-index: 150;
+  height: 72vh;
+  max-height: 1160rpx;
+  overflow: hidden;
   background: #FFFFFF;
-  border-radius: 32rpx 32rpx 0 0;
-  box-shadow: 0 -4rpx 32rpx rgba(0,0,0,0.08);
-  max-height: 70vh;
+  border: 1rpx solid rgba(146, 169, 191, 0.22);
+  border-bottom: 0;
+  border-radius: 30rpx 30rpx 0 0;
+  box-shadow: 0 -10rpx 36rpx rgba(34, 68, 101, 0.12);
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s ease;
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.bottom-drawer-dragging {
+  transition: none;
+}
+.drawer-drag-zone {
+  flex: 0 0 auto;
+  border-bottom: 1rpx solid var(--network-line);
+  background: var(--network-paper);
+  touch-action: none;
 }
 .drawer-handle {
   display: flex;
   justify-content: center;
-  padding: 16rpx 0 8rpx;
+  padding: 13rpx 0 7rpx;
 }
 .drawer-handle-bar {
-  width: 64rpx;
-  height: 8rpx;
+  width: 58rpx;
+  height: 7rpx;
   border-radius: 4rpx;
-  background: #E5E6EB;
+  background: #C9D5E0;
 }
 .drawer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8rpx 32rpx 20rpx;
+  gap: 20rpx;
+  padding: 5rpx 28rpx 22rpx;
+}
+.drawer-heading {
+  min-width: 0;
+}
+.drawer-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
 }
 .drawer-title {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: #1D2129;
+  color: var(--network-ink);
+  font-size: 32rpx;
+  font-weight: 720;
+  letter-spacing: 1rpx;
 }
 .drawer-count {
-  font-size: 24rpx;
-  color: #2B6FF0;
+  color: var(--network-action);
+  font-size: 21rpx;
   font-weight: 600;
-  background: rgba(43, 111, 240, 0.08);
-  padding: 4rpx 16rpx;
-  border-radius: 16rpx;
+}
+.drawer-summary {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 7rpx;
+  color: var(--network-muted);
+  font-size: 20rpx;
+}
+.drawer-live-dot {
+  width: 10rpx;
+  height: 10rpx;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--network-online);
+}
+.drawer-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4rpx;
+  min-width: 76rpx;
+  height: 50rpx;
+  justify-content: center;
+  color: var(--network-action);
+  font-size: 21rpx;
+  font-weight: 600;
 }
 .drawer-list {
   flex: 1;
+  min-height: 0;
+  height: 0;
+  box-sizing: border-box;
   padding: 0 24rpx;
-  max-height: 55vh;
+  background: #FFFFFF;
 }
 
 .device-card {
+  position: relative;
   display: flex;
   align-items: center;
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid #F2F3F5;
+  min-height: 148rpx;
+  padding: 21rpx 8rpx 21rpx 17rpx;
+  border-bottom: 1rpx solid var(--network-line);
+  box-sizing: border-box;
 }
 .device-card:last-child {
   border-bottom: none;
 }
-.device-card-left {
-  margin-right: 20rpx;
+.device-status-rail {
+  position: absolute;
+  top: 28rpx;
+  bottom: 28rpx;
+  left: 0;
+  width: 4rpx;
+  border-radius: 2rpx;
+  background: var(--network-faint);
 }
-.device-icon-wrap {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.device-row-online .device-status-rail {
+  background: var(--network-online);
 }
-.device-icon-fixed {
-  background: #EAF2FC;
-}
-.device-icon-mobile {
-  background: #EAF6F1;
+.device-row-reserved .device-status-rail {
+  background: var(--network-warning);
 }
 .device-card-center {
   flex: 1;
@@ -1162,57 +1255,28 @@ onUnmounted(() => {
   gap: 8rpx;
 }
 .device-card-name {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #1D2129;
+  color: var(--network-ink);
+  font-size: 27rpx;
+  font-weight: 650;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
 }
-.device-type-mini {
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-  flex-shrink: 0;
-}
-.type-mini-fixed {
-  background: rgba(43, 111, 240, 0.1);
-}
-.type-mini-mobile {
-  background: rgba(0, 180, 42, 0.1);
-}
-.type-mini-text {
-  font-size: 20rpx;
-  font-weight: 600;
-}
-.type-mini-fixed .type-mini-text {
-  color: #2B6FF0;
-}
-.type-mini-mobile .type-mini-text {
-  color: #00B42A;
+.nearest-tag {
+  flex: 0 0 auto;
+  color: var(--network-action);
+  font-size: 18rpx;
+  font-weight: 650;
 }
 .device-card-meta {
   display: flex;
   align-items: center;
   margin-top: 8rpx;
 }
-.device-card-category {
-  padding: 2rpx 10rpx;
-  background: #F2F3F5;
-  border-radius: 6rpx;
-}
-.category-text {
-  font-size: 20rpx;
-  color: #4E5969;
-}
-.device-card-dot {
-  font-size: 20rpx;
-  color: #C9CDD4;
-  margin: 0 8rpx;
-}
 .device-card-addr {
   font-size: 22rpx;
-  color: #86909C;
+  color: var(--network-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1221,8 +1285,7 @@ onUnmounted(() => {
 .device-card-bottom {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 10rpx;
+  margin-top: 9rpx;
 }
 .device-card-status {
   display: flex;
@@ -1235,39 +1298,57 @@ onUnmounted(() => {
   border-radius: 50%;
 }
 .card-status-online .card-status-dot {
-  background: #00B42A;
+  background: var(--network-online);
 }
 .card-status-offline .card-status-dot {
   background: #C9CDD4;
 }
+.card-status-reserved .card-status-dot {
+  background: var(--network-warning);
+}
 .card-status-text {
   font-size: 22rpx;
-  color: #4E5969;
+  color: var(--network-muted);
+}
+.device-card-separator {
+  margin: 0 8rpx;
+  color: var(--network-faint);
+  font-size: 20rpx;
+}
+.device-card-kind {
+  overflow: hidden;
+  color: var(--network-muted);
+  font-size: 20rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .device-card-distance {
+  color: var(--network-ink);
   font-size: 24rpx;
-  color: #2B6FF0;
-  font-weight: 600;
+  font-weight: 700;
 }
 .device-card-right {
-  margin-left: 16rpx;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
+  margin-left: 18rpx;
 }
 .nav-btn {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4rpx 16rpx rgba(43, 111, 240, 0.3);
-  transition: all 0.3s ease;
+  gap: 1rpx;
+  color: var(--network-action);
+  font-size: 21rpx;
+  transition: opacity 150ms ease;
 }
 .nav-btn:active {
-  transform: scale(0.92);
+  opacity: 0.58;
 }
 .nav-btn-icon {
-  font-size: 32rpx;
+  font-size: 20rpx;
 }
 
 .empty-state {
@@ -1308,7 +1389,7 @@ onUnmounted(() => {
 }
 
 .drawer-bottom-safe {
-  height: 40rpx;
+  height: calc(36rpx + env(safe-area-inset-bottom));
 }
 
 </style>

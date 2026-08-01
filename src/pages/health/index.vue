@@ -1,6 +1,24 @@
 <template>
   <view class="page">
-    <scroll-view class="page-scroll" scroll-y>
+    <view class="health-mast" :style="{ paddingTop: statusBarHeight + 'px' }">
+      <view class="mast-content">
+        <view class="mast-signal" aria-hidden="true">
+          <view class="mast-beat mast-beat-short"></view>
+          <view class="mast-beat mast-beat-tall"></view>
+          <view class="mast-beat mast-beat-short"></view>
+        </view>
+        <view class="mast-copy">
+          <text class="mast-title">健康监测</text>
+          <text class="mast-caption">HEALTH SIGNAL</text>
+        </view>
+        <view class="mast-state" :class="{ 'mast-state-live': isDeviceConnected }">
+          <view class="mast-state-dot"></view>
+          <text>{{ isDeviceConnected ? '实时守护中' : '等待设备' }}</text>
+        </view>
+      </view>
+    </view>
+
+    <scroll-view class="page-scroll" scroll-y :show-scrollbar="false">
       <view class="signal-panel">
         <view class="signal-header">
           <view>
@@ -15,7 +33,7 @@
 
         <view class="reading-row">
           <view class="reading-main">
-            <app-icon name="heart-filled" :size="24" color="#B52832" />
+            <app-icon-tile name="heart-filled" tone="coral" />
             <text class="reading-value">{{ displayHeartRate }}</text>
             <text class="reading-unit">BPM</text>
           </view>
@@ -87,47 +105,55 @@
       <view class="resource-section">
         <view class="section-head">
           <text class="section-title">健康资料</text>
-          <text class="section-note">集中管理</text>
+          <text class="section-note">设备与档案</text>
         </view>
-        <view class="resource-list">
-          <view class="resource-row" @tap="goBind">
-            <view class="resource-icon">
-              <app-icon name="heart-filled" :size="20" color="#235FAE" />
-            </view>
-            <view class="resource-copy">
+
+        <view class="device-card" @tap="goBind">
+          <app-icon-tile
+            class="device-mark"
+            name="wearable"
+            tone="coral"
+            :status="isDeviceConnected ? 'online' : 'offline'"
+          />
+          <view class="device-copy">
+            <view class="device-heading">
               <text class="resource-title">穿戴设备</text>
-              <text class="resource-desc">
-                {{ isDeviceConnected ? heartRateData.wearable.name : '未连接，连接后同步实测数据' }}
-              </text>
+              <view class="device-state" :class="{ 'device-state-live': isDeviceConnected }">
+                <view class="device-state-dot"></view>
+                <text>{{ isDeviceConnected ? '已连接' : '未连接' }}</text>
+              </view>
             </view>
-            <view class="resource-action">
-              <text>{{ isDeviceConnected ? '已连接' : '连接' }}</text>
+            <text class="resource-desc">
+              {{ isDeviceConnected ? heartRateData.wearable.name : '连接手环或手表，同步实时心率' }}
+            </text>
+          </view>
+          <view class="device-action">
+            <text>{{ isDeviceConnected ? '管理' : '连接' }}</text>
+            <app-icon name="right" :size="14" color="#2E6DD1" />
+          </view>
+        </view>
+
+        <view class="resource-grid">
+          <view class="resource-card" @tap="goCheckup">
+            <view class="resource-card-head">
+              <app-icon-tile name="list" tone="violet" />
               <app-icon name="right" :size="14" color="#8291A4" />
             </view>
+            <text class="resource-title">体检报告</text>
+            <text class="resource-value">{{ latestReport ? latestReport.checkupDate : '待录入' }}</text>
+            <text class="resource-desc">
+              {{ latestReport ? `${latestAbnormalCount}项指标需关注` : '录入后生成分析' }}
+            </text>
           </view>
 
-          <view class="resource-row" @tap="goCheckup">
-            <view class="resource-icon">
-              <app-icon name="list" :size="20" color="#235FAE" />
+          <view class="resource-card" @tap="goArchive">
+            <view class="resource-card-head">
+              <app-icon-tile name="folder-add-filled" tone="blue" />
+              <app-icon name="right" :size="14" color="#8291A4" />
             </view>
-            <view class="resource-copy">
-              <text class="resource-title">体检报告</text>
-              <text class="resource-desc">
-                {{ latestReport ? `${latestReport.checkupDate} · ${latestAbnormalCount}项异常` : '暂无报告，点击录入' }}
-              </text>
-            </view>
-            <app-icon name="right" :size="14" color="#8291A4" />
-          </view>
-
-          <view class="resource-row resource-row-last" @tap="goArchive">
-            <view class="resource-icon">
-              <app-icon name="folder-add-filled" :size="20" color="#235FAE" />
-            </view>
-            <view class="resource-copy">
-              <text class="resource-title">健康档案</text>
-              <text class="resource-desc">{{ healthReports.length }}份体检记录</text>
-            </view>
-            <app-icon name="right" :size="14" color="#8291A4" />
+            <text class="resource-title">健康档案</text>
+            <text class="resource-value">{{ healthReports.length }}<text class="resource-unit">份</text></text>
+            <text class="resource-desc">按时间归档体检记录</text>
           </view>
         </view>
       </view>
@@ -140,11 +166,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 import { listHealthReports, type HealthReportResponse } from '@/api/reports'
 
 const { monitoring: heartRateData, loadMonitoring } = useHealthMonitoring()
 const healthReports = ref<HealthReportResponse[]>([])
+const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
 
 const isDeviceConnected = computed(() => heartRateData.value.wearable.connected)
 const latestAlert = computed(() => heartRateData.value.alerts[0] || null)
@@ -228,22 +256,105 @@ function goArchive() {
 
 <style lang="scss" scoped>
 .page {
-  min-height: 100vh;
-  background: #F1F5F8;
+  height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #F3F7FC;
   color: #192B3D;
 }
 
+.health-mast {
+  flex: none;
+  border-bottom: 1rpx solid #DEE8F1;
+  background: #F9FCFF;
+}
+
+.mast-content {
+  display: flex;
+  align-items: center;
+  height: 88rpx;
+  padding: 0 28rpx;
+}
+
+.mast-signal {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  width: 52rpx;
+  height: 52rpx;
+  margin-right: 14rpx;
+  border: 1rpx solid #D5E4F2;
+  border-radius: 13rpx;
+  background: #FFFFFF;
+}
+
+.mast-beat {
+  width: 5rpx;
+  border-radius: 4rpx;
+  background: #2E6DD1;
+}
+
+.mast-beat-short { height: 15rpx; }
+.mast-beat-tall { height: 30rpx; background: #B52832; }
+
+.mast-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.mast-title {
+  color: #18334F;
+  font-size: 29rpx;
+  font-weight: 720;
+  line-height: 1.25;
+}
+
+.mast-caption {
+  margin-top: 2rpx;
+  color: #71869B;
+  font-size: 14rpx;
+  font-weight: 650;
+  letter-spacing: 2rpx;
+}
+
+.mast-state {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7rpx;
+  color: #718295;
+  font-size: 18rpx;
+  font-weight: 600;
+}
+
+.mast-state-dot {
+  width: 9rpx;
+  height: 9rpx;
+  border-radius: 50%;
+  background: #A6B1BC;
+}
+
+.mast-state-live { color: #287858; }
+.mast-state-live .mast-state-dot { background: #23956A; }
+
 .page-scroll {
-  height: 100vh;
+  min-height: 0;
+  height: 0;
+  flex: 1;
   box-sizing: border-box;
 }
 
 .signal-panel {
-  margin: 24rpx 24rpx 0;
+  margin: 18rpx 24rpx 0;
   padding: 30rpx 28rpx 26rpx;
-  border: 1rpx solid #D9E4EC;
-  border-radius: 22rpx;
-  background: #FFFFFF;
+  border: 1rpx solid #DCE7F0;
+  border-radius: 20rpx;
+  background: #F9FCFF;
 }
 
 .signal-header,
@@ -251,11 +362,9 @@ function goArchive() {
 .chart-header,
 .metric-row,
 .section-head,
-.resource-row,
 .alert-strip,
 .alert-signal,
-.alert-meta,
-.resource-action {
+.alert-meta {
   display: flex;
   align-items: center;
 }
@@ -332,8 +441,8 @@ function goArchive() {
 
 .reading-main {
   display: flex;
-  align-items: baseline;
-  gap: 8rpx;
+  align-items: center;
+  gap: 10rpx;
 }
 
 .reading-value {
@@ -514,7 +623,7 @@ function goArchive() {
 }
 
 .resource-section {
-  margin: 32rpx 24rpx 0;
+  margin: 28rpx 24rpx 0;
 }
 
 .section-head {
@@ -531,62 +640,117 @@ function goArchive() {
   font-size: 19rpx;
 }
 
-.resource-list {
-  padding: 0 24rpx;
-  border: 1rpx solid #D9E4EC;
-  border-radius: 20rpx;
-  background: #FFFFFF;
-}
-
-.resource-row {
-  min-height: 116rpx;
-  border-bottom: 1rpx solid #E7EDF2;
-}
-
-.resource-row-last {
-  border-bottom: 0;
-}
-
-.resource-icon {
+.device-card {
   display: flex;
-  flex: none;
   align-items: center;
-  justify-content: center;
-  width: 58rpx;
-  height: 58rpx;
-  border-radius: 15rpx;
-  background: #ECF3FA;
+  min-height: 112rpx;
+  padding: 22rpx 22rpx;
+  border: 1rpx solid #DCE7F0;
+  border-radius: 18rpx;
+  background: #F9FCFF;
 }
 
-.resource-copy {
+.device-card:active,
+.resource-card:active {
+  background: #F0F6FC;
+}
+
+.device-copy {
   min-width: 0;
   flex: 1;
-  margin-left: 18rpx;
+  margin-left: 20rpx;
+}
+
+.device-heading {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
 }
 
 .resource-title {
-  font-size: 25rpx;
-  font-weight: 700;
+  font-size: 24rpx;
+  font-weight: 720;
 }
 
+.device-state {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  color: #75879A;
+  font-size: 17rpx;
+}
+
+.device-state-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: #A6B1BC;
+}
+
+.device-state-live { color: #287858; }
+.device-state-live .device-state-dot { background: #23956A; }
+
 .resource-desc {
-  margin-top: 4rpx;
+  margin-top: 5rpx;
   overflow: hidden;
   color: #7D8E9E;
-  font-size: 19rpx;
+  font-size: 18rpx;
+  line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.resource-action {
+.device-action {
+  display: flex;
+  flex: none;
+  align-items: center;
   gap: 3rpx;
-  margin-left: 12rpx;
-  color: #46627D;
-  font-size: 19rpx;
+  margin-left: 14rpx;
+  color: #2E6DD1;
+  font-size: 18rpx;
   font-weight: 650;
 }
 
+.resource-grid {
+  display: flex;
+  gap: 14rpx;
+  margin-top: 14rpx;
+}
+
+.resource-card {
+  min-width: 0;
+  flex: 1;
+  padding: 20rpx 20rpx 22rpx;
+  border: 1rpx solid #DCE7F0;
+  border-radius: 18rpx;
+  background: #FFFFFF;
+}
+
+.resource-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18rpx;
+}
+
+.resource-value {
+  display: block;
+  margin-top: 12rpx;
+  color: #213B54;
+  font-size: 28rpx;
+  font-weight: 740;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.resource-unit {
+  margin-left: 3rpx;
+  color: #708397;
+  font-size: 18rpx;
+  font-weight: 600;
+}
+
 .bottom-safe {
-  height: calc(140rpx + env(safe-area-inset-bottom));
+  height: calc(72rpx + env(safe-area-inset-bottom));
 }
 </style>

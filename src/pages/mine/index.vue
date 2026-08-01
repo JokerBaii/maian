@@ -14,6 +14,7 @@
     <scroll-view
       class="scroll-content"
       scroll-y
+      :show-scrollbar="false"
       :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
     >
       <view class="profile-section">
@@ -65,25 +66,19 @@
         <text class="menu-section-title">急救服务</text>
         <view class="menu-list">
           <view class="menu-item" @tap="goDevices">
-            <view class="menu-icon-wrap menu-icon-blue">
-              <app-icon class="menu-icon-text" name="heart-filled" :size="20" color="#FFFFFF" />
-            </view>
+            <app-icon-tile class="menu-icon" name="wearable" tone="coral" />
             <text class="menu-label">我的设备</text>
-            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
           </view>
           <view class="menu-item" @tap="goRecords">
-            <view class="menu-icon-wrap menu-icon-red">
-              <app-icon class="menu-icon-text" name="notification-filled" :size="20" color="#FFFFFF" />
-            </view>
+            <app-icon-tile class="menu-icon" name="notification-filled" tone="coral" />
             <text class="menu-label">救援记录</text>
-            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
           </view>
           <view class="menu-item menu-item-last" @tap="goContacts">
-            <view class="menu-icon-wrap menu-icon-orange">
-              <app-icon class="menu-icon-text" name="phone-filled" :size="20" color="#FFFFFF" />
-            </view>
+            <app-icon-tile class="menu-icon" name="phone-filled" tone="green" />
             <text class="menu-label">紧急联系人</text>
-            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
           </view>
         </view>
       </view>
@@ -92,18 +87,14 @@
         <text class="menu-section-title">健康管理</text>
         <view class="menu-list">
           <view class="menu-item" @tap="goArchive">
-            <view class="menu-icon-wrap menu-icon-green">
-              <app-icon class="menu-icon-text" name="folder-add-filled" :size="21" color="#FFFFFF" />
-            </view>
+            <app-icon-tile class="menu-icon" name="folder-add-filled" tone="blue" />
             <text class="menu-label">健康档案</text>
-            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
           </view>
           <view class="menu-item menu-item-last" @tap="goCheckup">
-            <view class="menu-icon-wrap menu-icon-purple">
-              <app-icon class="menu-icon-text" name="list" :size="21" color="#FFFFFF" />
-            </view>
+            <app-icon-tile class="menu-icon" name="list" tone="violet" />
             <text class="menu-label">体检报告</text>
-            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
           </view>
         </view>
       </view>
@@ -112,21 +103,17 @@
         <text class="menu-section-title">其他</text>
         <view class="menu-list">
           <view class="menu-item" @tap="goAuth">
-            <view class="menu-icon-wrap menu-icon-cyan">
-              <app-icon class="menu-icon-text" name="auth-filled" :size="21" color="#FFFFFF" />
-            </view>
+            <app-icon-tile class="menu-icon" name="auth-filled" tone="green" />
             <text class="menu-label">身份信息</text>
             <view class="menu-extra">
               <text class="menu-extra-text" v-if="user.isVerified">已校验</text>
             </view>
-            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
           </view>
           <view class="menu-item menu-item-last" @tap="goSettings">
-            <view class="menu-icon-wrap menu-icon-grey">
-              <app-icon class="menu-icon-text" name="settings-filled" :size="20" color="#FFFFFF" />
-            </view>
+            <app-icon-tile class="menu-icon" name="settings-filled" tone="slate" />
             <text class="menu-label">设置</text>
-            <app-icon class="menu-arrow" name="right" :size="16" color="#A7B0C0" />
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
           </view>
         </view>
       </view>
@@ -140,7 +127,8 @@
 import { ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
-import { listEmergencyDevices } from '@/api/devices'
+import AppIconTile from '@/components/AppIconTile.vue'
+import { listMyEmergencyDevices } from '@/api/devices'
 import { listRescueCalls } from '@/api/rescue'
 import { getCurrentProfile } from '@/api/user'
 import { getScienceSubmissionCount } from '@/api/science'
@@ -182,7 +170,7 @@ function goCheckup() {
 async function loadStats() {
   const [rescues, devices, profile, submissions] = await Promise.allSettled([
     listRescueCalls(),
-    listEmergencyDevices(),
+    listMyEmergencyDevices(),
     getCurrentProfile(),
     getScienceSubmissionCount()
   ])
@@ -201,8 +189,9 @@ onShow(loadStats)
 
 <style lang="scss" scoped>
 .page {
-  min-height: 100vh;
-  background: #F0F4FA;
+  height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px));
+  overflow: hidden;
+  background: #F3F7FA;
 }
 
 .nav-bar {
@@ -211,7 +200,7 @@ onShow(loadStats)
   left: 0;
   right: 0;
   z-index: 999;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
 }
 .nav-bar-content {
   display: flex;
@@ -244,7 +233,7 @@ onShow(loadStats)
 }
 
 .scroll-content {
-  min-height: 100vh;
+  height: 100%;
   box-sizing: border-box;
 }
 
@@ -259,7 +248,7 @@ onShow(loadStats)
   left: 0;
   right: 0;
   height: 360rpx;
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 50%, #7DA8F7 100%);
+  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 50%, #7DA8F7 100%);
   border-radius: 0 0 48rpx 48rpx;
 }
 .profile-card {
@@ -292,7 +281,7 @@ onShow(loadStats)
 .avatar-text {
   font-size: 52rpx;
   font-weight: 800;
-  color: #2B6FF0;
+  color: #2E6DD1;
 }
 .profile-info {
   flex: 1;
@@ -367,7 +356,7 @@ onShow(loadStats)
 .stat-value {
   font-size: 44rpx;
   font-weight: 800;
-  color: #1D2129;
+  color: #20364D;
   line-height: 1;
 }
 .stat-label {
@@ -394,9 +383,9 @@ onShow(loadStats)
 }
 .menu-list {
   background: #FFFFFF;
-  border-radius: 20rpx;
+  border: 1rpx solid var(--network-line);
+  border-radius: var(--network-radius-section);
   overflow: hidden;
-  box-shadow: 0 4rpx 16rpx rgba(43, 111, 240, 0.06);
 }
 .menu-item {
   display: flex;
@@ -411,52 +400,13 @@ onShow(loadStats)
 .menu-item-last {
   border-bottom: none;
 }
-.menu-icon-wrap {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 20rpx;
-  flex-shrink: 0;
-}
-.menu-icon-blue {
-  background: linear-gradient(135deg, #2B6FF0 0%, #5B8DEF 100%);
-  box-shadow: 0 4rpx 12rpx rgba(43, 111, 240, 0.2);
-}
-.menu-icon-red {
-  background: linear-gradient(135deg, #F53F3F 0%, #FF7D7D 100%);
-  box-shadow: 0 4rpx 12rpx rgba(245, 63, 63, 0.2);
-}
-.menu-icon-orange {
-  background: linear-gradient(135deg, #FF9A2E 0%, #FFCF8B 100%);
-  box-shadow: 0 4rpx 12rpx rgba(255, 154, 46, 0.2);
-}
-.menu-icon-green {
-  background: linear-gradient(135deg, #00B42A 0%, #4DC580 100%);
-  box-shadow: 0 4rpx 12rpx rgba(0, 180, 42, 0.2);
-}
-.menu-icon-purple {
-  background: linear-gradient(135deg, #722ED1 0%, #B37FEB 100%);
-  box-shadow: 0 4rpx 12rpx rgba(114, 46, 209, 0.2);
-}
-.menu-icon-cyan {
-  background: linear-gradient(135deg, #0FC6C2 0%, #5CE0DB 100%);
-  box-shadow: 0 4rpx 12rpx rgba(15, 198, 194, 0.2);
-}
-.menu-icon-grey {
-  background: linear-gradient(135deg, #86909C 0%, #C9CDD4 100%);
-  box-shadow: 0 4rpx 12rpx rgba(134, 144, 156, 0.2);
-}
-.menu-icon-text {
-  font-size: 32rpx;
-  color: #FFFFFF;
+.menu-icon {
+  margin-right: 18rpx;
 }
 .menu-label {
   flex: 1;
   font-size: 30rpx;
-  color: #1D2129;
+  color: #20364D;
   font-weight: 500;
 }
 .menu-extra {
@@ -464,7 +414,7 @@ onShow(loadStats)
 }
 .menu-extra-text {
   font-size: 24rpx;
-  color: #00B42A;
+  color: #23956A;
   font-weight: 500;
 }
 .menu-arrow {

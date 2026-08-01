@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 
@@ -57,6 +58,13 @@ public class GlobalExceptionHandler {
         log.warn("Health analysis unavailable", exception);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
             .body(ApiResponse.error("HEALTH_ANALYSIS_UNAVAILABLE", exception.getMessage()));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataConflict(DataIntegrityViolationException exception) {
+        log.warn("Database constraint conflict", exception);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ApiResponse.error("DATA_CONFLICT", "请求与已有数据冲突，请刷新后重试"));
     }
 
     @ExceptionHandler(Exception.class)

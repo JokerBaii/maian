@@ -1,7 +1,7 @@
 import { request } from './http'
 
 export type EmergencyDeviceType = 'FIXED' | 'MOBILE'
-export type EmergencyDeviceStatus = 'AVAILABLE' | 'MAINTENANCE' | 'OFFLINE' | 'EXPIRED'
+export type EmergencyDeviceStatus = 'AVAILABLE' | 'RESERVED' | 'MAINTENANCE' | 'OFFLINE' | 'EXPIRED'
 
 export interface EmergencyDeviceResponse {
   id: string
@@ -21,6 +21,7 @@ export interface EmergencyDeviceResponse {
   instructions?: string
   imageUrls: string[]
   vehicleImageUrls: string[]
+  lastLocationAt?: string
   createdAt: string
 }
 
@@ -37,6 +38,12 @@ export interface PageResponse<T> {
 export function listEmergencyDevices() {
   return request<PageResponse<EmergencyDeviceResponse>>(
     '/api/v1/emergency-devices?page=0&size=100&sort=createdAt,desc'
+  )
+}
+
+export function listMyEmergencyDevices() {
+  return request<PageResponse<EmergencyDeviceResponse>>(
+    '/api/v1/emergency-devices/mine?page=0&size=100&sort=createdAt,desc'
   )
 }
 
@@ -80,6 +87,16 @@ export function updateEmergencyDeviceStatus(id: string, status: EmergencyDeviceS
   return request<EmergencyDeviceResponse>(`/api/v1/emergency-devices/${id}/status`, {
     method: 'PATCH' as UniNamespace.RequestOptions['method'],
     data: { status }
+  })
+}
+
+export function updateEmergencyDeviceLocation(
+  id: string,
+  location: { longitude: number; latitude: number; address: string }
+) {
+  return request<EmergencyDeviceResponse>(`/api/v1/emergency-devices/${id}/location`, {
+    method: 'PATCH' as UniNamespace.RequestOptions['method'],
+    data: location
   })
 }
 

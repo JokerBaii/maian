@@ -11,6 +11,7 @@ export interface CreateRescueCallRequest {
   description?: string
   symptoms: string[]
   imageUrls: string[]
+  clientRequestId?: string
 }
 
 export interface RescueCallResponse {
@@ -23,6 +24,21 @@ export interface RescueCallResponse {
   description?: string
   symptoms: string[]
   imageUrls: string[]
+  matchedAed?: {
+    deviceId: string
+    type: 'FIXED' | 'MOBILE'
+    name: string
+    category: string
+    address: string
+    longitude: number
+    latitude: number
+    ownerPhone?: string
+    vehicleInfo?: string
+    distanceMeters: number
+    estimatedArrivalSeconds: number
+    strategy: string
+    matchedAt: string
+  }
   createdAt: string
   updatedAt: string
 }
@@ -46,6 +62,13 @@ export function createRescueCall(payload: CreateRescueCallRequest) {
 
 export function getRescueCall(id: string) {
   return request<RescueCallResponse>(`/api/v1/rescue-calls/${encodeURIComponent(id)}`)
+}
+
+export function retryRescueMatch(id: string) {
+  return request<RescueCallResponse>(
+    `/api/v1/rescue-calls/${encodeURIComponent(id)}/match-attempts`,
+    { method: 'POST' }
+  )
 }
 
 export function listRescueCalls() {
