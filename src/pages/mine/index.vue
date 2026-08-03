@@ -31,7 +31,7 @@
             <view class="name-row">
               <text class="nickname">{{ user.nickname }}</text>
               <view class="role-badge">
-                <text class="role-badge-text">急救志愿者</text>
+                <text class="role-badge-text">{{ roleLabel }}</text>
               </view>
             </view>
             <text class="phone">{{ user.phone }}</text>
@@ -75,6 +75,21 @@
             <text class="menu-label">救援记录</text>
             <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
           </view>
+          <view v-if="user.role === 'VOLUNTEER'" class="menu-item" @tap="goRescueTasks">
+            <app-icon-tile class="menu-icon" name="volunteer" tone="green" />
+            <text class="menu-label">救援任务</text>
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
+          </view>
+          <view v-if="user.role === 'ADMIN'" class="menu-item" @tap="goDeviceReview">
+            <app-icon-tile class="menu-icon" name="check" tone="blue" />
+            <text class="menu-label">设备审核</text>
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
+          </view>
+          <view v-if="user.role === 'ADMIN'" class="menu-item" @tap="goScienceReview">
+            <app-icon-tile class="menu-icon" name="science-update" tone="cyan" />
+            <text class="menu-label">投稿审核</text>
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
+          </view>
           <view class="menu-item menu-item-last" @tap="goContacts">
             <app-icon-tile class="menu-icon" name="phone-filled" tone="green" />
             <text class="menu-label">紧急联系人</text>
@@ -102,6 +117,12 @@
       <view class="menu-section">
         <text class="menu-section-title">其他</text>
         <view class="menu-list">
+          <view class="menu-item" @tap="goDemoMode">
+            <app-icon-tile class="menu-icon" name="user-filled" tone="blue" />
+            <text class="menu-label">演示身份切换</text>
+            <view class="menu-extra"><text class="menu-extra-text">比赛演示</text></view>
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
+          </view>
           <view class="menu-item" @tap="goAuth">
             <app-icon-tile class="menu-icon" name="auth-filled" tone="green" />
             <text class="menu-label">身份信息</text>
@@ -124,7 +145,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
@@ -136,8 +157,14 @@ import { getScienceSubmissionCount } from '@/api/science'
 const user = reactive({
   nickname: '用户',
   phone: '',
+  role: 'USER',
   isVerified: false
 })
+const roleLabel = computed(() => ({
+  USER: '普通用户',
+  VOLUNTEER: '急救志愿者',
+  ADMIN: '平台审核员'
+} as Record<string, string>)[user.role] || '当前用户')
 const rescueCount = ref(0)
 const deviceCount = ref(0)
 const contributionCount = ref(0)
@@ -161,6 +188,18 @@ function goAuth() {
 function goSettings() {
   uni.navigateTo({ url: '/pages/mine/settings' })
 }
+function goDemoMode() {
+  uni.navigateTo({ url: '/pages/mine/demo' })
+}
+function goRescueTasks() {
+  uni.navigateTo({ url: '/pages/rescue/tasks' })
+}
+function goDeviceReview() {
+  uni.navigateTo({ url: '/pages/device/review' })
+}
+function goScienceReview() {
+  uni.navigateTo({ url: '/pages/science/review' })
+}
 function goArchive() {
   uni.navigateTo({ url: '/pages/checkup/archive' })
 }
@@ -179,6 +218,7 @@ async function loadStats() {
   if (profile.status === 'fulfilled') {
     user.nickname = profile.value.nickname
     user.phone = profile.value.phone
+    user.role = profile.value.role
     user.isVerified = profile.value.verified
   }
   if (submissions.status === 'fulfilled') contributionCount.value = submissions.value.count

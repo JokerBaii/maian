@@ -9,6 +9,8 @@ export interface ScienceSubmissionResponse {
   hasCoverImage: boolean
   coverImageUrl?: string
   submittedAt: string
+  reviewNote?: string
+  reviewedAt?: string
 }
 
 export interface ScienceArticleInteractionResponse {
@@ -68,4 +70,26 @@ export function getScienceSubmission(id: string) {
 
 export function deleteScienceSubmission(id: string) {
   return request<void>(`/api/v1/science-submissions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function listPendingScienceSubmissions() {
+  return request<{
+    content: ScienceSubmissionResponse[]
+    page: number
+    size: number
+    totalElements: number
+    totalPages: number
+    first: boolean
+    last: boolean
+  }>('/api/v1/science-submissions/reviews/pending?page=0&size=100&sort=submittedAt,asc')
+}
+
+export function reviewScienceSubmission(id: string, approved: boolean, reviewNote?: string) {
+  return request<ScienceSubmissionResponse>(
+    `/api/v1/science-submissions/${encodeURIComponent(id)}/review`,
+    {
+      method: 'PATCH' as UniNamespace.RequestOptions['method'],
+      data: { approved, reviewNote }
+    }
+  )
 }

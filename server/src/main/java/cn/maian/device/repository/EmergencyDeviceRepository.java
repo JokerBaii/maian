@@ -1,6 +1,7 @@
 package cn.maian.device.repository;
 
 import cn.maian.device.domain.DeviceType;
+import cn.maian.device.domain.DeviceStatus;
 import cn.maian.device.domain.EmergencyDevice;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,11 +15,20 @@ import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Collection;
 import java.util.UUID;
 
 public interface EmergencyDeviceRepository extends JpaRepository<EmergencyDevice, UUID> {
 
     Page<EmergencyDevice> findAllByType(DeviceType type, Pageable pageable);
+
+    Page<EmergencyDevice> findAllByStatus(DeviceStatus status, Pageable pageable);
+    Page<EmergencyDevice> findAllByStatusNotIn(Collection<DeviceStatus> statuses, Pageable pageable);
+    Page<EmergencyDevice> findAllByTypeAndStatusNotIn(
+        DeviceType type,
+        Collection<DeviceStatus> statuses,
+        Pageable pageable
+    );
     Page<EmergencyDevice> findAllByRegisteredByUserId(UUID userId, Pageable pageable);
     Page<EmergencyDevice> findAllByRegisteredByUserIdAndType(
         UUID userId,

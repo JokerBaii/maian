@@ -1,6 +1,6 @@
 {
-  "name": "uni-preset-vue",
-  "version": "0.0.0",
+  "name": "maian-rescue-mobile",
+  "version": "1.0.0",
   "scripts": {
     "dev:h5": "uni",
     "build:ios": "uni build -p app-ios",
@@ -16,8 +16,7 @@
     "@dcloudio/uni-mp-weixin": "3.0.0-4080420251103001",
     "@dcloudio/uni-ui": "^1.5.12",
     "leaflet": "^1.9.4",
-    "vue": "^3.4.21",
-    "vue-i18n": "^9.1.9"
+    "vue": "^3.4.21"
   },
   "devDependencies": {
     "@dcloudio/types": "^3.4.8",

@@ -4,7 +4,7 @@ import cn.maian.health.domain.WearableDevice;
 import cn.maian.health.dto.SaveWearableDeviceRequest;
 import cn.maian.health.dto.WearableDeviceResponse;
 import cn.maian.health.repository.WearableDeviceRepository;
-import cn.maian.user.service.UserProfileService;
+import cn.maian.user.service.CurrentUserService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,23 +12,28 @@ import org.springframework.transaction.annotation.Transactional;
 public class WearableDeviceService {
 
     private final WearableDeviceRepository wearableDeviceRepository;
+    private final CurrentUserService currentUserService;
 
-    public WearableDeviceService(WearableDeviceRepository wearableDeviceRepository) {
+    public WearableDeviceService(
+        WearableDeviceRepository wearableDeviceRepository,
+        CurrentUserService currentUserService
+    ) {
         this.wearableDeviceRepository = wearableDeviceRepository;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional(readOnly = true)
     public WearableDeviceResponse current() {
-        return wearableDeviceRepository.findByUserId(UserProfileService.CURRENT_USER_ID)
+        return wearableDeviceRepository.findByUserId(currentUserService.currentUserId())
             .map(WearableDeviceResponse::from)
             .orElseGet(WearableDeviceResponse::unbound);
     }
 
     @Transactional
     public WearableDeviceResponse save(SaveWearableDeviceRequest request) {
-        var device = wearableDeviceRepository.findByUserId(UserProfileService.CURRENT_USER_ID)
+        var device = wearableDeviceRepository.findByUserId(currentUserService.currentUserId())
             .orElseGet(() -> WearableDevice.bind(
-                UserProfileService.CURRENT_USER_ID,
+                currentUserService.currentUserId(),
                 request.deviceIdentifier(),
                 request.name(),
                 request.type(),
@@ -47,12 +52,12 @@ public class WearableDeviceService {
 
     @Transactional
     public void delete() {
-        wearableDeviceRepository.findByUserId(UserProfileService.CURRENT_USER_ID)
+        wearableDeviceRepository.findByUserId(currentUserService.currentUserId())
             .ifPresent(wearableDeviceRepository::delete);
     }
 
     @Transactional(readOnly = true)
     public WearableDevice findCurrentEntity() {
-        return wearableDeviceRepository.findByUserId(UserProfileService.CURRENT_USER_ID).orElse(null);
+        return wearableDeviceRepository.findByUserId(currentUserService.currentUserId()).orElse(null);
     }
 }

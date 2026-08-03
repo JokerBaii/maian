@@ -5,7 +5,7 @@ import cn.maian.health.dto.CreateHealthReportRequest;
 import cn.maian.health.dto.HealthAnalysisRequest;
 import cn.maian.health.dto.HealthReportResponse;
 import cn.maian.health.repository.HealthReportRepository;
-import cn.maian.user.service.UserProfileService;
+import cn.maian.user.service.CurrentUserService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,13 +17,16 @@ public class HealthReportService {
 
     private final HealthReportRepository healthReportRepository;
     private final HealthAnalysisService healthAnalysisService;
+    private final CurrentUserService currentUserService;
 
     public HealthReportService(
         HealthReportRepository healthReportRepository,
-        HealthAnalysisService healthAnalysisService
+        HealthAnalysisService healthAnalysisService,
+        CurrentUserService currentUserService
     ) {
         this.healthReportRepository = healthReportRepository;
         this.healthAnalysisService = healthAnalysisService;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional
@@ -33,7 +36,7 @@ public class HealthReportService {
             new HealthAnalysisRequest(summary, request.indicators())
         );
         var report = cn.maian.health.domain.HealthReport.create(
-            UserProfileService.CURRENT_USER_ID,
+            currentUserService.currentUserId(),
             request.checkupDate(),
             request.hospital(),
             request.sourceImageUrl(),
@@ -46,7 +49,7 @@ public class HealthReportService {
     @Transactional(readOnly = true)
     public List<HealthReportResponse> listCurrentUserReports() {
         return healthReportRepository
-            .findAllByUserIdOrderByCheckupDateDesc(UserProfileService.CURRENT_USER_ID)
+            .findAllByUserIdOrderByCheckupDateDesc(currentUserService.currentUserId())
             .stream()
             .map(HealthReportResponse::from)
             .toList();
@@ -54,14 +57,14 @@ public class HealthReportService {
 
     @Transactional(readOnly = true)
     public HealthReportResponse get(UUID id) {
-        var report = healthReportRepository.findByIdAndUserId(id, UserProfileService.CURRENT_USER_ID)
+        var report = healthReportRepository.findByIdAndUserId(id, currentUserService.currentUserId())
             .orElseThrow(() -> new ResourceNotFoundException("体检报告不存在"));
         return HealthReportResponse.from(report);
     }
 
     @Transactional
     public void delete(UUID id) {
-        var report = healthReportRepository.findByIdAndUserId(id, UserProfileService.CURRENT_USER_ID)
+        var report = healthReportRepository.findByIdAndUserId(id, currentUserService.currentUserId())
             .orElseThrow(() -> new ResourceNotFoundException("体检报告不存在"));
         healthReportRepository.delete(report);
     }

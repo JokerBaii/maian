@@ -28,6 +28,8 @@ public record EmergencyDeviceResponse(
     List<String> imageUrls,
     List<String> vehicleImageUrls,
     Instant lastLocationAt,
+    String reviewNote,
+    Instant reviewedAt,
     Instant createdAt
 ) {
     public static EmergencyDeviceResponse from(EmergencyDevice device) {
@@ -50,6 +52,8 @@ public record EmergencyDeviceResponse(
             device.getImageUrls(),
             device.getVehicleImageUrls(),
             device.getLastLocationAt(),
+            device.getReviewNote(),
+            device.getReviewedAt(),
             device.getCreatedAt()
         );
     }

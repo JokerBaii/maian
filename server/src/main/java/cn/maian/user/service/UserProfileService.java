@@ -1,28 +1,22 @@
 package cn.maian.user.service;
 
-import cn.maian.common.exception.ResourceNotFoundException;
 import cn.maian.user.dto.UserProfileResponse;
 import cn.maian.user.dto.VerifyIdentityRequest;
-import cn.maian.user.repository.UserProfileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
-import java.util.UUID;
 
 @Service
 public class UserProfileService {
 
-    public static final UUID CURRENT_USER_ID =
-        UUID.fromString("30000000-0000-0000-0000-000000000001");
-
     private static final int[] ID_CARD_WEIGHTS = { 7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2 };
     private static final char[] ID_CARD_CHECK_CODES = { '1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2' };
 
-    private final UserProfileRepository userProfileRepository;
+    private final CurrentUserService currentUserService;
 
-    public UserProfileService(UserProfileRepository userProfileRepository) {
-        this.userProfileRepository = userProfileRepository;
+    public UserProfileService(CurrentUserService currentUserService) {
+        this.currentUserService = currentUserService;
     }
 
     @Transactional(readOnly = true)
@@ -54,7 +48,6 @@ public class UserProfileService {
     }
 
     private cn.maian.user.domain.UserProfile findCurrent() {
-        return userProfileRepository.findById(CURRENT_USER_ID)
-            .orElseThrow(() -> new ResourceNotFoundException("用户资料不存在"));
+        return currentUserService.currentProfile();
     }
 }

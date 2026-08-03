@@ -15,15 +15,20 @@ import java.util.UUID;
 public class EmergencyContactService {
 
     private final EmergencyContactRepository emergencyContactRepository;
+    private final CurrentUserService currentUserService;
 
-    public EmergencyContactService(EmergencyContactRepository emergencyContactRepository) {
+    public EmergencyContactService(
+        EmergencyContactRepository emergencyContactRepository,
+        CurrentUserService currentUserService
+    ) {
         this.emergencyContactRepository = emergencyContactRepository;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional(readOnly = true)
     public List<EmergencyContactResponse> findAll() {
         return emergencyContactRepository
-            .findAllByUserIdOrderByCreatedAtAsc(UserProfileService.CURRENT_USER_ID)
+            .findAllByUserIdOrderByCreatedAtAsc(currentUserService.currentUserId())
             .stream()
             .map(EmergencyContactResponse::from)
             .toList();
@@ -32,7 +37,7 @@ public class EmergencyContactService {
     @Transactional
     public EmergencyContactResponse create(SaveEmergencyContactRequest request) {
         var contact = EmergencyContact.create(
-            UserProfileService.CURRENT_USER_ID,
+            currentUserService.currentUserId(),
             request.name().trim(),
             request.phone().trim(),
             request.relation().trim()
@@ -55,7 +60,7 @@ public class EmergencyContactService {
     private EmergencyContact findOwned(UUID id) {
         var contact = emergencyContactRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("紧急联系人不存在"));
-        if (!UserProfileService.CURRENT_USER_ID.equals(contact.getUserId())) {
+        if (!currentUserService.currentUserId().equals(contact.getUserId())) {
             throw new ResourceNotFoundException("紧急联系人不存在");
         }
         return contact;

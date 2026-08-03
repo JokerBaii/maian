@@ -10,6 +10,7 @@
         <view v-if="currentTab === 'initiated'" class="tab-indicator"></view>
       </view>
       <view
+        v-if="canParticipate"
         class="tab-item"
         :class="{ 'tab-active': currentTab === 'participated' }"
         @tap="currentTab = 'participated'"
@@ -43,19 +44,6 @@
             <view class="record-info-row">
               <app-icon class="record-info-icon" name="calendar" :size="14" color="#8994A8" />
               <text class="record-info-text">{{ record.createTime }}</text>
-            </view>
-          </view>
-          <view v-if="record.status === 'completed' && record.rating" class="record-footer">
-            <text class="rating-label">救援评分</text>
-            <view class="rating-stars">
-              <app-icon
-                v-for="i in 5"
-                :key="i"
-                class="star"
-                :name="i <= record.rating ? 'star-filled' : 'star'"
-                :size="15"
-                :color="i <= record.rating ? '#D99A2B' : '#CDD3DE'"
-              />
             </view>
           </view>
         </view>
@@ -93,19 +81,6 @@
               <text class="record-info-text">{{ record.createTime }}</text>
             </view>
           </view>
-          <view v-if="record.status === 'completed' && record.rating" class="record-footer">
-            <text class="rating-label">救援评分</text>
-            <view class="rating-stars">
-              <app-icon
-                v-for="i in 5"
-                :key="i"
-                class="star"
-                :name="i <= record.rating ? 'star-filled' : 'star'"
-                :size="15"
-                :color="i <= record.rating ? '#D99A2B' : '#CDD3DE'"
-              />
-            </view>
-          </view>
         </view>
       </view>
       <view v-else class="empty-state">
@@ -118,11 +93,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
-import { listRescueCalls, type RescueCallResponse } from '@/api/rescue'
+import { listRescueCalls, listResponderTasks, type RescueCallResponse } from '@/api/rescue'
+import { demoUsers, getDemoUserId } from '@/utils/demoSession'
 
 const currentTab = ref<'initiated' | 'participated'>('initiated')
 
@@ -133,11 +109,12 @@ interface RescueRecordView {
   urgency: string
   status: string
   createTime: string
-  rating?: number
 }
 
 const initiatedRecords = ref<RescueRecordView[]>([])
 const participatedRecords = ref<RescueRecordView[]>([])
+const currentDemoUser = computed(() => demoUsers.find(user => user.id === getDemoUserId()) || demoUsers[0])
+const canParticipate = computed(() => ['VOLUNTEER', 'ADMIN'].includes(currentDemoUser.value.role))
 
 function formatTime(value: string) {
   const date = new Date(value)
@@ -158,8 +135,14 @@ function toRecord(call: RescueCallResponse): RescueRecordView {
 
 async function loadRecords() {
   try {
-    const page = await listRescueCalls()
-    initiatedRecords.value = page.content.map(toRecord)
+    const [initiated, participated] = await Promise.all([
+      listRescueCalls(),
+      canParticipate.value ? listResponderTasks() : Promise.resolve(null)
+    ])
+    initiatedRecords.value = initiated.content.map(toRecord)
+    participatedRecords.value = participated?.content
+      .filter(call => call.responderUserId === getDemoUserId())
+      .map(toRecord) || []
   } catch {
     uni.showToast({ title: '救援记录加载失败', icon: 'none' })
   }
@@ -347,34 +330,6 @@ onShow(loadRecords)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.record-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 16rpx;
-  padding-top: 16rpx;
-  border-top: 1rpx solid #F2F3F5;
-}
-.rating-label {
-  font-size: 24rpx;
-  color: #86909C;
-  font-weight: 500;
-}
-.rating-stars {
-  display: flex;
-  gap: 4rpx;
-}
-.star {
-  font-size: 32rpx;
-  line-height: 1;
-}
-.star-filled {
-  color: #FF9A2E;
-}
-.star-empty {
-  color: #E5E6EB;
 }
 
 .empty-state {

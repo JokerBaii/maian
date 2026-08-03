@@ -52,17 +52,7 @@
         </view>
 
         <view class="trend-chart">
-          <view class="trend-normal-band"></view>
-          <view
-            v-for="(item, index) in trendBars"
-            :key="index"
-            class="trend-column"
-          >
-            <view
-              class="trend-bar"
-              :style="{ height: item.height + 'rpx', backgroundColor: item.color }"
-            ></view>
-          </view>
+          <canvas canvas-id="healthTrendCanvas" id="healthTrendCanvas" class="trend-canvas"></canvas>
         </view>
         <view class="trend-labels">
           <text>0时</text>
@@ -92,7 +82,7 @@
         <view class="alert-signal">
           <view class="alert-dot"></view>
           <view class="alert-copy">
-            <text class="alert-label">{{ isDeviceConnected ? '最近预警' : '示例预警' }}</text>
+            <text class="alert-label">最近预警</text>
             <text class="alert-message">{{ latestAlert.message }}</text>
           </view>
         </view>
@@ -164,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
@@ -196,25 +186,66 @@ const sceneLabel = computed(() => {
   return labels[heartRateData.value.scene] || '实时监测'
 })
 const trendModeLabel = computed(() =>
-  isDeviceConnected.value ? '设备实测 · 每 30 分钟' : '示例趋势 · 不代表个人数据'
+  isDeviceConnected.value ? '设备同步记录' : '连接设备后显示趋势'
 )
-const trendBars = computed(() => {
-  const data = heartRateData.value.todayData.filter((_, index) => index % 2 === 0)
-  const values = data.map(item => item.value)
-  const maximum = Math.max(...values, 1)
-  const minimum = Math.min(...values, maximum)
-  const range = maximum - minimum || 1
-  return data.map(item => ({
-    height: ((item.value - minimum) / range) * 88 + 18,
-    color: item.value > 110
-      ? '#D54A55'
-      : item.value > 95
-        ? '#D88735'
-        : item.value < 60
-          ? '#5E83C7'
-          : '#24966B'
-  }))
-})
+async function drawTrendChart() {
+  const data = heartRateData.value.todayData
+  if (data.length < 2) return
+  const rect = await new Promise<any>(resolve => {
+    uni.createSelectorQuery().select('#healthTrendCanvas').boundingClientRect(resolve).exec()
+  })
+  if (!rect?.width || !rect?.height) return
+
+  const canvas = uni.createCanvasContext('healthTrendCanvas')
+  const width = rect.width
+  const height = rect.height
+  const top = 8
+  const bottom = 8
+  const chartHeight = height - top - bottom
+  const maxValue = 135
+  const minValue = 45
+  const valueRange = maxValue - minValue
+  const x = (index: number) => index * width / (data.length - 1)
+  const y = (value: number) => top + (maxValue - value) / valueRange * chartHeight
+
+  canvas.setFillStyle('rgba(36, 150, 107, 0.07)')
+  canvas.fillRect(0, y(100), width, y(60) - y(100))
+  canvas.setStrokeStyle('#DDE7EE')
+  canvas.setLineWidth(1)
+  ;[60, 80, 100, 120].forEach(value => {
+    canvas.beginPath()
+    canvas.moveTo(0, y(value))
+    canvas.lineTo(width, y(value))
+    canvas.stroke()
+  })
+
+  canvas.beginPath()
+  canvas.moveTo(x(0), y(data[0].value))
+  for (let index = 1; index < data.length; index++) {
+    const controlX = (x(index - 1) + x(index)) / 2
+    canvas.bezierCurveTo(controlX, y(data[index - 1].value), controlX, y(data[index].value), x(index), y(data[index].value))
+  }
+  canvas.lineTo(width, height)
+  canvas.lineTo(0, height)
+  canvas.closePath()
+  const fill = canvas.createLinearGradient(0, 0, 0, height)
+  fill.addColorStop(0, 'rgba(77, 151, 220, 0.24)')
+  fill.addColorStop(1, 'rgba(77, 151, 220, 0.02)')
+  canvas.setFillStyle(fill)
+  canvas.fill()
+
+  for (let index = 0; index < data.length - 1; index++) {
+    const high = Math.max(data[index].value, data[index + 1].value) > 110
+    const controlX = (x(index) + x(index + 1)) / 2
+    canvas.beginPath()
+    canvas.setStrokeStyle(high ? '#EF4D5D' : '#249C6B')
+    canvas.setLineWidth(2.6)
+    canvas.moveTo(x(index), y(data[index].value))
+    canvas.bezierCurveTo(controlX, y(data[index].value), controlX, y(data[index + 1].value), x(index + 1), y(data[index + 1].value))
+    canvas.stroke()
+  }
+  canvas.draw()
+}
 
 onMounted(async () => {
   const [monitoring, reports] = await Promise.allSettled([
@@ -223,6 +254,9 @@ onMounted(async () => {
   ])
   if (monitoring.status !== 'fulfilled') {
     uni.showToast({ title: '健康数据加载失败', icon: 'none' })
+  } else {
+    await nextTick()
+    drawTrendChart()
   }
   if (reports.status === 'fulfilled') {
     healthReports.value = reports.value
@@ -496,40 +530,11 @@ function goArchive() {
 
 .trend-chart {
   position: relative;
-  display: flex;
-  align-items: flex-end;
-  gap: 7rpx;
-  height: 142rpx;
-  margin-top: 18rpx;
+  height: 190rpx;
+  margin: 18rpx -8rpx 0;
   overflow: hidden;
 }
-
-.trend-normal-band {
-  position: absolute;
-  right: 0;
-  bottom: 30rpx;
-  left: 0;
-  height: 58rpx;
-  border-top: 1rpx solid #DDEBE5;
-  border-bottom: 1rpx solid #DDEBE5;
-  background: #F3F9F6;
-}
-
-.trend-column {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex: 1;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.trend-bar {
-  width: 100%;
-  max-width: 14rpx;
-  min-height: 8rpx;
-  border-radius: 7rpx;
-}
+.trend-canvas { width: 100%; height: 190rpx; }
 
 .trend-labels {
   display: flex;

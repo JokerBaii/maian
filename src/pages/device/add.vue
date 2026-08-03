@@ -826,7 +826,7 @@ async function handleSubmit() {
     }
     isSubmitting.value = false
     uni.showToast({
-      title: editingId.value ? '设备修改成功' : '设备录入成功',
+      title: editingId.value ? '设备修改成功' : '已提交平台审核',
       icon: 'success',
       duration: 1200
     })

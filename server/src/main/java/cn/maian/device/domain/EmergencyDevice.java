@@ -83,6 +83,11 @@ public class EmergencyDevice {
 
     private Instant reservedAt;
 
+    @Column(length = 300)
+    private String reviewNote;
+
+    private Instant reviewedAt;
+
     @ElementCollection
     @CollectionTable(
         name = "emergency_device_images",
@@ -130,7 +135,7 @@ public class EmergencyDevice {
     ) {
         var device = new EmergencyDevice();
         device.id = UUID.randomUUID();
-        device.status = DeviceStatus.AVAILABLE;
+        device.status = DeviceStatus.PENDING_REVIEW;
         device.createdAt = Instant.now();
         device.update(type, category, name, address, longitude, latitude, ownerPhone, serviceTime,
             expireDate, owner, vehicleInfo, serviceRange, instructions, imageUrls, vehicleImageUrls);
@@ -173,6 +178,11 @@ public class EmergencyDevice {
         this.instructions = instructions;
         this.imageUrls = new ArrayList<>(imageUrls);
         this.vehicleImageUrls = new ArrayList<>(vehicleImageUrls);
+        if (this.status == DeviceStatus.REJECTED) {
+            this.status = DeviceStatus.PENDING_REVIEW;
+            this.reviewNote = null;
+            this.reviewedAt = null;
+        }
         if (type == DeviceType.MOBILE && previousType != DeviceType.MOBILE) {
             this.lastLocationAt = Instant.now();
         } else if (type == DeviceType.FIXED) {
@@ -182,6 +192,15 @@ public class EmergencyDevice {
 
     public void changeStatus(DeviceStatus status) {
         this.status = status;
+    }
+
+    public void review(boolean approved, String note) {
+        if (status != DeviceStatus.PENDING_REVIEW && status != DeviceStatus.REJECTED) {
+            throw new IllegalStateException("只有待审核或已驳回设备可以审核");
+        }
+        this.status = approved ? DeviceStatus.AVAILABLE : DeviceStatus.REJECTED;
+        this.reviewNote = note == null || note.isBlank() ? null : note.trim();
+        this.reviewedAt = Instant.now();
     }
 
     public void registerTo(UUID userId) {
@@ -297,5 +316,13 @@ public class EmergencyDevice {
 
     public UUID getRegisteredByUserId() {
         return registeredByUserId;
+    }
+
+    public String getReviewNote() {
+        return reviewNote;
+    }
+
+    public Instant getReviewedAt() {
+        return reviewedAt;
     }
 }

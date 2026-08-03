@@ -1,5 +1,29 @@
 <script setup lang="ts">
+import { onLaunch } from '@dcloudio/uni-app'
+
 defineOptions({ name: 'MaianApp' })
+
+const PRIVACY_CONSENT_KEY = 'maian:privacy-consent:v1'
+
+onLaunch(() => {
+  if (uni.getStorageSync(PRIVACY_CONSENT_KEY)) return
+  setTimeout(() => {
+    uni.showModal({
+      title: '隐私保护提示',
+      content: '为提供急救定位、穿戴设备连接、健康档案和图片上传功能，应用会在使用对应功能时申请必要权限。请阅读隐私政策与医疗免责声明。',
+      confirmText: '同意并继续',
+      cancelText: '查看详情',
+      confirmColor: '#2E6DD1',
+      success: result => {
+        if (result.confirm) {
+          uni.setStorageSync(PRIVACY_CONSENT_KEY, new Date().toISOString())
+          return
+        }
+        uni.navigateTo({ url: '/pages/legal/index?type=privacy' })
+      }
+    })
+  }, 350)
+})
 </script>
 
 <style lang="scss">

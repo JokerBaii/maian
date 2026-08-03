@@ -16,7 +16,7 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import cn.maian.user.service.UserProfileService;
+import cn.maian.user.service.CurrentUserService;
 
 @Service
 public class RescueCallService {
@@ -32,13 +32,16 @@ public class RescueCallService {
 
     private final RescueCallRepository rescueCallRepository;
     private final AedDispatchService aedDispatchService;
+    private final CurrentUserService currentUserService;
 
     public RescueCallService(
         RescueCallRepository rescueCallRepository,
-        AedDispatchService aedDispatchService
+        AedDispatchService aedDispatchService,
+        CurrentUserService currentUserService
     ) {
         this.rescueCallRepository = rescueCallRepository;
         this.aedDispatchService = aedDispatchService;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional
@@ -46,7 +49,7 @@ public class RescueCallService {
         if (request.clientRequestId() != null && !request.clientRequestId().isBlank()) {
             var existing = rescueCallRepository.findByClientRequestIdAndRequestedByUserId(
                 request.clientRequestId(),
-                UserProfileService.CURRENT_USER_ID
+                currentUserService.currentUserId()
             );
             if (existing.isPresent()) {
                 return RescueCallResponse.from(existing.orElseThrow());
@@ -62,7 +65,7 @@ public class RescueCallService {
             request.imageUrls(),
             request.clientRequestId()
         );
-        rescueCall.requestBy(UserProfileService.CURRENT_USER_ID);
+        rescueCall.requestBy(currentUserService.currentUserId());
         rescueCall.beginMatching();
         rescueCall = rescueCallRepository.saveAndFlush(rescueCall);
         matchAndAssign(rescueCall);
@@ -73,7 +76,7 @@ public class RescueCallService {
     public RescueCallResponse retryMatching(UUID id) {
         RescueCall rescueCall = rescueCallRepository.findOwnedForMatchingById(
                 id,
-                UserProfileService.CURRENT_USER_ID
+                currentUserService.currentUserId()
             )
             .orElseThrow(() -> new ResourceNotFoundException("未找到救援请求：" + id));
         if (rescueCall.getMatchedDevice() != null || rescueCall.getStatus() != RescueStatus.MATCHING) {
@@ -91,13 +94,51 @@ public class RescueCallService {
     @Transactional(readOnly = true)
     public Page<RescueCallResponse> findAll(Pageable pageable) {
         return rescueCallRepository
-            .findAllOwnedDetailed(UserProfileService.CURRENT_USER_ID, pageable)
+            .findAllOwnedDetailed(currentUserService.currentUserId(), pageable)
             .map(RescueCallResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<RescueCallResponse> findResponderTasks(Pageable pageable) {
+        currentUserService.requireAnyRole("VOLUNTEER", "ADMIN");
+        return rescueCallRepository
+            .findResponderTasks(currentUserService.currentUserId(), pageable)
+            .map(RescueCallResponse::from);
+    }
+
+    @Transactional
+    public RescueCallResponse accept(UUID id) {
+        currentUserService.requireAnyRole("VOLUNTEER", "ADMIN");
+        var rescueCall = findForResponderUpdate(id);
+        rescueCall.acceptBy(currentUserService.currentUserId());
+        return RescueCallResponse.from(rescueCall);
+    }
+
+    @Transactional
+    public RescueCallResponse updateResponderProgress(UUID id, RescueStatus nextStatus) {
+        currentUserService.requireAnyRole("VOLUNTEER", "ADMIN");
+        var rescueCall = findForResponderUpdate(id);
+        if (!currentUserService.currentUserId().equals(rescueCall.getResponderUserId())) {
+            throw new cn.maian.common.exception.ForbiddenOperationException("只能更新自己接取的救援任务");
+        }
+        if (nextStatus != RescueStatus.RESCUING && nextStatus != RescueStatus.COMPLETED) {
+            throw new IllegalArgumentException("救援者只能更新为赶往现场或已完成");
+        }
+        transition(rescueCall, nextStatus);
+        return RescueCallResponse.from(rescueCall);
     }
 
     @Transactional
     public RescueCallResponse updateStatus(UUID id, RescueStatus nextStatus) {
         RescueCall rescueCall = findEntity(id);
+        if (nextStatus != RescueStatus.CANCELLED) {
+            throw new cn.maian.common.exception.ForbiddenOperationException("呼救者只能取消救援请求");
+        }
+        transition(rescueCall, nextStatus);
+        return RescueCallResponse.from(rescueCall);
+    }
+
+    private void transition(RescueCall rescueCall, RescueStatus nextStatus) {
         Set<RescueStatus> allowed = ALLOWED_TRANSITIONS.getOrDefault(
             rescueCall.getStatus(),
             Set.of()
@@ -112,12 +153,16 @@ public class RescueCallService {
             && rescueCall.getMatchedDevice() != null) {
             rescueCall.getMatchedDevice().releaseReservation(rescueCall.getId());
         }
-        return RescueCallResponse.from(rescueCall);
     }
 
     private RescueCall findEntity(UUID id) {
-        return rescueCallRepository.findOwnedDetailedById(id, UserProfileService.CURRENT_USER_ID)
+        return rescueCallRepository.findOwnedDetailedById(id, currentUserService.currentUserId())
             .orElseThrow(() -> new ResourceNotFoundException("未找到救援请求：" + id));
+    }
+
+    private RescueCall findForResponderUpdate(UUID id) {
+        return rescueCallRepository.findDetailedForUpdateById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("未找到救援任务：" + id));
     }
 
     private void matchAndAssign(RescueCall rescueCall) {

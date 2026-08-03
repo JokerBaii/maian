@@ -361,8 +361,8 @@ const nativeMarkers = computed(() => filteredDevices.value.map((device, index) =
   }
 })))
 
-function markerAsset(device: any, png = false) {
-  const extension = png ? 'png' : 'svg'
+function markerAsset(device: any, _png = false) {
+  const extension = 'png'
   const type = device.type === 'mobile' ? 'mobile' : 'fixed'
   const state = deviceStatusClass(device) === 'online' ? '' : '-offline'
   const filename = `marker-${type}${state}.${extension}`
@@ -372,6 +372,23 @@ function markerAsset(device: any, png = false) {
   // #endif
   // #ifndef H5
   return `/static/map/${filename}`
+  // #endif
+}
+
+function preloadMarkerAssets() {
+  // #ifdef H5
+  if (typeof Image === 'undefined') return
+  const assets = [
+    { type: 'fixed', status: 'available' },
+    { type: 'fixed', status: 'maintenance' },
+    { type: 'mobile', status: 'online', online: true },
+    { type: 'mobile', status: 'offline', online: false }
+  ]
+  assets.forEach(device => {
+    const image = new Image()
+    image.decoding = 'async'
+    image.src = markerAsset(device)
+  })
   // #endif
 }
 
@@ -432,7 +449,7 @@ async function initLeafletMap() {
       zoomControl: false,
       attributionControl: true
     }).setView([myLocation.value[1], myLocation.value[0]], 13)
-    leafletApi.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    leafletApi.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap'
     }).addTo(mapInstance)
@@ -625,11 +642,16 @@ function toggleDrawer() {
 
 onMounted(() => {
   nextTick(async () => {
-    await loadDevices()
+    preloadMarkerAssets()
+    const devicesPromise = loadDevices()
     // #ifdef H5
-    initMap()
+    const mapPromise = initMap()
     // #endif
     locateMe(false)
+    await devicesPromise
+    // #ifdef H5
+    await mapPromise
+    // #endif
   })
 })
 

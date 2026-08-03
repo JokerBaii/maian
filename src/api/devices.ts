@@ -1,7 +1,7 @@
 import { request } from './http'
 
 export type EmergencyDeviceType = 'FIXED' | 'MOBILE'
-export type EmergencyDeviceStatus = 'AVAILABLE' | 'RESERVED' | 'MAINTENANCE' | 'OFFLINE' | 'EXPIRED'
+export type EmergencyDeviceStatus = 'PENDING_REVIEW' | 'AVAILABLE' | 'RESERVED' | 'MAINTENANCE' | 'OFFLINE' | 'EXPIRED' | 'REJECTED'
 
 export interface EmergencyDeviceResponse {
   id: string
@@ -22,6 +22,8 @@ export interface EmergencyDeviceResponse {
   imageUrls: string[]
   vehicleImageUrls: string[]
   lastLocationAt?: string
+  reviewNote?: string
+  reviewedAt?: string
   createdAt: string
 }
 
@@ -45,6 +47,19 @@ export function listMyEmergencyDevices() {
   return request<PageResponse<EmergencyDeviceResponse>>(
     '/api/v1/emergency-devices/mine?page=0&size=100&sort=createdAt,desc'
   )
+}
+
+export function listPendingEmergencyDevices() {
+  return request<PageResponse<EmergencyDeviceResponse>>(
+    '/api/v1/emergency-devices/reviews/pending?page=0&size=100&sort=createdAt,asc'
+  )
+}
+
+export function reviewEmergencyDevice(id: string, approved: boolean, reviewNote?: string) {
+  return request<EmergencyDeviceResponse>(`/api/v1/emergency-devices/${id}/review`, {
+    method: 'PATCH' as UniNamespace.RequestOptions['method'],
+    data: { approved, reviewNote }
+  })
 }
 
 export interface SaveEmergencyDeviceRequest {

@@ -11,9 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserSettingsService {
 
     private final UserSettingsRepository userSettingsRepository;
+    private final CurrentUserService currentUserService;
 
-    public UserSettingsService(UserSettingsRepository userSettingsRepository) {
+    public UserSettingsService(
+        UserSettingsRepository userSettingsRepository,
+        CurrentUserService currentUserService
+    ) {
         this.userSettingsRepository = userSettingsRepository;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional
@@ -41,9 +46,9 @@ public class UserSettingsService {
 
     @Transactional
     public UserSettings findOrCreate() {
-        return userSettingsRepository.findById(UserProfileService.CURRENT_USER_ID)
+        return userSettingsRepository.findById(currentUserService.currentUserId())
             .orElseGet(() -> userSettingsRepository.save(
-                UserSettings.defaults(UserProfileService.CURRENT_USER_ID)
+                UserSettings.defaults(currentUserService.currentUserId())
             ));
     }
 }

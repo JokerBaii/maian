@@ -119,6 +119,52 @@
       </view>
     </view>
 
+    <view class="home-section classroom-section">
+      <view class="section-heading">
+        <view>
+          <text class="section-title">急救课堂</text>
+          <text class="section-subtitle">每天掌握一个救命要点</text>
+        </view>
+        <view class="section-link" @tap="openScience">
+          <text>全部内容</text>
+          <app-icon name="right" :size="14" color="#2E6DD1" />
+        </view>
+      </view>
+
+      <view class="classroom-panel">
+        <view v-for="article in homeArticles.slice(0, 2)" :key="article.id" class="classroom-row" @tap="openArticle(article.id)">
+          <image class="classroom-cover" :src="article.cover" mode="aspectFill" />
+          <view class="classroom-copy">
+            <text class="classroom-tag tag-article">知识文章 · {{ article.categoryLabel }}</text>
+            <text class="classroom-title">{{ article.title }}</text>
+            <text class="classroom-meta">{{ article.author }} · {{ article.viewCount }} 次阅读</text>
+          </view>
+          <app-icon name="right" :size="15" color="#9AA8B6" />
+        </view>
+        <view v-for="video in homeVideos" :key="video.id" class="classroom-row" @tap="playVideo(video.id)">
+          <view class="classroom-video-cover">
+            <image class="classroom-cover" :src="video.poster" mode="aspectFill" />
+            <view class="row-play"><app-icon name="videocam-filled" :size="14" color="#FFFFFF" /></view>
+          </view>
+          <view class="classroom-copy">
+            <text class="classroom-tag tag-video">视频课堂 · {{ video.duration }}</text>
+            <text class="classroom-title">{{ video.title }}</text>
+            <text class="classroom-meta">{{ video.source }}</text>
+          </view>
+          <app-icon name="right" :size="15" color="#9AA8B6" />
+        </view>
+      </view>
+
+      <view class="quiz-shortcut" @tap="openQuiz">
+        <view class="quiz-shortcut-mark">15题</view>
+        <view class="quiz-shortcut-copy">
+          <text>急救知识自测</text>
+          <text>单独板块 · 即时答案解析</text>
+        </view>
+        <app-icon name="right" :size="16" color="#2E6DD1" />
+      </view>
+    </view>
+
     <view class="safety-note">
       <view class="safety-line"></view>
       <text>危及生命时，请立即拨打 120</text>
@@ -136,10 +182,13 @@ import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
 import { getCurrentGcj02Location } from '@/utils/location'
+import { scienceArticles, officialFirstAidVideos } from '@/data/editorial'
 
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
 const waveform = [12, 18, 16, 24, 20, 30, 22, 18, 28, 42, 16, 58, 20, 36, 24, 18, 22, 30, 20, 16, 24, 18, 14]
 const { monitoring: healthMonitoring, loadMonitoring } = useHealthMonitoring()
+const homeArticles = scienceArticles.slice(0, 3)
+const homeVideos = officialFirstAidVideos.slice(0, 2)
 
 const deviceSnapshot = ref<EmergencyDeviceResponse[]>([])
 const currentCoordinates = ref<{ longitude: number; latitude: number } | null>(null)
@@ -170,7 +219,7 @@ const heartState = computed(() => {
 
 const healthBars = computed(() => {
   const values = healthMonitoring.value.todayData
-    .filter((_, index) => index % 4 === 0)
+    .filter((_, index) => index % 2 === 0)
     .map(point => point.value)
   if (!values.length) return []
   const min = Math.min(...values)
@@ -220,6 +269,18 @@ function openCheckup() {
 
 function openScience() {
   uni.navigateTo({ url: '/pages/science/index' })
+}
+
+function openArticle(id: string) {
+  uni.navigateTo({ url: `/pages/science/detail?id=${id}` })
+}
+
+function playVideo(id: string) {
+  uni.navigateTo({ url: `/pages/science/video?id=${id}` })
+}
+
+function openQuiz() {
+  uni.navigateTo({ url: '/pages/science/quiz' })
 }
 
 onShow(loadHomeData)
@@ -602,6 +663,26 @@ onShow(loadHomeData)
   border-radius: 4rpx;
   background: #79AFE3;
 }
+
+.classroom-section { margin-top: 18rpx; }
+.section-heading > view:first-child { display: flex; flex-direction: column; gap: 4rpx; }
+.section-subtitle { color: #8090A3; font-size: 20rpx; font-weight: 400; }
+.classroom-panel { overflow: hidden; margin-top: 16rpx; border: 1rpx solid #DDE6EE; border-radius: 18rpx; background: #FFFFFF; }
+.classroom-row { display: flex; align-items: center; gap: 15rpx; min-height: 124rpx; padding: 14rpx 17rpx; border-bottom: 1rpx solid #E9EEF3; }
+.classroom-row:last-child { border-bottom: 0; }
+.classroom-cover, .classroom-video-cover { flex-shrink: 0; width: 142rpx; height: 94rpx; border-radius: 10rpx; }
+.classroom-video-cover { position: relative; overflow: hidden; }
+.classroom-video-cover .classroom-cover { width: 100%; height: 100%; }
+.row-play { position: absolute; top: 50%; left: 50%; display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; border-radius: 50%; background: rgba(169, 33, 43, .92); transform: translate(-50%, -50%); }
+.classroom-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 5rpx; }
+.classroom-tag { font-size: 17rpx; font-weight: 680; }.tag-article { color: #2E6DD1; }.tag-video { color: #A9212B; }
+.classroom-title { overflow: hidden; color: #263D55; font-size: 23rpx; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.classroom-meta { overflow: hidden; color: #8492A3; font-size: 17rpx; text-overflow: ellipsis; white-space: nowrap; }
+.quiz-shortcut { display: flex; align-items: center; gap: 14rpx; margin-top: 18rpx; padding: 16rpx; border: 1rpx solid #D6E2F1; border-radius: 14rpx; background: #F1F6FC; }
+.quiz-shortcut-mark { display: flex; align-items: center; justify-content: center; width: 65rpx; height: 54rpx; border-radius: 9rpx; background: #2E6DD1; color: #FFFFFF; font-size: 19rpx; font-weight: 700; }
+.quiz-shortcut-copy { display: flex; flex: 1; flex-direction: column; gap: 4rpx; }
+.quiz-shortcut-copy text:first-child { color: #294766; font-size: 23rpx; font-weight: 700; }
+.quiz-shortcut-copy text:last-child { color: #7B8B9E; font-size: 18rpx; }
 
 .safety-note {
   display: flex;

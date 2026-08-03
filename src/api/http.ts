@@ -1,3 +1,5 @@
+import { getDemoUserId } from '@/utils/demoSession'
+
 export interface ApiError {
   code: string
   message: string
@@ -54,7 +56,8 @@ export function request<T>(
       timeout: options.timeout || 10000,
       header: {
         Accept: 'application/json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-Demo-User-Id': getDemoUserId()
       },
       success(response: UniNamespace.RequestSuccessCallbackResult) {
         if (response.statusCode === 204) {

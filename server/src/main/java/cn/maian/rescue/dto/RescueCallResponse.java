@@ -20,6 +20,9 @@ public record RescueCallResponse(
     Set<String> symptoms,
     List<String> imageUrls,
     MatchedAedResponse matchedAed,
+    UUID responderUserId,
+    Instant acceptedAt,
+    Instant completedAt,
     Instant createdAt,
     Instant updatedAt
 ) {
@@ -35,6 +38,9 @@ public record RescueCallResponse(
             rescueCall.getSymptoms(),
             rescueCall.getImageUrls(),
             MatchedAedResponse.from(rescueCall),
+            rescueCall.getResponderUserId(),
+            rescueCall.getAcceptedAt(),
+            rescueCall.getCompletedAt(),
             rescueCall.getCreatedAt(),
             rescueCall.getUpdatedAt()
         );

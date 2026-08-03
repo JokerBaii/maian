@@ -348,7 +348,7 @@ async function initMap() {
         zoomControl: false,
         attributionControl: true
       }).setView([latitude, longitude], 15)
-      Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      Leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
       }).addTo(mapInstance)

@@ -4,7 +4,7 @@ import cn.maian.health.domain.HeartRateReading;
 import cn.maian.health.dto.CreateHeartRateReadingRequest;
 import cn.maian.health.dto.HeartRateReadingResponse;
 import cn.maian.health.repository.HeartRateReadingRepository;
-import cn.maian.user.service.UserProfileService;
+import cn.maian.user.service.CurrentUserService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,13 +15,16 @@ public class HeartRateReadingService {
 
     private final HeartRateReadingRepository heartRateReadingRepository;
     private final WearableDeviceService wearableDeviceService;
+    private final CurrentUserService currentUserService;
 
     public HeartRateReadingService(
         HeartRateReadingRepository heartRateReadingRepository,
-        WearableDeviceService wearableDeviceService
+        WearableDeviceService wearableDeviceService,
+        CurrentUserService currentUserService
     ) {
         this.heartRateReadingRepository = heartRateReadingRepository;
         this.wearableDeviceService = wearableDeviceService;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional
@@ -35,7 +38,7 @@ public class HeartRateReadingService {
             throw new IllegalArgumentException("心率记录时间不能晚于当前时间");
         }
         var reading = HeartRateReading.create(
-            UserProfileService.CURRENT_USER_ID,
+            currentUserService.currentUserId(),
             wearable.getId(),
             request.bpm(),
             request.scene() == null ? "resting" : request.scene(),

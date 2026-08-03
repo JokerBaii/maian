@@ -96,6 +96,12 @@
       }
     },
     {
+      "path": "pages/science/video",
+      "style": {
+        "navigationBarTitleText": "视频课堂"
+      }
+    },
+    {
       "path": "pages/science/quiz",
       "style": {
         "navigationBarTitleText": "知识自测"
@@ -136,6 +142,36 @@
       "path": "pages/mine/settings",
       "style": {
         "navigationBarTitleText": "设置"
+      }
+    },
+    {
+      "path": "pages/mine/demo",
+      "style": {
+        "navigationBarTitleText": "演示身份切换"
+      }
+    },
+    {
+      "path": "pages/device/review",
+      "style": {
+        "navigationBarTitleText": "设备审核"
+      }
+    },
+    {
+      "path": "pages/rescue/tasks",
+      "style": {
+        "navigationBarTitleText": "救援任务"
+      }
+    },
+    {
+      "path": "pages/legal/index",
+      "style": {
+        "navigationBarTitleText": "隐私与协议"
+      }
+    },
+    {
+      "path": "pages/science/review",
+      "style": {
+        "navigationBarTitleText": "投稿审核"
       }
     }
   ],

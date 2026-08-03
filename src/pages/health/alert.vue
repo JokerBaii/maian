@@ -1,11 +1,6 @@
 <template>
   <view class="page">
     <view class="scroll-content">
-      <view v-if="!heartRateData.wearable.connected" class="sample-note">
-        <app-icon name="info-filled" :size="15" color="#1F63D5" />
-        <text>示例数据 · 连接设备后显示真实预警</text>
-      </view>
-
       <view class="summary-card">
         <view class="summary-bg"></view>
         <view class="summary-content">
@@ -38,7 +33,7 @@
             <text class="card-title">预警记录</text>
           </view>
         </view>
-        <view class="timeline">
+        <view v-if="alertList.length" class="timeline">
           <view
             v-for="(alert, idx) in alertList"
             :key="idx"
@@ -73,6 +68,10 @@
               </view>
             </view>
           </view>
+        </view>
+        <view v-else class="empty-state">
+          <text class="empty-title">暂无预警记录</text>
+          <text class="empty-desc">连接穿戴设备并同步心率后，超出阈值的记录会显示在这里</text>
         </view>
       </view>
 
@@ -131,18 +130,6 @@ onMounted(async () => {
 .page {
   min-height: 100vh;
   background: #F3F7FA;
-}
-
-.sample-note {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  margin: 20rpx 24rpx 0;
-  padding: 14rpx 18rpx;
-  border-radius: 14rpx;
-  background: #EDF4FF;
-  color: #41658F;
-  font-size: 21rpx;
 }
 
 .scroll-content {
@@ -271,6 +258,14 @@ onMounted(async () => {
 .timeline {
   padding-left: 4rpx;
 }
+.empty-state {
+  padding: 28rpx 16rpx 18rpx;
+  text-align: center;
+}
+.empty-title,
+.empty-desc { display: block; }
+.empty-title { color: #42536A; font-size: 27rpx; font-weight: 700; }
+.empty-desc { margin-top: 8rpx; color: #8996A8; font-size: 22rpx; line-height: 1.6; }
 .timeline-item {
   display: flex;
   gap: 20rpx;

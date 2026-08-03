@@ -1,126 +1,91 @@
 <template>
   <view class="page">
     <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-        <view class="nav-bar-content">
-          <view class="nav-back" @tap="goBack">
-          <app-icon name="left" :size="24" color="#FFFFFF" />
-        </view>
+      <view class="nav-bar-content">
+        <view class="nav-back" @tap="goBack"><app-icon name="left" :size="24" color="#FFFFFF" /></view>
         <text class="nav-title">紧急呼救</text>
         <view class="nav-placeholder"></view>
       </view>
     </view>
 
-    <view
-      class="scroll-content"
-      :style="{ paddingTop: (statusBarHeight + 44) + 'px' }"
-    >
-      <view class="sos-hero">
-        <view class="sos-ring-container" @tap="triggerSOS">
-          <view class="sos-pulse sos-pulse-1"></view>
-          <view class="sos-pulse sos-pulse-2"></view>
-          <view class="sos-pulse sos-pulse-3"></view>
-          <view class="sos-main-btn" :class="{ 'sos-activated': isActivated }">
-            <text class="sos-main-text">SOS</text>
-            <text class="sos-main-label">{{ isActivated ? '已选择危急' : '危急模式' }}</text>
+    <scroll-view scroll-y class="page-scroll" :style="{ paddingTop: (statusBarHeight + 44) + 'px' }">
+      <view class="sos-panel">
+        <text class="sos-kicker">ONE-TAP EMERGENCY</text>
+        <text class="sos-title">一键发出救援请求</text>
+        <text class="sos-desc">自动携带位置并匹配预计最快到达的 AED</text>
+
+        <view class="sos-button-wrap" @tap="triggerSOS">
+          <view class="sos-pulse"></view>
+          <view class="sos-button" :class="{ active: isSubmitting }">
+            <text class="sos-word">SOS</text>
+            <text class="sos-action-text">{{ sosButtonText }}</text>
           </view>
         </view>
-        <text class="sos-location" @tap="refreshLocation">
-          <app-icon class="location-icon" name="location-filled" :size="18" color="#1F63D5" />
-          {{ locationText }}
-        </text>
-        <text class="sos-guidance">确认症状和位置后再发送，减少误触</text>
-      </view>
 
-      <view class="form-section">
-        <view class="form-label">
-          <view class="label-bar"></view>
-          <text class="label-text">紧急等级</text>
+        <view class="location-chip" @tap="refreshLocation">
+          <app-icon name="location-filled" :size="16" :color="rescueCoordinates ? '#1D7B58' : '#8A6A28'" />
+          <text>{{ locationText }}</text>
+          <text class="refresh-text">刷新</text>
         </view>
-        <view class="urgency-selector">
-          <view
-            v-for="item in urgencyOptions"
-            :key="item.value"
-            class="urgency-option"
-            :class="[
-              'urgency-' + item.value,
-              { 'urgency-active': selectedUrgency === item.value }
-            ]"
-            @tap="selectedUrgency = item.value"
-          >
-            <view class="urgency-dot"></view>
-            <text class="urgency-label">{{ item.label }}</text>
+
+        <view class="dispatch-flow">
+          <view v-for="(step, index) in flowSteps" :key="step.label" class="flow-step">
+            <view class="flow-icon"><app-icon :name="step.icon" :size="16" color="#2E6DD1" /></view>
+            <text>{{ step.label }}</text>
+            <view v-if="index < flowSteps.length - 1" class="flow-line"></view>
           </view>
         </view>
       </view>
 
-      <view class="form-section">
-        <view class="form-label">
-          <view class="label-bar"></view>
-          <text class="label-text">症状描述</text>
-        </view>
-        <view class="symptom-tags">
-          <view
-            v-for="tag in symptomTags"
-            :key="tag"
-            class="symptom-tag"
-            :class="{ 'symptom-tag-active': selectedSymptoms.includes(tag) }"
-            @tap="toggleSymptom(tag)"
-          >
-            <text class="symptom-tag-text">{{ tag }}</text>
+      <view class="emergency-actions">
+        <view class="call-120" @tap="callEmergency">
+          <app-icon name="phone-filled" :size="19" color="#A9212B" />
+          <view class="call-copy">
+            <text class="call-title">直接拨打 120</text>
+            <text class="call-desc">危及生命时优先联系专业急救</text>
           </view>
+          <app-icon name="right" :size="16" color="#A9212B" />
         </view>
       </view>
 
-      <view class="form-section">
-        <view class="form-label">
-          <view class="label-bar"></view>
-          <text class="label-text">详细说明</text>
+      <view class="details-card">
+        <view class="details-head" @tap="detailsExpanded = !detailsExpanded">
+          <view>
+            <text class="details-title">补充现场信息</text>
+            <text class="details-hint">选填，不影响一键呼救</text>
+          </view>
+          <app-icon :name="detailsExpanded ? 'up' : 'down'" :size="17" color="#708197" />
         </view>
-        <view class="desc-input-wrap">
-          <textarea
-            v-model="description"
-            class="desc-input"
-            placeholder="请描述当前紧急情况，包括伤者状态、具体需求等..."
-            placeholder-class="desc-placeholder"
-            maxlength="500"
-            :auto-height="false"
-          />
-          <text class="desc-count">{{ description.length }}/500</text>
-        </view>
-      </view>
 
-      <view class="form-section">
-        <view class="form-label">
-          <view class="label-bar"></view>
-          <text class="label-text">现场照片</text>
-          <text class="label-hint">（可选）</text>
-        </view>
-        <view class="photo-upload">
-          <view
-            v-for="(img, idx) in photoList"
-            :key="idx"
-            class="photo-item"
-          >
-            <image class="photo-img" :src="img" mode="aspectFill" />
-            <view class="photo-delete" @tap="removePhoto(idx)">
-              <app-icon name="closeempty" :size="18" color="#FFFFFF" />
+        <view v-if="detailsExpanded" class="details-content">
+          <text class="field-label">现场情况</text>
+          <view class="symptom-tags">
+            <view v-for="tag in symptomTags" :key="tag" class="symptom-tag" :class="{ selected: selectedSymptoms.includes(tag) }" @tap="toggleSymptom(tag)">
+              <text>{{ tag }}</text>
             </view>
           </view>
-          <view v-if="photoList.length < 9" class="photo-add" @tap="addPhoto">
-            <app-icon name="camera-filled" :size="28" color="#77849A" />
-            <text class="add-label">上传照片</text>
+
+          <text class="field-label field-label-spaced">紧急程度</text>
+          <view class="urgency-selector">
+            <view v-for="item in urgencyOptions" :key="item.value" class="urgency-option" :class="{ selected: selectedUrgency === item.value }" @tap="selectedUrgency = item.value">
+              <view class="urgency-dot" :class="'dot-' + item.value"></view>
+              <text>{{ item.label }}</text>
+            </view>
+          </view>
+
+          <textarea v-model="description" class="desc-input" placeholder="补充伤者状态、现场入口等信息" maxlength="300" />
+          <view class="photo-row">
+            <image v-for="(img, index) in photoList" :key="img" class="photo" :src="img" mode="aspectFill" @tap="removePhoto(index)" />
+            <view v-if="photoList.length < 3" class="photo-add" @tap="addPhoto">
+              <app-icon name="camera-filled" :size="22" color="#708197" /><text>现场照片</text>
+            </view>
           </view>
         </view>
       </view>
 
-      <view class="submit-area">
-        <view class="submit-btn" :class="{ 'submit-disabled': submitDisabled }" @tap="submitRescue">
-          <text class="submit-text">{{ submitBtnText }}</text>
-        </view>
-      </view>
-
+      <view class="safety-note">平台协同不能替代 120，呼救后请保持电话畅通</view>
       <view class="bottom-safe"></view>
-    </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -132,107 +97,90 @@ import { ApiRequestError } from '@/api/http'
 import { createRescueCall, type RescueUrgency } from '@/api/rescue'
 import { getCurrentGcj02Location } from '@/utils/location'
 
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
-
-const isActivated = ref(false)
+const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
 const isSubmitting = ref(false)
-
+const isLocating = ref(false)
+const detailsExpanded = ref(false)
 const selectedUrgency = ref('critical')
 const selectedSymptoms = ref<string[]>([])
 const description = ref('')
 const photoList = ref<string[]>([])
-const clientRequestId = `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
-
 const locationText = ref('正在获取当前位置')
 const rescueCoordinates = ref<{ latitude: number; longitude: number } | null>(null)
-
-function refreshLocation() {
-  getCurrentGcj02Location()
-    .then((result) => {
-      rescueCoordinates.value = {
-        latitude: result.latitude,
-        longitude: result.longitude
-      }
-      locationText.value = `当前位置 · ${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}`
-    })
-    .catch(() => {
-      rescueCoordinates.value = null
-      locationText.value = '定位失败，点击重新获取'
-    })
-}
-
-onMounted(refreshLocation)
-
+const flowSteps = [
+  { label: '获取定位', icon: 'location-filled' },
+  { label: '智能匹配', icon: 'map-filled' },
+  { label: '实时驰援', icon: 'navigate-filled' }
+]
 const urgencyOptions = [
   { value: 'critical', label: '危急' },
   { value: 'high', label: '紧急' },
   { value: 'medium', label: '一般' }
 ]
+const symptomTags = ['意识不清', '呼吸异常', '胸痛心悸', '外伤出血', '跌倒骨折', '其他情况']
 
-const symptomTags = ['心脏骤停', '呼吸困难', '外伤出血', '晕厥', '骨折', '其他']
-
-const submitBtnText = computed(() => {
-  if (isSubmitting.value) return '正在发送...'
-  return '发送救援请求'
+const sosButtonText = computed(() => {
+  if (isLocating.value) return '正在定位'
+  if (isSubmitting.value) return '正在呼救'
+  return '立即呼救'
 })
-const submitDisabled = computed(() => (
-  isSubmitting.value || selectedSymptoms.value.length === 0 || !rescueCoordinates.value
-))
+
+async function refreshLocation() {
+  if (isLocating.value) return false
+  isLocating.value = true
+  locationText.value = '正在获取当前位置'
+  try {
+    const result = await getCurrentGcj02Location()
+    rescueCoordinates.value = { latitude: result.latitude, longitude: result.longitude }
+    locationText.value = `定位已就绪 · ${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}`
+    return true
+  } catch {
+    rescueCoordinates.value = null
+    locationText.value = '定位失败，点击重新获取'
+    return false
+  } finally {
+    isLocating.value = false
+  }
+}
 
 function toggleSymptom(tag: string) {
-  const idx = selectedSymptoms.value.indexOf(tag)
-  if (idx > -1) {
-    selectedSymptoms.value.splice(idx, 1)
-  } else {
-    selectedSymptoms.value.push(tag)
-  }
+  const index = selectedSymptoms.value.indexOf(tag)
+  if (index >= 0) selectedSymptoms.value.splice(index, 1)
+  else selectedSymptoms.value.push(tag)
 }
 
 function addPhoto() {
   uni.chooseImage({
-    count: 9 - photoList.value.length,
+    count: 3 - photoList.value.length,
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
-    success: (res) => {
-      photoList.value.push(...res.tempFilePaths)
-    }
+    success: result => photoList.value.push(...result.tempFilePaths)
   })
 }
 
-function removePhoto(idx: number) {
-  photoList.value.splice(idx, 1)
+function removePhoto(index: number) {
+  photoList.value.splice(index, 1)
 }
 
-function triggerSOS() {
-  if (isActivated.value) return
-  isActivated.value = true
-  selectedUrgency.value = 'critical'
-  setTimeout(() => {
-    isActivated.value = false
-  }, 600)
-}
-
-async function submitRescue() {
-  if (isSubmitting.value) return
-  if (!selectedSymptoms.value.length) {
-    uni.showToast({ title: '请至少选择一项症状', icon: 'none' })
-    return
-  }
-  const coordinates = rescueCoordinates.value
-  if (!coordinates) {
+async function triggerSOS() {
+  if (isSubmitting.value || isLocating.value) return
+  if (!rescueCoordinates.value && !(await refreshLocation())) {
     uni.showModal({
-      title: '无法发送位置',
-      content: '请先授权定位；如情况危急，请立即拨打 120。',
-      showCancel: false,
-      confirmText: '知道了'
+      title: '暂时无法获取位置',
+      content: '请开启定位权限后重试；情况危急时请直接拨打 120。',
+      confirmText: '拨打 120',
+      cancelText: '稍后重试',
+      success: result => result.confirm && callEmergency()
     })
     return
   }
+  await submitRescue()
+}
 
+async function submitRescue() {
+  const coordinates = rescueCoordinates.value
+  if (!coordinates || isSubmitting.value) return
   isSubmitting.value = true
-
   try {
     const uploadedImages = await Promise.all(photoList.value.map(uploadImage))
     const rescueCall = await createRescueCall({
@@ -240,398 +188,76 @@ async function submitRescue() {
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
       address: locationText.value,
-      description: description.value.trim() || undefined,
-      symptoms: selectedSymptoms.value,
-      imageUrls: uploadedImages.map((image) => image.url),
-      clientRequestId
+      description: description.value.trim() || '一键呼救，请尽快联系确认现场情况',
+      symptoms: selectedSymptoms.value.length ? selectedSymptoms.value : ['需要紧急救助'],
+      imageUrls: uploadedImages.map(image => image.url),
+      clientRequestId: `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
     })
-    uni.navigateTo({
-      url: `/pages/rescue/detail?id=${encodeURIComponent(rescueCall.id)}`
-    })
+    uni.navigateTo({ url: `/pages/rescue/detail?id=${encodeURIComponent(rescueCall.id)}` })
   } catch (error) {
-    const message = error instanceof ApiRequestError
-      ? error.message
-      : '救援请求发送失败，请重试'
-    uni.showModal({
-      title: '发送失败',
-      content: `${message}\n如情况危急，请立即拨打 120。`,
-      showCancel: false,
-      confirmText: '知道了'
-    })
+    const message = error instanceof ApiRequestError ? error.message : '救援请求发送失败，请重试'
+    uni.showModal({ title: '发送失败', content: `${message}\n如情况危急，请立即拨打 120。`, showCancel: false })
   } finally {
     isSubmitting.value = false
   }
 }
 
+function callEmergency() {
+  uni.makePhoneCall({ phoneNumber: '120' })
+}
+
 function goBack() {
   uni.navigateBack()
 }
+
+onMounted(refreshLocation)
 </script>
 
 <style lang="scss" scoped>
-.page {
-  min-height: 100vh;
-  background: #F4F7FB;
-}
-
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  background: #A9212B;
-  border-bottom: 1rpx solid rgba(255, 255, 255, 0.16);
-}
-.nav-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.back-arrow {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
-.nav-placeholder {
-  width: 64rpx;
-}
-
-.scroll-content {
-  min-height: 100vh;
-  box-sizing: border-box;
-}
-
-.sos-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 48rpx 0 32rpx;
-  background: #F4F7FB;
-  border-bottom: 1rpx solid #E1E7F0;
-}
-.sos-ring-container {
-  position: relative;
-  width: 280rpx;
-  height: 280rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.sos-pulse {
-  position: absolute;
-  border-radius: 50%;
-  border: 2rpx solid rgba(169, 33, 43, 0.22);
-  animation: rescuePulse 2.4s ease-out infinite;
-}
-.sos-pulse-1 {
-  width: 280rpx;
-  height: 280rpx;
-  animation-delay: 0s;
-}
-.sos-pulse-2 {
-  display: none;
-}
-.sos-pulse-3 {
-  display: none;
-}
-@keyframes rescuePulse {
-  0% {
-    transform: scale(0.85);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.3);
-    opacity: 0;
-  }
-}
-.sos-main-btn {
-  width: 200rpx;
-  height: 200rpx;
-  border-radius: 50%;
-  background: #A9212B;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4rpx 12rpx rgba(96, 20, 27, 0.18);
-  z-index: 3;
-  transition: all 0.3s ease;
-}
-.sos-activated {
-  transform: scale(0.9);
-  box-shadow: 0 4rpx 24rpx rgba(245, 63, 63, 0.8);
-}
-.sos-main-text {
-  font-size: 64rpx;
-  font-weight: 800;
-  color: #FFFFFF;
-  letter-spacing: 6rpx;
-  line-height: 1;
-}
-.sos-main-label {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.9);
-  margin-top: 8rpx;
-}
-.sos-location {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-top: 24rpx;
-  font-size: 24rpx;
-  color: #33415C;
-  background: #E9EEF6;
-  padding: 8rpx 24rpx;
-  border-radius: 24rpx;
-}
-.sos-guidance {
-  margin-top: 12rpx;
-  color: #77849A;
-  font-size: 22rpx;
-}
-.location-icon {
-  font-size: 24rpx;
-}
-
-.form-section {
-  padding: 32rpx 32rpx 0;
-}
-.form-label {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20rpx;
-}
-.label-bar {
-  width: 6rpx;
-  height: 28rpx;
-  border-radius: 3rpx;
-  background: #1F63D5;
-  margin-right: 12rpx;
-}
-.label-text {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #20364D;
-}
-.label-hint {
-  font-size: 22rpx;
-  color: #C9CDD4;
-  margin-left: 8rpx;
-}
-
-.urgency-selector {
-  display: flex;
-  gap: 20rpx;
-}
-.urgency-option {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-  padding: 20rpx 0;
-  border-radius: 12rpx;
-  background: #FFFFFF;
-  border: 2rpx solid #E5E6EB;
-  transition: border-color 150ms ease, background 150ms ease;
-}
-.urgency-option.urgency-active {
-  border-color: transparent;
-}
-.urgency-critical.urgency-active {
-  background: #FBEAEC;
-  border-color: #A9212B;
-}
-.urgency-high.urgency-active {
-  background: #FFF4DE;
-  border-color: #A86708;
-}
-.urgency-medium.urgency-active {
-  background: #EAF1FD;
-  border-color: #1F63D5;
-}
-.urgency-dot {
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
-}
-.urgency-critical .urgency-dot {
-  background: #C93D46;
-}
-.urgency-high .urgency-dot {
-  background: #FF9A2E;
-}
-.urgency-medium .urgency-dot {
-  background: #2E6DD1;
-}
-.urgency-label {
-  font-size: 28rpx;
-  color: #4E5969;
-  font-weight: 500;
-}
-.urgency-active .urgency-label {
-  font-weight: 700;
-}
-.urgency-critical.urgency-active .urgency-label {
-  color: #C93D46;
-}
-.urgency-high.urgency-active .urgency-label {
-  color: #FF9A2E;
-}
-.urgency-medium.urgency-active .urgency-label {
-  color: #2E6DD1;
-}
-
-.symptom-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
-}
-.symptom-tag {
-  padding: 14rpx 28rpx;
-  border-radius: 32rpx;
-  background: #FFFFFF;
-  border: 2rpx solid #E5E6EB;
-  transition: border-color 150ms ease, background 150ms ease;
-}
-.symptom-tag-active {
-  background: #EAF1FD;
-  border-color: #1F63D5;
-}
-.symptom-tag-text {
-  font-size: 26rpx;
-  color: #4E5969;
-  font-weight: 500;
-}
-.symptom-tag-active .symptom-tag-text {
-  color: #174D9F;
-  font-weight: 600;
-}
-
-.desc-input-wrap {
-  background: #FFFFFF;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  position: relative;
-  border: 1rpx solid #DCE3ED;
-}
-.desc-input {
-  width: 100%;
-  height: 200rpx;
-  font-size: 28rpx;
-  color: #20364D;
-  line-height: 1.6;
-}
-.desc-placeholder {
-  color: #C9CDD4;
-  font-size: 28rpx;
-}
-.desc-count {
-  position: absolute;
-  bottom: 16rpx;
-  right: 24rpx;
-  font-size: 22rpx;
-  color: #C9CDD4;
-}
-
-.photo-upload {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20rpx;
-}
-.photo-item {
-  position: relative;
-  width: 200rpx;
-  height: 200rpx;
-  border-radius: 16rpx;
-  overflow: hidden;
-}
-.photo-img {
-  width: 100%;
-  height: 100%;
-}
-.photo-delete {
-  position: absolute;
-  top: 8rpx;
-  right: 8rpx;
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.delete-icon {
-  font-size: 22rpx;
-  color: #FFFFFF;
-}
-.photo-add {
-  width: 200rpx;
-  height: 200rpx;
-  border-radius: 16rpx;
-  border: 2rpx dashed #C9CDD4;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  background: #FFFFFF;
-}
-.add-icon {
-  font-size: 56rpx;
-  color: #C9CDD4;
-  line-height: 1;
-}
-.add-label {
-  font-size: 22rpx;
-  color: #C9CDD4;
-}
-
-.submit-area {
-  padding: 48rpx 32rpx;
-}
-.submit-btn {
-  width: 100%;
-  height: 96rpx;
-  border-radius: 48rpx;
-  background: #A9212B;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 3rpx 10rpx rgba(96, 20, 27, 0.16);
-  transition: transform 150ms ease, opacity 150ms ease;
-}
-.submit-btn:active {
-  transform: scale(0.98);
-}
-.submit-disabled {
-  opacity: 0.6;
-  box-shadow: none;
-}
-.submit-text {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-  letter-spacing: 2rpx;
-}
-
-.bottom-safe {
-  height: 60rpx;
-}
+.page { min-height: 100vh; background: #F3F7FA; color: #20364D; }
+.nav-bar { position: fixed; z-index: 20; top: 0; left: 0; right: 0; background: #A9212B; }
+.nav-bar-content { display: flex; align-items: center; justify-content: space-between; height: 88rpx; padding: 0 24rpx; }
+.nav-back, .nav-placeholder { width: 60rpx; height: 60rpx; display: flex; align-items: center; justify-content: center; }
+.nav-title { color: #FFFFFF; font-size: 33rpx; font-weight: 700; }
+.page-scroll { height: 100vh; box-sizing: border-box; }
+.sos-panel { margin: 24rpx; padding: 34rpx 28rpx 26rpx; border-radius: 24rpx; background: #FFFFFF; text-align: center; border: 1rpx solid #E0E7EF; }
+.sos-kicker { display: block; color: #A9212B; font-size: 19rpx; font-weight: 700; letter-spacing: 3rpx; }
+.sos-title { display: block; margin-top: 9rpx; color: #1A3048; font-size: 36rpx; font-weight: 750; }
+.sos-desc { display: block; margin-top: 9rpx; color: #708197; font-size: 23rpx; }
+.sos-button-wrap { position: relative; display: flex; align-items: center; justify-content: center; width: 250rpx; height: 250rpx; margin: 24rpx auto 18rpx; }
+.sos-pulse { position: absolute; width: 224rpx; height: 224rpx; border: 2rpx solid rgba(169, 33, 43, .25); border-radius: 50%; animation: pulse 2s ease-out infinite; }
+.sos-button { z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 190rpx; height: 190rpx; border-radius: 50%; background: #A9212B; box-shadow: 0 12rpx 26rpx rgba(132, 25, 34, .2); }
+.sos-button.active { opacity: .78; transform: scale(.96); }
+.sos-word { color: #FFFFFF; font-size: 58rpx; font-weight: 800; letter-spacing: 5rpx; line-height: 1; }
+.sos-action-text { margin-top: 10rpx; color: #FFFFFF; font-size: 23rpx; font-weight: 650; }
+@keyframes pulse { from { transform: scale(.85); opacity: 1; } to { transform: scale(1.18); opacity: 0; } }
+.location-chip { display: inline-flex; align-items: center; gap: 8rpx; max-width: 100%; padding: 11rpx 16rpx; border-radius: 10rpx; background: #F3F6F9; color: #546579; font-size: 21rpx; }
+.refresh-text { margin-left: 7rpx; color: #2E6DD1; font-weight: 650; }
+.dispatch-flow { display: flex; justify-content: center; margin-top: 25rpx; padding-top: 22rpx; border-top: 1rpx solid #EEF2F6; }
+.flow-step { position: relative; display: flex; flex: 1; flex-direction: column; align-items: center; gap: 8rpx; color: #627387; font-size: 20rpx; }
+.flow-icon { z-index: 1; display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; border-radius: 50%; background: #EAF1FD; }
+.flow-line { position: absolute; top: 23rpx; left: calc(50% + 24rpx); width: calc(100% - 48rpx); height: 2rpx; background: #D8E3F1; }
+.emergency-actions { margin: 0 24rpx 18rpx; }
+.call-120 { display: flex; align-items: center; gap: 16rpx; padding: 20rpx 22rpx; border: 1rpx solid #ECD7D9; border-radius: 18rpx; background: #FFF7F7; }
+.call-copy { display: flex; flex: 1; flex-direction: column; gap: 3rpx; text-align: left; }
+.call-title { color: #8E2029; font-size: 25rpx; font-weight: 700; }
+.call-desc { color: #8C7478; font-size: 20rpx; }
+.details-card { margin: 0 24rpx; border: 1rpx solid #E0E7EF; border-radius: 20rpx; background: #FFFFFF; }
+.details-head { display: flex; align-items: center; justify-content: space-between; padding: 22rpx 24rpx; }
+.details-head > view { display: flex; flex-direction: column; gap: 4rpx; }
+.details-title { font-size: 27rpx; font-weight: 700; }
+.details-hint { color: #8694A6; font-size: 20rpx; }
+.details-content { padding: 2rpx 24rpx 24rpx; border-top: 1rpx solid #EEF2F6; }
+.field-label { display: block; margin: 22rpx 0 14rpx; font-size: 23rpx; font-weight: 650; }
+.field-label-spaced { margin-top: 26rpx; }
+.symptom-tags { display: flex; flex-wrap: wrap; gap: 10rpx; }
+.symptom-tag { padding: 11rpx 18rpx; border: 1rpx solid #DCE3EB; border-radius: 9rpx; background: #F7F9FB; color: #56677B; font-size: 22rpx; }
+.symptom-tag.selected { border-color: #AFC8EC; background: #EAF1FD; color: #245FAF; font-weight: 650; }
+.urgency-selector { display: flex; gap: 10rpx; }
+.urgency-option { display: flex; flex: 1; align-items: center; justify-content: center; gap: 8rpx; padding: 14rpx 0; border: 1rpx solid #DCE3EB; border-radius: 9rpx; color: #617185; font-size: 22rpx; }
+.urgency-option.selected { border-color: #AFC8EC; background: #F0F5FC; color: #244F88; font-weight: 650; }
+.urgency-dot { width: 10rpx; height: 10rpx; border-radius: 50%; }.dot-critical { background: #A9212B; }.dot-high { background: #CF8525; }.dot-medium { background: #2E6DD1; }
+.desc-input { box-sizing: border-box; width: 100%; height: 130rpx; margin-top: 22rpx; padding: 17rpx; border: 1rpx solid #DCE3EB; border-radius: 10rpx; background: #F8FAFC; color: #30455C; font-size: 23rpx; }
+.photo-row { display: flex; gap: 12rpx; margin-top: 14rpx; }.photo, .photo-add { width: 122rpx; height: 94rpx; border-radius: 9rpx; }.photo-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6rpx; border: 1rpx dashed #BCC8D5; color: #708197; font-size: 18rpx; }
+.safety-note { margin: 22rpx 24rpx 0; color: #8390A1; text-align: center; font-size: 20rpx; }.bottom-safe { height: 70rpx; }
 </style>

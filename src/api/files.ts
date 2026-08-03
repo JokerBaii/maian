@@ -1,4 +1,5 @@
 import { ApiRequestError, resolveApiUrl, type ApiResponse } from './http'
+import { getDemoUserId } from '@/utils/demoSession'
 
 export interface FileUploadResponse {
   url: string
@@ -10,6 +11,7 @@ export function uploadImage(filePath: string): Promise<FileUploadResponse> {
       url: resolveApiUrl('/api/v1/files/images'),
       filePath,
       name: 'file',
+      header: { 'X-Demo-User-Id': getDemoUserId() },
       success(response) {
         let body: ApiResponse<FileUploadResponse>
         try {

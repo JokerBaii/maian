@@ -14,7 +14,9 @@ public record ScienceSubmissionResponse(
     SubmissionStatus status,
     boolean hasCoverImage,
     String coverImageUrl,
-    Instant submittedAt
+    Instant submittedAt,
+    String reviewNote,
+    Instant reviewedAt
 ) {
     public static ScienceSubmissionResponse from(ScienceSubmission submission) {
         return new ScienceSubmissionResponse(
@@ -25,7 +27,9 @@ public record ScienceSubmissionResponse(
             submission.getStatus(),
             submission.isHasCoverImage(),
             submission.getCoverImageUrl(),
-            submission.getSubmittedAt()
+            submission.getSubmittedAt(),
+            submission.getReviewNote(),
+            submission.getReviewedAt()
         );
     }
 }

@@ -6,6 +6,7 @@ import cn.maian.device.domain.DeviceType;
 import cn.maian.device.dto.EmergencyDeviceResponse;
 import cn.maian.device.dto.SaveEmergencyDeviceRequest;
 import cn.maian.device.dto.UpdateDeviceStatusRequest;
+import cn.maian.device.dto.ReviewEmergencyDeviceRequest;
 import cn.maian.device.dto.UpdateDeviceLocationRequest;
 import cn.maian.device.service.EmergencyDeviceService;
 import jakarta.validation.Valid;
@@ -51,6 +52,11 @@ public class EmergencyDeviceController {
         return ApiResponse.ok(PageResponse.from(emergencyDeviceService.findMine(type, pageable)));
     }
 
+    @GetMapping("/reviews/pending")
+    public ApiResponse<PageResponse<EmergencyDeviceResponse>> findPendingReviews(Pageable pageable) {
+        return ApiResponse.ok(PageResponse.from(emergencyDeviceService.findPendingReviews(pageable)));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<EmergencyDeviceResponse> findById(@PathVariable UUID id) {
         return ApiResponse.ok(emergencyDeviceService.findById(id));
@@ -86,6 +92,14 @@ public class EmergencyDeviceController {
         @Valid @RequestBody UpdateDeviceLocationRequest request
     ) {
         return ApiResponse.ok(emergencyDeviceService.updateLocation(id, request));
+    }
+
+    @PatchMapping("/{id}/review")
+    public ApiResponse<EmergencyDeviceResponse> review(
+        @PathVariable UUID id,
+        @Valid @RequestBody ReviewEmergencyDeviceRequest request
+    ) {
+        return ApiResponse.ok(emergencyDeviceService.review(id, request));
     }
 
     @DeleteMapping("/{id}")

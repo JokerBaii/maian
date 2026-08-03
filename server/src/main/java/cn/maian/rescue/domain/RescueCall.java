@@ -95,6 +95,14 @@ public class RescueCall {
     @Column(length = 36)
     private UUID requestedByUserId;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 36)
+    private UUID responderUserId;
+
+    private Instant acceptedAt;
+
+    private Instant completedAt;
+
     protected RescueCall() {
     }
 
@@ -149,6 +157,9 @@ public class RescueCall {
     public void transitionTo(RescueStatus nextStatus) {
         this.status = nextStatus;
         this.updatedAt = Instant.now();
+        if (nextStatus == RescueStatus.COMPLETED) {
+            this.completedAt = this.updatedAt;
+        }
     }
 
     public void requestBy(UUID userId) {
@@ -160,6 +171,15 @@ public class RescueCall {
 
     public void beginMatching() {
         transitionTo(RescueStatus.MATCHING);
+    }
+
+    public void acceptBy(UUID responderUserId) {
+        if (status != RescueStatus.MATCHING || this.responderUserId != null) {
+            throw new IllegalStateException("该救援任务已被接单或不可接单");
+        }
+        this.responderUserId = responderUserId;
+        this.acceptedAt = Instant.now();
+        transitionTo(RescueStatus.ACCEPTED);
     }
 
     public void assignDevice(
@@ -247,5 +267,17 @@ public class RescueCall {
 
     public UUID getRequestedByUserId() {
         return requestedByUserId;
+    }
+
+    public UUID getResponderUserId() {
+        return responderUserId;
+    }
+
+    public Instant getAcceptedAt() {
+        return acceptedAt;
+    }
+
+    public Instant getCompletedAt() {
+        return completedAt;
     }
 }

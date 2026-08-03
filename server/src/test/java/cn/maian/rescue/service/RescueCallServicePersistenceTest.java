@@ -9,7 +9,8 @@ import cn.maian.rescue.domain.RescueStatus;
 import cn.maian.rescue.domain.UrgencyLevel;
 import cn.maian.rescue.dto.CreateRescueCallRequest;
 import cn.maian.rescue.repository.RescueCallRepository;
-import cn.maian.user.service.UserProfileService;
+import cn.maian.user.context.DemoUserContext;
+import cn.maian.user.service.CurrentUserService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,8 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @DataJpaTest(properties = {
     "spring.flyway.enabled=false",
@@ -41,15 +44,18 @@ class RescueCallServicePersistenceTest {
     @BeforeEach
     void setUp() {
         var properties = new DispatchProperties(15, 80, 120, 35, 6.5, 1.25, 30, 20, 900);
+        CurrentUserService currentUserService = mock(CurrentUserService.class);
+        when(currentUserService.currentUserId()).thenReturn(DemoUserContext.DEFAULT_USER_ID);
         rescueCallService = new RescueCallService(
             rescueCallRepository,
-            new AedDispatchService(deviceRepository, properties)
+            new AedDispatchService(deviceRepository, properties),
+            currentUserService
         );
     }
 
     @Test
     void persistsMatchAndReleasesReservationWhenCallIsCancelled() {
-        EmergencyDevice device = deviceRepository.save(EmergencyDevice.create(
+        EmergencyDevice device = EmergencyDevice.create(
             DeviceType.FIXED,
             "AED",
             "测试 AED",
@@ -65,7 +71,9 @@ class RescueCallServicePersistenceTest {
             null,
             List.of(),
             List.of()
-        ));
+        );
+        device.review(true, "测试审核通过");
+        device = deviceRepository.save(device);
 
         var created = rescueCallService.create(new CreateRescueCallRequest(
             UrgencyLevel.CRITICAL,
@@ -83,7 +91,7 @@ class RescueCallServicePersistenceTest {
 
         var persistedCall = rescueCallRepository.findOwnedDetailedById(
             created.id(),
-            UserProfileService.CURRENT_USER_ID
+            DemoUserContext.DEFAULT_USER_ID
         ).orElseThrow();
         assertThat(persistedCall.getMatchedDevice()).isNotNull();
         assertThat(persistedCall.getMatchedDevice().getId()).isEqualTo(device.getId());

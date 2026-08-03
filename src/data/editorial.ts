@@ -14,8 +14,8 @@ export const scienceArticles = [
     content: 'AED（自动体外除颤器）是一种便携式医疗设备，可以诊断特定的心律失常，并给予电击除颤。AED操作简单，非专业人员也能使用...\n\n第一步：打开AED电源\n按下电源按钮或翻开盖子即可自动开机...\n\n第二步：贴电极片\n按照电极片上的图示，将一片贴在右胸上部，另一片贴在左胸下部...\n\n第三步：听从语音提示\nAED会自动分析心律，如需电击，会语音提示"建议除颤"...\n\n第四步：电击\n确保无人接触患者后，按下电击按钮...',
     viewCount: 12580, likeCount: 892, collectCount: 567, publishTime: '2025-03-01', isLiked: false, isCollected: true,
     media: {
-      type: 'video',
-      url: 'https://www.bjredcross.org.cn/upload/videos/2021/12/22/6cd2d827f38ae7d6.mp4',
+      type: 'image',
+      url: '',
       poster: editorialCovers.aed,
       images: []
     }
@@ -27,8 +27,8 @@ export const scienceArticles = [
     content: '心肺复苏（CPR）是针对心搏骤停采取的急救措施...\n\n判断意识：轻拍双肩，大声呼唤\n呼救：拨打120，取AED\n胸外按压：双手交叠，掌根置于胸骨中下1/3处，深度5-6cm，频率100-120次/分\n人工呼吸：30次按压后2次吹气\n持续循环直到专业救援到达...',
     viewCount: 9870, likeCount: 723, collectCount: 445, publishTime: '2025-03-15', isLiked: true, isCollected: false,
     media: {
-      type: 'video',
-      url: 'https://www.gzfuquan.gov.cn/masvod/public/2020/06/10/20200610_1729d9a8e31_r1_500k.mp4',
+      type: 'image',
+      url: '',
       poster: editorialCovers.cpr,
       images: []
     }
@@ -40,8 +40,8 @@ export const scienceArticles = [
     content: '海姆立克急救法是通过冲击腹部使膈肌上抬，增加胸腔压力将异物排出...\n\n成人施救：站在患者身后，一手握拳置于肚脐上方，另一手包住拳头，向内向上快速冲击...\n\n儿童施救：跪在儿童身后，使用同样手法但力度减小...\n\n婴儿施救：面朝下放在前臂上，掌根拍击背部5次...',
     viewCount: 7650, likeCount: 534, collectCount: 389, publishTime: '2025-04-01', isLiked: false, isCollected: false,
     media: {
-      type: 'video',
-      url: 'https://medical-cms.cdn.bcebos.com/video/video_16444798680122HsmFTQo.mp4',
+      type: 'image',
+      url: '',
       poster: editorialCovers.cpr,
       images: []
     }
@@ -171,6 +171,39 @@ export const scienceCategories = [
   { key: 'emergency', label: '突发急症' },
   { key: 'health', label: '健康管理' },
   { key: 'exercise', label: '运动养生' }
+]
+
+export const officialFirstAidVideos = [
+  {
+    id: 'V001',
+    title: 'AED 急救使用培训',
+    summary: '从开机、电极片粘贴到听从语音指令，完整演示 AED 操作流程。',
+    duration: '培训视频',
+    source: '中共广西区委党校',
+    poster: editorialCovers.cpr,
+    url: 'https://www.gxdx.gov.cn/UploadFiles/files/20250522/080396AED%E6%80%A5%E6%95%91%E4%BD%BF%E7%94%A8%E5%9F%B9%E8%AE%AD%E8%A7%86%E9%A2%91.mp4',
+    sourcePage: 'https://www.gxdx.gov.cn/newsview.html?NewsId=70133'
+  },
+  {
+    id: 'V002',
+    title: 'AED 自己会教你怎么用',
+    summary: '北京市红十字会讲师示范如何识别设备提示并完成除颤操作。',
+    duration: '竖屏短课',
+    source: '新华网 · 北京市红十字会讲师',
+    poster: editorialCovers.aed,
+    url: 'https://vodpub6.v.news.cn/yqfbzx-original/20260616/2026061655fe05871980481da03d478ad7a4094e_6f6f83c940214384b0df345c5eb81783.mp4',
+    sourcePage: 'https://www.news.cn/tech/20260616/55fe05871980481da03d478ad7a4094e/c.html'
+  },
+  {
+    id: 'V003',
+    title: '心脏骤停，救人不能只等医生',
+    summary: '认识院外心脏骤停，理解第一目击者立即呼救和施救的重要性。',
+    duration: '竖屏短课',
+    source: '新华网 · 北京市红十字会讲师',
+    poster: editorialCovers.monitoring,
+    url: 'https://vodpub6.v.news.cn/yqfbzx-original/20260616/2026061655fe05871980481da03d478ad7a4094e_b141713644794a4598a857c5abcaf54b.mp4',
+    sourcePage: 'https://www.news.cn/tech/20260616/55fe05871980481da03d478ad7a4094e/c.html'
+  }
 ]
 
 export const scienceQuizQuestions = [

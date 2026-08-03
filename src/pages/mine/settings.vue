@@ -113,6 +113,27 @@
             </view>
             <app-icon name="right" :size="14" color="#A8B2C1" />
           </view>
+          <view class="settings-item" @tap="goLegal('privacy')">
+            <view class="settings-item-left">
+              <app-icon-tile class="settings-icon" name="auth-filled" tone="blue" />
+              <text class="settings-label">隐私政策</text>
+            </view>
+            <app-icon name="right" :size="14" color="#A8B2C1" />
+          </view>
+          <view class="settings-item" @tap="goLegal('terms')">
+            <view class="settings-item-left">
+              <app-icon-tile class="settings-icon" name="list" tone="violet" />
+              <text class="settings-label">用户协议</text>
+            </view>
+            <app-icon name="right" :size="14" color="#A8B2C1" />
+          </view>
+          <view class="settings-item settings-item-last" @tap="goLegal('medical')">
+            <view class="settings-item-left">
+              <app-icon-tile class="settings-icon" name="health-alert" tone="coral" />
+              <text class="settings-label">医疗免责声明</text>
+            </view>
+            <app-icon name="right" :size="14" color="#A8B2C1" />
+          </view>
         </view>
       </view>
 
@@ -275,6 +296,10 @@ function goAbout() {
     showCancel: false,
     confirmText: '知道了'
   })
+}
+
+function goLegal(type: 'privacy' | 'terms' | 'medical') {
+  uni.navigateTo({ url: `/pages/legal/index?type=${type}` })
 }
 </script>
 

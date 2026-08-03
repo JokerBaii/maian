@@ -47,6 +47,11 @@ public class ScienceSubmission {
     @Column(nullable = false, updatable = false)
     private Instant submittedAt;
 
+    @Column(length = 300)
+    private String reviewNote;
+
+    private Instant reviewedAt;
+
     protected ScienceSubmission() {
     }
 
@@ -68,6 +73,15 @@ public class ScienceSubmission {
         submission.status = SubmissionStatus.PENDING;
         submission.submittedAt = Instant.now();
         return submission;
+    }
+
+    public void review(boolean approved, String reviewNote) {
+        if (status != SubmissionStatus.PENDING) {
+            throw new IllegalStateException("投稿已经完成审核");
+        }
+        status = approved ? SubmissionStatus.APPROVED : SubmissionStatus.REJECTED;
+        this.reviewNote = reviewNote == null || reviewNote.isBlank() ? null : reviewNote.trim();
+        reviewedAt = Instant.now();
     }
 
     public UUID getId() {
@@ -104,5 +118,13 @@ public class ScienceSubmission {
 
     public Instant getSubmittedAt() {
         return submittedAt;
+    }
+
+    public String getReviewNote() {
+        return reviewNote;
+    }
+
+    public Instant getReviewedAt() {
+        return reviewedAt;
     }
 }

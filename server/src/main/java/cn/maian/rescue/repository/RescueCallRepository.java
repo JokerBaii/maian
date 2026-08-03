@@ -30,6 +30,20 @@ public interface RescueCallRepository extends JpaRepository<RescueCall, UUID> {
         """)
     Page<RescueCall> findAllOwnedDetailed(UUID userId, Pageable pageable);
 
+    @EntityGraph(attributePaths = "matchedDevice")
+    @Query("""
+        select rescueCall from RescueCall rescueCall
+        where rescueCall.responderUserId = :responderUserId
+           or (rescueCall.responderUserId is null
+               and rescueCall.status = cn.maian.rescue.domain.RescueStatus.MATCHING)
+        """)
+    Page<RescueCall> findResponderTasks(UUID responderUserId, Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "matchedDevice")
+    @Query("select rescueCall from RescueCall rescueCall where rescueCall.id = :id")
+    Optional<RescueCall> findDetailedForUpdateById(UUID id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = "matchedDevice")
     @Query("""

@@ -19,9 +19,9 @@
         <view class="tab-indicator" :class="{ 'tab-indicator-right': activeTab === 'week' }"></view>
       </view>
 
-      <view v-if="!heartRateData.wearable.connected" class="sample-note">
+      <view v-if="!heartRateData.todayData.length" class="sample-note">
         <app-icon name="info-filled" :size="15" color="#1F63D5" />
-        <text>示例数据 · 连接设备后显示真实记录</text>
+        <text>暂无心率记录，请先连接设备并完成一次测量</text>
       </view>
 
       <view v-if="activeTab === 'today'" class="chart-section">
@@ -29,7 +29,7 @@
           <view>
             <text class="chart-eyebrow">24 小时心率轨迹</text>
             <view class="chart-current">
-              <text class="chart-current-value">{{ heartRateData.current }}</text>
+              <text class="chart-current-value">{{ heartRateData.current || '--' }}</text>
               <text class="chart-current-unit">BPM</text>
             </view>
           </view>

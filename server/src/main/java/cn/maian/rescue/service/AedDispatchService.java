@@ -57,7 +57,11 @@ public class AedDispatchService {
             .filter(candidate -> candidate.score().distanceMeters()
                 <= properties.searchRadiusKm() * 1_000)
             .sorted(Comparator
-                .comparingInt((RankedCandidate candidate) -> candidate.score().estimatedArrivalSeconds())
+                .comparingInt((RankedCandidate candidate) -> candidate.score().rankingScoreSeconds())
+                .thenComparing(Comparator.comparingInt(
+                    (RankedCandidate candidate) -> candidate.score().confidencePercent()
+                ).reversed())
+                .thenComparingInt(candidate -> candidate.score().estimatedArrivalSeconds())
                 .thenComparing(candidate -> candidate.device().getType() == DeviceType.MOBILE ? 0 : 1)
                 .thenComparingInt(candidate -> candidate.score().distanceMeters()))
             .toList();

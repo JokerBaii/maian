@@ -1,38 +1,7 @@
 <template>
   <view class="page">
     <view class="cover-area">
-      <view v-if="article.media && article.media.type === 'video'" class="video-area">
-        <view v-if="!videoStarted" class="video-cover" @tap="startVideo">
-          <image
-            class="video-cover-image"
-            :src="article.cover"
-            mode="aspectFill"
-          />
-          <view class="video-cover-wash"></view>
-          <view class="video-play"></view>
-          <text class="video-cover-label">播放急救教学视频</text>
-        </view>
-        <video
-          v-else
-          id="science-video"
-          class="cover-video"
-          :src="article.media.url"
-          controls
-          autoplay
-          muted
-          show-center-play-btn
-          enable-progress-gesture
-          object-fit="contain"
-          webkit-playsinline
-          playsinline
-          x5-playsinline
-        ></video>
-        <view class="video-badge" :class="{ 'video-badge-playing': videoStarted }">
-          <app-icon name="videocam-filled" :size="16" color="#2E6DD1" />
-          <text class="video-badge-text">视频教程</text>
-        </view>
-      </view>
-      <view v-else class="cover-image-area">
+      <view class="cover-image-area">
         <image
           class="cover-image"
           :src="article.cover"
@@ -40,7 +9,7 @@
         />
         <view class="cover-gradient"></view>
       </view>
-      <view v-if="!(article.media && article.media.type === 'video')" class="cover-category">
+      <view class="cover-category">
         <view class="category-tag">
           <text class="category-text">{{ article.categoryLabel }}</text>
         </view>
@@ -136,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { scienceArticles } from '@/data/editorial'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
@@ -195,16 +164,6 @@ const contentParagraphs = computed(() => {
   const content = article.value.content || ''
   return content.split('\n\n').filter(p => p.trim())
 })
-
-const videoStarted = ref(false)
-let videoContext: any = null
-
-async function startVideo() {
-  videoStarted.value = true
-  await nextTick()
-  videoContext = uni.createVideoContext('science-video')
-  videoContext?.play()
-}
 
 function formatViewCount(count: number) {
   if (count >= 10000) {
@@ -279,88 +238,6 @@ onMounted(loadInteraction)
 .cover-image {
   width: 100%;
   height: 100%;
-}
-.video-area {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  overflow: hidden;
-  background: #EAF2FF;
-}
-.cover-video {
-  width: 100%;
-  height: 100%;
-}
-.video-cover {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18rpx;
-}
-.video-cover-image {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.video-cover-wash {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(247, 251, 255, 0.18), rgba(232, 242, 255, 0.68));
-}
-.video-play {
-  position: relative;
-  z-index: 2;
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #2E6DD1;
-  box-shadow: 0 14rpx 34rpx rgba(43, 111, 240, 0.3);
-}
-.video-play::before {
-  content: '';
-  width: 0;
-  height: 0;
-  margin-left: 8rpx;
-  border-top: 18rpx solid transparent;
-  border-bottom: 18rpx solid transparent;
-  border-left: 28rpx solid #FFFFFF;
-}
-.video-cover-label {
-  position: relative;
-  z-index: 2;
-  padding: 10rpx 20rpx;
-  border-radius: 18rpx;
-  background: rgba(255, 255, 255, 0.86);
-  font-size: 24rpx;
-  font-weight: 600;
-  color: #245BB8;
-}
-.video-badge {
-  position: absolute;
-  top: 24rpx;
-  right: 24rpx;
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-  padding: 8rpx 20rpx;
-  border-radius: 20rpx;
-  background: rgba(255, 255, 255, 0.9);
-  z-index: 20;
-}
-.video-badge-playing {
-  opacity: 0.82;
-}
-.video-badge-text {
-  font-size: 22rpx;
-  color: #245BB8;
-  font-weight: 500;
 }
 .cover-gradient {
   position: absolute;

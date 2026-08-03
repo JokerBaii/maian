@@ -53,7 +53,8 @@ const glyphFiles: Record<string, string> = {
   'rescue-bag': 'rescue-bag',
   camera: 'camera',
   volunteer: 'volunteer',
-  author: 'author'
+  author: 'author',
+  'user-filled': 'author'
 }
 
 const props = withDefaults(defineProps<{

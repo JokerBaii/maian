@@ -4,7 +4,7 @@ import cn.maian.health.domain.HeartRateReading;
 import cn.maian.health.dto.HealthMonitoringResponse;
 import cn.maian.health.repository.HeartRateReadingRepository;
 import cn.maian.health.repository.WearableDeviceRepository;
-import cn.maian.user.service.UserProfileService;
+import cn.maian.user.service.CurrentUserService;
 import cn.maian.user.service.UserSettingsService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,15 +31,18 @@ public class HealthMonitoringService {
     private final HeartRateReadingRepository heartRateReadingRepository;
     private final WearableDeviceRepository wearableDeviceRepository;
     private final UserSettingsService userSettingsService;
+    private final CurrentUserService currentUserService;
 
     public HealthMonitoringService(
         HeartRateReadingRepository heartRateReadingRepository,
         WearableDeviceRepository wearableDeviceRepository,
-        UserSettingsService userSettingsService
+        UserSettingsService userSettingsService,
+        CurrentUserService currentUserService
     ) {
         this.heartRateReadingRepository = heartRateReadingRepository;
         this.wearableDeviceRepository = wearableDeviceRepository;
         this.userSettingsService = userSettingsService;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional
@@ -49,11 +52,11 @@ public class HealthMonitoringService {
         Instant monthStart = today.minusDays(29).atStartOfDay(USER_ZONE).toInstant();
         List<HeartRateReading> readings = heartRateReadingRepository
             .findAllByUserIdAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(
-                UserProfileService.CURRENT_USER_ID,
+                currentUserService.currentUserId(),
                 monthStart
             );
         var settings = userSettingsService.findOrCreate();
-        var wearable = wearableDeviceRepository.findByUserId(UserProfileService.CURRENT_USER_ID);
+        var wearable = wearableDeviceRepository.findByUserId(currentUserService.currentUserId());
 
         List<HeartRateReading> todayReadings = readings.stream()
             .filter(reading -> toDate(reading).equals(today))

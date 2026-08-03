@@ -22,6 +22,16 @@ mvn spring-boot:run
 
 Flyway 会自动执行全部数据库迁移，不依赖 Docker。
 
+使用 Docker 部署时，先复制并修改环境变量，再启动：
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+docker compose ps
+```
+
+默认只将 MySQL 端口绑定到宿主机回环地址；后端监听 `${SERVER_PORT:-8080}`，上传文件保存在 `maian_uploads` 数据卷。部署到公网前必须修改数据库密码和 `CORS_ALLOWED_ORIGINS`。
+
 默认地址：`http://localhost:8080`
 
 健康检查：`GET /actuator/health`
@@ -67,11 +77,16 @@ curl -X POST http://localhost:8080/api/v1/health-reports \
 ```text
 GET/POST        /api/v1/emergency-devices
 GET             /api/v1/emergency-devices/mine
+GET             /api/v1/emergency-devices/reviews/pending
 GET/PUT/DELETE  /api/v1/emergency-devices/{id}
+PATCH           /api/v1/emergency-devices/{id}/review
 PATCH           /api/v1/emergency-devices/{id}/status
 PATCH           /api/v1/emergency-devices/{id}/location
 GET/POST        /api/v1/rescue-calls
+GET             /api/v1/rescue-calls/responder-tasks
 GET             /api/v1/rescue-calls/{id}
+POST            /api/v1/rescue-calls/{id}/accept
+PATCH           /api/v1/rescue-calls/{id}/responder-progress
 PATCH           /api/v1/rescue-calls/{id}/status
 POST            /api/v1/rescue-calls/{id}/match-attempts
 GET/POST        /api/v1/health-reports
@@ -85,7 +100,9 @@ PUT/DELETE      /api/v1/emergency-contacts/{id}
 GET             /api/v1/profile
 POST            /api/v1/profile/identity-verification
 GET/POST        /api/v1/science-submissions
+GET             /api/v1/science-submissions/reviews/pending
 GET/DELETE      /api/v1/science-submissions/{id}
+PATCH           /api/v1/science-submissions/{id}/review
 GET             /api/v1/science-submissions/count
 GET/PUT         /api/v1/science-articles/{articleId}/interaction
 GET/POST        /api/v1/files/images
@@ -110,3 +127,5 @@ GET/POST        /api/v1/files/images
 ## 数据真实性
 
 健康监测、穿戴设备绑定、提醒设置、科普投稿、体检报告、设备与救援记录均已由 MySQL 持久化。没有心率记录时接口返回空数据状态，不再生成模拟读数。设备修改、救援查询和投稿管理均按当前用户隔离。
+
+首次建库会写入一组比赛展示数据，用于开箱展示地图点位、健康趋势、报告和多角色审核流程；界面按正常业务数据呈现。正式接入实际业务前，应以审核后的现场采集数据替换这组展示数据。

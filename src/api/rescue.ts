@@ -39,6 +39,9 @@ export interface RescueCallResponse {
     strategy: string
     matchedAt: string
   }
+  responderUserId?: string
+  acceptedAt?: string
+  completedAt?: string
   createdAt: string
   updatedAt: string
 }
@@ -74,5 +77,24 @@ export function retryRescueMatch(id: string) {
 export function listRescueCalls() {
   return request<PageResponse<RescueCallResponse>>(
     '/api/v1/rescue-calls?page=0&size=100&sort=createdAt,desc'
+  )
+}
+
+export function listResponderTasks() {
+  return request<PageResponse<RescueCallResponse>>(
+    '/api/v1/rescue-calls/responder-tasks?page=0&size=100&sort=createdAt,desc'
+  )
+}
+
+export function acceptRescueTask(id: string) {
+  return request<RescueCallResponse>(`/api/v1/rescue-calls/${encodeURIComponent(id)}/accept`, {
+    method: 'POST'
+  })
+}
+
+export function updateResponderProgress(id: string, status: 'RESCUING' | 'COMPLETED') {
+  return request<RescueCallResponse>(
+    `/api/v1/rescue-calls/${encodeURIComponent(id)}/responder-progress`,
+    { method: 'PATCH' as UniNamespace.RequestOptions['method'], data: { status } }
   )
 }

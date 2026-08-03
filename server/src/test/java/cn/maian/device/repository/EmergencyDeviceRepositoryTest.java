@@ -68,7 +68,7 @@ class EmergencyDeviceRepositoryTest {
         double latitude,
         double longitude
     ) {
-        return EmergencyDevice.create(
+        EmergencyDevice device = EmergencyDevice.create(
             DeviceType.FIXED,
             category,
             category + " 设备",
@@ -85,5 +85,7 @@ class EmergencyDeviceRepositoryTest {
             List.of(),
             List.of()
         );
+        device.review(true, "测试审核通过");
+        return device;
     }
 }

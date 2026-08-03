@@ -48,6 +48,24 @@ public class RescueCallController {
         return ApiResponse.ok(PageResponse.from(rescueCallService.findAll(pageable)));
     }
 
+    @GetMapping("/responder-tasks")
+    public ApiResponse<PageResponse<RescueCallResponse>> findResponderTasks(Pageable pageable) {
+        return ApiResponse.ok(PageResponse.from(rescueCallService.findResponderTasks(pageable)));
+    }
+
+    @PostMapping("/{id}/accept")
+    public ApiResponse<RescueCallResponse> accept(@PathVariable UUID id) {
+        return ApiResponse.ok(rescueCallService.accept(id));
+    }
+
+    @PatchMapping("/{id}/responder-progress")
+    public ApiResponse<RescueCallResponse> updateResponderProgress(
+        @PathVariable UUID id,
+        @Valid @RequestBody UpdateRescueStatusRequest request
+    ) {
+        return ApiResponse.ok(rescueCallService.updateResponderProgress(id, request.status()));
+    }
+
     @PostMapping("/{id}/match-attempts")
     public ApiResponse<RescueCallResponse> retryMatching(@PathVariable UUID id) {
         return ApiResponse.ok(rescueCallService.retryMatching(id));
