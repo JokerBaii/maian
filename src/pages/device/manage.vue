@@ -102,6 +102,13 @@
             <view class="card-footer">
               <text class="footer-service">{{ device.serviceTime || '服务时段未设置' }}</text>
               <view class="card-actions">
+                <view
+                  v-if="device.type === 'MOBILE'"
+                  class="card-btn card-btn-detail"
+                  @tap="reportMobileLocation(device)"
+                >
+                  <text class="card-btn-text">上报位置</text>
+                </view>
                 <view class="card-btn card-btn-detail" @tap="viewDetail(device)">
                   <text class="card-btn-text">详情</text>
                 </view>
@@ -138,7 +145,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onHide, onShow } from '@dcloudio/uni-app'
+import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { getCurrentGcj02Location } from '@/utils/location'
@@ -162,7 +169,6 @@ const mobileDevices = ref<DeviceView[]>([])
 const currentDevices = computed(() => (
   activeTab.value === 'fixed' ? fixedDevices.value : mobileDevices.value
 ))
-let locationSyncTimer: ReturnType<typeof setInterval> | null = null
 let syncingLocation = false
 
 function toView(device: EmergencyDeviceResponse): DeviceView {
@@ -265,38 +271,26 @@ function getCurrentLocation(): Promise<{ longitude: number; latitude: number }> 
   return getCurrentGcj02Location()
 }
 
-async function syncAvailableMobileLocations() {
+/**
+ * 上报单台移动设备的当前位置。
+ *
+ * 只在用户点击时对指定设备生效：批量把同一个位置写到所有移动设备会让它们
+ * 落在同一坐标，调度距离全部变成 0，失去调度意义。
+ */
+async function reportMobileLocation(device: DeviceView) {
   if (syncingLocation) return
-  const availableDevices = mobileDevices.value.filter(device => device.status === 'AVAILABLE')
-  if (!availableDevices.length) return
   syncingLocation = true
   try {
     const location = await getCurrentLocation()
     const address = `实时位置 · ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
-    const updatedDevices = await Promise.all(availableDevices.map(device =>
-      updateEmergencyDeviceLocation(device.id, { ...location, address })
-    ))
-    updatedDevices.forEach(updated => {
-      const target = mobileDevices.value.find(device => device.id === updated.id)
-      if (target) Object.assign(target, toView(updated))
-    })
-  } catch {
-    // 位置权限被拒绝时保留原状态，由 120 秒新鲜度门禁自动停止派单。
+    const updated = await updateEmergencyDeviceLocation(device.id, { ...location, address })
+    const target = mobileDevices.value.find(item => item.id === updated.id)
+    if (target) Object.assign(target, toView(updated))
+    uni.showToast({ title: '位置已上报', icon: 'success' })
+  } catch (error: any) {
+    uni.showToast({ title: error?.message || '位置上报失败', icon: 'none' })
   } finally {
     syncingLocation = false
-  }
-}
-
-function startLocationSync() {
-  stopLocationSync()
-  syncAvailableMobileLocations()
-  locationSyncTimer = setInterval(syncAvailableMobileLocations, 15_000)
-}
-
-function stopLocationSync() {
-  if (locationSyncTimer) {
-    clearInterval(locationSyncTimer)
-    locationSyncTimer = null
   }
 }
 
@@ -339,12 +333,7 @@ function confirmDelete(device: DeviceView) {
   })
 }
 
-onShow(async () => {
-  await loadDevices()
-  startLocationSync()
-})
-
-onHide(stopLocationSync)
+onShow(loadDevices)
 
 </script>
 
@@ -362,7 +351,6 @@ onHide(stopLocationSync)
   font-size: 22rpx;
   font-weight: 600;
 }
-.review-rejected { color: #C93D46; background: #FFF0F0; }
 .badge-pending { color: #B66A10; background: #FFF4E5; }
 .badge-rejected { color: #C93D46; background: #FFF0F0; }
 
@@ -628,11 +616,6 @@ onHide(stopLocationSync)
   font-size: 21rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.card-status-badge {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
 }
 .badge-dot {
   width: 12rpx;

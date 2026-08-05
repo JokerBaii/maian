@@ -114,6 +114,12 @@
       }
     },
     {
+      "path": "pages/science/submissions",
+      "style": {
+        "navigationBarTitleText": "我的投稿"
+      }
+    },
+    {
       "path": "pages/science/index",
       "style": {
         "navigationBarTitleText": "急救与健康科普",

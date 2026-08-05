@@ -3,7 +3,10 @@ package cn.maian.health.controller;
 import cn.maian.common.api.ApiResponse;
 import cn.maian.health.dto.CreateHealthReportRequest;
 import cn.maian.health.dto.HealthReportResponse;
+import cn.maian.health.dto.ReportRecognitionRequest;
+import cn.maian.health.dto.ReportRecognitionResponse;
 import cn.maian.health.service.HealthReportService;
+import cn.maian.health.service.ReportRecognitionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,9 +26,21 @@ import java.util.UUID;
 public class HealthReportController {
 
     private final HealthReportService healthReportService;
+    private final ReportRecognitionService reportRecognitionService;
 
-    public HealthReportController(HealthReportService healthReportService) {
+    public HealthReportController(
+        HealthReportService healthReportService,
+        ReportRecognitionService reportRecognitionService
+    ) {
         this.healthReportService = healthReportService;
+        this.reportRecognitionService = reportRecognitionService;
+    }
+
+    @PostMapping("/recognition")
+    public ApiResponse<ReportRecognitionResponse> recognize(
+        @Valid @RequestBody ReportRecognitionRequest request
+    ) {
+        return ApiResponse.ok(reportRecognitionService.recognize(request.sourceImageUrl()));
     }
 
     @PostMapping

@@ -86,6 +86,7 @@ public class ScienceSubmissionService {
         scienceSubmissionRepository.delete(findOwned(id));
     }
 
+    /** 按当前用户校验归属，避免通过 id 访问他人投稿。 */
     private ScienceSubmission findOwned(UUID id) {
         var submission = scienceSubmissionRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("投稿不存在"));

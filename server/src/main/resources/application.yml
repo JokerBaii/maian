@@ -44,11 +44,15 @@ app:
     directory: ${UPLOAD_DIRECTORY:./data/uploads}
     max-file-size: ${UPLOAD_MAX_FILE_SIZE:5242880}
   dispatch:
-    search-radius-km: ${DISPATCH_SEARCH_RADIUS_KM:15}
+    # AED 取回属于争分夺秒的场景，搜索半径按"跑得到"来定，
+    # 半径过大时会把几公里外的设备也算作候选，预计到达时间失去意义。
+    search-radius-km: ${DISPATCH_SEARCH_RADIUS_KM:3}
     candidate-limit: ${DISPATCH_CANDIDATE_LIMIT:80}
     mobile-location-max-age-seconds: ${DISPATCH_LOCATION_MAX_AGE_SECONDS:120}
     mobile-speed-kmh: ${DISPATCH_MOBILE_SPEED_KMH:35}
-    runner-speed-kmh: ${DISPATCH_RUNNER_SPEED_KMH:6.5}
+    # 固定设备的取回按骑行（电动车/自行车）估算，而非步行：
+    # 取回 AED 是争分夺秒的动作，志愿者会用最快的可用交通方式。
+    runner-speed-kmh: ${DISPATCH_RUNNER_SPEED_KMH:18}
     route-distance-factor: ${DISPATCH_ROUTE_DISTANCE_FACTOR:1.25}
     mobile-dispatch-overhead-seconds: ${DISPATCH_MOBILE_OVERHEAD_SECONDS:30}
     fixed-pickup-overhead-seconds: ${DISPATCH_FIXED_OVERHEAD_SECONDS:20}

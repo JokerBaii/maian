@@ -397,7 +397,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
-import { getCurrentGcj02Location } from '@/utils/location'
+import { getCurrentGcj02Location, FIXED_LOCATION } from '@/utils/location'
 // #ifdef H5
 import { loadAMap } from '@/common/amap'
 // #endif
@@ -560,21 +560,16 @@ async function initPickerMap() {
       uni.showToast({ title: '已使用当前位置', icon: 'none' })
       cancelLocationPicker()
     }
-    getCurrentGcj02Location()
-      .then((location) => {
-        useLocation(location.longitude, location.latitude)
-      })
-      .catch(() => {
-        uni.showToast({ title: '请授权定位后重试', icon: 'none' })
-        cancelLocationPicker()
-      })
+    getCurrentGcj02Location().then((location) => {
+      useLocation(location.longitude, location.latitude)
+    })
     return
   }
   const AMap = (window as any).AMap
 
   const center = fixedForm.value.longitude
     ? [fixedForm.value.longitude, fixedForm.value.latitude]
-    : [120.15, 30.28]
+    : [FIXED_LOCATION.longitude, FIXED_LOCATION.latitude]
 
   pickerMapInstance = new AMap.Map('lp-map-container', {
     zoom: 15,

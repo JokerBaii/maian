@@ -52,6 +52,7 @@ export async function getScienceSubmissionCount() {
   return request<{ count: number }>('/api/v1/science-submissions/count')
 }
 
+/** 当前用户的投稿列表，按提交时间倒序。 */
 export function listScienceSubmissions() {
   return request<{
     content: ScienceSubmissionResponse[]

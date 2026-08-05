@@ -31,6 +31,22 @@ export interface CreateHealthReportRequest {
   indicators: HealthIndicatorRequest[]
 }
 
+export interface ReportRecognitionResponse {
+  notice: string
+  hospital: string
+  checkupDate: string
+  indicators: HealthIndicatorRequest[]
+}
+
+/** 上传原图后识别关键指标，返回结果需人工核对再保存。 */
+export function recognizeHealthReport(sourceImageUrl: string) {
+  return request<ReportRecognitionResponse>('/api/v1/health-reports/recognition', {
+    method: 'POST',
+    data: { sourceImageUrl },
+    timeout: 20000
+  })
+}
+
 export function createHealthReport(payload: CreateHealthReportRequest) {
   return request<HealthReportResponse>('/api/v1/health-reports', {
     method: 'POST',
@@ -45,4 +61,10 @@ export function listHealthReports() {
 
 export function getHealthReport(id: string) {
   return request<HealthReportResponse>(`/api/v1/health-reports/${encodeURIComponent(id)}`)
+}
+
+export function deleteHealthReport(id: string) {
+  return request<void>(`/api/v1/health-reports/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  })
 }

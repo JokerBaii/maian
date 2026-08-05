@@ -19,7 +19,6 @@
         <view class="status-panel" :class="`status-${rescueCall.status.toLowerCase()}`">
           <view class="status-head">
             <view>
-              <text class="status-kicker">RESCUE STATUS</text>
               <text class="status-title">{{ statusMeta.label }}</text>
             </view>
             <view class="live-chip">
@@ -214,6 +213,7 @@ import 'leaflet/dist/leaflet.css'
 // #endif
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
+import { addBaseTileLayer } from '@/common/mapTiles'
 import { resolveApiUrl } from '@/api/http'
 import {
   getRescueCall,
@@ -230,6 +230,10 @@ const mapUnavailable = ref(false)
 let mapInstance: any = null
 let mapDataLayer: any = null
 let pollingTimer: ReturnType<typeof setInterval> | null = null
+let renderedGeometryKey = ''
+let matchRetryCount = 0
+/** 约 3 分钟内的重试上限（每 3 轮轮询触发一次，轮询间隔 3 秒）。 */
+const MATCH_RETRY_LIMIT = 60
 
 const progressSteps = ['已呼救', '匹配中', '救援中', '已完成']
 const statusMap: Record<RescueStatus, { label: string; description: string; step: number }> = {
@@ -259,8 +263,8 @@ const nativeMarkers = computed(() => {
     longitude: rescueCall.value.longitude,
     latitude: rescueCall.value.latitude,
     iconPath: '/static/icons/tab-map-active.png',
-    width: 38,
-    height: 38,
+    width: 28,
+    height: 28,
     callout: {
       content: '呼救位置',
       color: '#B52832',
@@ -280,8 +284,8 @@ const nativeMarkers = computed(() => {
       iconPath: matched.type === 'MOBILE'
         ? '/static/map/marker-mobile.png'
         : '/static/map/marker-fixed.png',
-      width: 34,
-      height: 42,
+      width: 26,
+      height: 32,
       callout: {
         content: `已匹配·${formatEta(matched.estimatedArrivalSeconds)}`,
         color: '#1F63D5',
@@ -315,8 +319,15 @@ async function loadDetail(showLoading = true) {
   errorMessage.value = ''
   try {
     let latest = await getRescueCall(rescueId.value)
+    // 重新匹配是写操作（跑完整调度评分并锁设备），不能跟着 3 秒轮询一起打。
+    // 每 3 轮（约 9 秒）尝试一次，并设上限，避免长时间无候选设备时持续压数据库。
     if (!latest.matchedAed && latest.status === 'MATCHING' && !showLoading) {
-      latest = await retryRescueMatch(rescueId.value)
+      matchRetryCount += 1
+      if (matchRetryCount % 3 === 1 && matchRetryCount <= MATCH_RETRY_LIMIT) {
+        latest = await retryRescueMatch(rescueId.value)
+      }
+    } else if (latest.matchedAed) {
+      matchRetryCount = 0
     }
     rescueCall.value = latest
     loading.value = false
@@ -346,29 +357,43 @@ async function initMap() {
     if (!mapInstance) {
       mapInstance = Leaflet.map('rescue-detail-map', {
         zoomControl: false,
-        attributionControl: true
+        attributionControl: true,
+        preferCanvas: true
       }).setView([latitude, longitude], 15)
-      Leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
-      }).addTo(mapInstance)
+      addBaseTileLayer(Leaflet, mapInstance)
       mapDataLayer = Leaflet.layerGroup().addTo(mapInstance)
     }
+
+    // 详情页每 3 秒轮询一次，只有位置或匹配结果真的变了才重绘图层，
+    // 否则每轮都会清空标记并重新 fitBounds，画面持续抖动。
+    const matched = rescueCall.value.matchedAed
+    const geometryKey = [
+      latitude,
+      longitude,
+      matched?.deviceId ?? '',
+      matched?.latitude ?? '',
+      matched?.longitude ?? ''
+    ].join('|')
+    if (geometryKey === renderedGeometryKey) {
+      mapUnavailable.value = false
+      return
+    }
+    renderedGeometryKey = geometryKey
+
     mapDataLayer.clearLayers()
     const marker = Leaflet.divIcon({
       className: 'rescue-location-marker',
       html: '<span><i></i></span>',
-      iconSize: [38, 48],
-      iconAnchor: [19, 44]
+      iconSize: [28, 35],
+      iconAnchor: [14, 33]
     })
     Leaflet.marker([latitude, longitude], { icon: marker }).addTo(mapDataLayer)
-    const matched = rescueCall.value.matchedAed
     if (matched) {
       const deviceMarker = Leaflet.divIcon({
         className: 'matched-aed-marker',
         html: '<span>AED</span>',
-        iconSize: [42, 42],
-        iconAnchor: [21, 21]
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       })
       Leaflet.marker([matched.latitude, matched.longitude], { icon: deviceMarker })
         .addTo(mapDataLayer)
@@ -470,17 +495,17 @@ onUnmounted(() => {
 .rescue-location-marker span {
   position: relative;
   display: block;
-  width: 34px;
-  height: 34px;
-  border: 4px solid #FFFFFF;
-  border-radius: 50% 50% 50% 8px;
+  width: 25px;
+  height: 25px;
+  border: 3px solid #FFFFFF;
+  border-radius: 50% 50% 50% 6px;
   background: #C22936;
-  box-shadow: 0 8px 20px rgba(194, 41, 54, 0.28);
+  box-shadow: 0 5px 14px rgba(194, 41, 54, 0.28);
   transform: rotate(-45deg);
 }
 .rescue-location-marker i {
   position: absolute;
-  inset: 10px;
+  inset: 7px;
   border-radius: 50%;
   background: #FFFFFF;
 }
@@ -490,16 +515,16 @@ onUnmounted(() => {
 }
 .matched-aed-marker span {
   display: flex;
-  width: 42px;
-  height: 42px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
-  border: 4px solid #FFFFFF;
+  border: 3px solid #FFFFFF;
   border-radius: 50%;
   background: #16855D;
-  box-shadow: 0 6px 16px rgba(22, 133, 93, 0.28);
+  box-shadow: 0 4px 12px rgba(22, 133, 93, 0.28);
   color: #FFFFFF;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 800;
 }
 /* #endif */
@@ -573,21 +598,20 @@ onUnmounted(() => {
 }
 
 .status-panel {
-  padding: 34rpx 30rpx 30rpx;
+  padding: 30rpx;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 88% 4%, rgba(255, 255, 255, 0.2), transparent 32%),
-    linear-gradient(135deg, #275FBF 0%, #347DEB 100%);
-  color: #FFFFFF;
-  box-shadow: 0 16rpx 42rpx rgba(41, 101, 199, 0.24);
+  border-radius: 24rpx;
+  background: #FFFFFF;
+  border: 1rpx solid #E1E8F0;
+  color: #1C2B45;
 }
 
 .status-completed {
-  background: linear-gradient(135deg, #11815D 0%, #22A87A 100%);
+  border-color: rgba(34, 168, 122, 0.4);
 }
 
 .status-cancelled {
-  background: linear-gradient(135deg, #68758A 0%, #8894A6 100%);
+  border-color: #E1E8F0;
 }
 
 .status-head,
@@ -611,16 +635,16 @@ onUnmounted(() => {
 
 .status-title {
   display: block;
-  margin-top: 8rpx;
-  font-size: 42rpx;
+  font-size: 40rpx;
   font-weight: 800;
   letter-spacing: -1rpx;
+  color: #1C2B45;
 }
 
 .status-desc {
   display: block;
-  margin-top: 18rpx;
-  color: rgba(255, 255, 255, 0.82);
+  margin-top: 14rpx;
+  color: #68758A;
   font-size: 25rpx;
   line-height: 1.65;
 }
@@ -630,9 +654,10 @@ onUnmounted(() => {
   align-items: center;
   gap: 8rpx;
   padding: 9rpx 14rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  border: 1rpx solid #D6E4F5;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.12);
+  background: #F2F7FD;
+  color: #2E6DD1;
   font-size: 21rpx;
 }
 
@@ -640,8 +665,7 @@ onUnmounted(() => {
   width: 10rpx;
   height: 10rpx;
   border-radius: 50%;
-  background: #9EF0C8;
-  box-shadow: 0 0 0 6rpx rgba(158, 240, 200, 0.12);
+  background: #23956A;
 }
 
 .status-progress {
@@ -657,7 +681,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 10rpx;
-  color: rgba(255, 255, 255, 0.48);
+  color: #A8B4C4;
   font-size: 20rpx;
 }
 
@@ -668,7 +692,7 @@ onUnmounted(() => {
   right: 50%;
   width: 100%;
   height: 2rpx;
-  background: rgba(255, 255, 255, 0.2);
+  background: #E1E8F0;
 }
 
 .progress-step:first-child::before {
@@ -676,11 +700,11 @@ onUnmounted(() => {
 }
 
 .progress-step.active {
-  color: #FFFFFF;
+  color: #2E6DD1;
 }
 
 .progress-step.active::before {
-  background: rgba(255, 255, 255, 0.75);
+  background: #2E6DD1;
 }
 
 .progress-node {
@@ -692,18 +716,18 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 4rpx solid rgba(255, 255, 255, 0.45);
+  border: 4rpx solid #E1E8F0;
   border-radius: 50%;
-  background: #3477DB;
-}
-
-.progress-step.active .progress-node {
-  border-color: #FFFFFF;
   background: #FFFFFF;
 }
 
+.progress-step.active .progress-node {
+  border-color: #2E6DD1;
+  background: #2E6DD1;
+}
+
 .progress-step.active:not(:last-child) .progress-node {
-  background: rgba(255, 255, 255, 0.18);
+  background: #2E6DD1;
 }
 
 .map-card,

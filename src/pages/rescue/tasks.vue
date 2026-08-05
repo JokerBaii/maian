@@ -1,7 +1,6 @@
 <template>
   <view class="page">
     <view class="hero">
-      <text class="hero-kicker">志愿者响应台</text>
       <text class="hero-title">附近救援任务</text>
       <text class="hero-desc">处理接单、赶往现场和完成救援的状态联动。</text>
     </view>
@@ -81,10 +80,9 @@ onShow(load)
 
 <style lang="scss" scoped>
 .page { min-height: 100vh; padding: 24rpx; box-sizing: border-box; background: #F3F7FA; color: #172033; }
-.hero { padding: 32rpx; border-radius: 24rpx; background: #173A67; color: #FFFFFF; }
-.hero-kicker { display: block; color: #AFCFFF; font-size: 22rpx; letter-spacing: 2rpx; }
-.hero-title { display: block; margin-top: 8rpx; font-size: 38rpx; font-weight: 700; }
-.hero-desc { display: block; margin-top: 10rpx; color: #DCEAFF; font-size: 24rpx; }
+.hero { padding: 8rpx 4rpx 4rpx; }
+.hero-title { display: block; font-size: 38rpx; font-weight: 700; color: #1C2B45; }
+.hero-desc { display: block; margin-top: 10rpx; color: #8D9AAF; font-size: 24rpx; }
 .empty { margin-top: 22rpx; padding: 60rpx 20rpx; border-radius: 22rpx; background: #FFFFFF; text-align: center; color: #68758A; }
 .task-list { margin-top: 22rpx; }
 .task-card { margin-bottom: 18rpx; padding: 28rpx; border-radius: 22rpx; background: #FFFFFF; border: 1rpx solid #E1E8F0; }
@@ -93,10 +91,10 @@ onShow(load)
 .status { padding: 6rpx 14rpx; border-radius: 10rpx; background: #EAF2FF; color: #1F63D5; font-size: 22rpx; }
 .task-address { display: block; margin-top: 18rpx; font-size: 29rpx; font-weight: 700; }
 .task-desc { display: block; margin-top: 10rpx; color: #56627A; font-size: 25rpx; line-height: 1.6; }
-.aed { display: block; margin-top: 16rpx; padding: 16rpx; border-radius: 12rpx; background: #EAF6F0; color: #147452; font-size: 24rpx; }
+.aed { display: block; margin-top: 16rpx; color: #147452; font-size: 24rpx; }
 .actions { margin-top: 24rpx; }
-.primary, .complete, .done { padding: 20rpx 0; border-radius: 14rpx; text-align: center; font-size: 27rpx; font-weight: 700; }
-.primary { color: #FFFFFF; background: #1F63D5; }
-.complete { color: #FFFFFF; background: #158F63; }
-.done { color: #68758A; background: #EDF1F5; }
+.primary, .complete, .done { padding: 18rpx 0; border-radius: 12rpx; text-align: center; font-size: 27rpx; font-weight: 700; }
+.primary { color: #1F63D5; background: #FFFFFF; border: 1rpx solid #1F63D5; }
+.complete { color: #147452; background: #FFFFFF; border: 1rpx solid #158F63; }
+.done { color: #8D9AAF; background: #F5F7FA; border: 1rpx solid #E1E8F0; }
 </style>

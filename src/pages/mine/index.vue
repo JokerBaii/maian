@@ -56,7 +56,7 @@
           <text class="stat-label">我的设备</text>
         </view>
         <view class="stat-divider"></view>
-        <view class="stat-item">
+        <view class="stat-item" @tap="goSubmissions">
           <text class="stat-value">{{ contributionCount }}</text>
           <text class="stat-label">科普投稿</text>
         </view>
@@ -175,6 +175,9 @@ statusBarHeight.value = systemInfo.statusBarHeight || 20
 
 function goDevices() {
   uni.navigateTo({ url: '/pages/device/manage' })
+}
+function goSubmissions() {
+  uni.navigateTo({ url: '/pages/science/submissions' })
 }
 function goRecords() {
   uni.navigateTo({ url: '/pages/mine/records' })

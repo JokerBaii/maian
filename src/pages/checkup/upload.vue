@@ -1,15 +1,6 @@
 <template>
   <view class="page">
     <view class="page-scroll">
-      <view class="intro-card">
-        <app-icon-tile name="folder-add-filled" tone="violet" size="large" />
-        <view class="intro-copy">
-          <text class="intro-kicker">HEALTH REPORT</text>
-          <text class="intro-title">录入体检报告</text>
-          <text class="intro-desc">上传报告原图并确认关键指标，系统将生成结构化健康分析</text>
-        </view>
-      </view>
-
       <view class="form-card">
         <view class="section-head">
           <view>
@@ -57,9 +48,26 @@
             <view class="preview-mask" @tap="chooseImage">
               <text>更换图片</text>
             </view>
-            <view class="remove-image" @tap.stop="imagePath = ''">
+            <view class="remove-image" @tap.stop="clearImage">
               <app-icon name="closeempty" :size="15" color="#FFFFFF" />
             </view>
+          </view>
+
+          <view v-if="imagePath" class="recognize-row">
+            <view
+              class="recognize-button"
+              :class="{ 'recognize-button-busy': recognizing }"
+              @tap="recognizeReport"
+            >
+              <app-icon name="scan" :size="16" color="#FFFFFF" />
+              <text class="recognize-text">{{ recognizing ? '识别中…' : '识别报告指标' }}</text>
+            </view>
+            <text class="recognize-hint">自动读取机构、日期与关键指标</text>
+          </view>
+
+          <view v-if="recognizeNotice" class="recognize-notice">
+            <app-icon name="info" :size="14" color="#1F63D5" />
+            <text class="recognize-notice-text">{{ recognizeNotice }}</text>
           </view>
         </view>
       </view>
@@ -163,7 +171,7 @@ import { reactive, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { uploadImage } from '@/api/files'
-import { createHealthReport } from '@/api/reports'
+import { createHealthReport, recognizeHealthReport } from '@/api/reports'
 
 interface IndicatorForm {
   key: number
@@ -189,6 +197,10 @@ const form = reactive({
 })
 const imagePath = ref('')
 const submitting = ref(false)
+const recognizing = ref(false)
+const recognizeNotice = ref('')
+/** 识别时已上传的图片地址，保存时直接复用，避免重复上传同一张图。 */
+const uploadedImageUrl = ref('')
 
 function createIndicator(key: number): IndicatorForm {
   return {
@@ -212,8 +224,49 @@ function chooseImage() {
     sourceType: ['album', 'camera'],
     success: (result) => {
       imagePath.value = result.tempFilePaths[0] || ''
+      // 换图后此前的上传结果和识别提示都不再对应当前图片
+      uploadedImageUrl.value = ''
+      recognizeNotice.value = ''
     }
   })
+}
+
+function clearImage() {
+  imagePath.value = ''
+  uploadedImageUrl.value = ''
+  recognizeNotice.value = ''
+}
+
+async function recognizeReport() {
+  if (recognizing.value || !imagePath.value) return
+  recognizing.value = true
+  uni.showLoading({ title: '识别中…' })
+  try {
+    if (!uploadedImageUrl.value) {
+      const uploaded = await uploadImage(imagePath.value)
+      uploadedImageUrl.value = uploaded.url
+    }
+    const result = await recognizeHealthReport(uploadedImageUrl.value)
+
+    form.hospital = result.hospital
+    form.checkupDate = result.checkupDate
+    form.indicators = result.indicators.map((indicator) => ({
+      key: nextKey++,
+      name: indicator.name,
+      value: indicator.value,
+      unit: indicator.unit || '',
+      referenceRange: indicator.referenceRange || '',
+      abnormal: indicator.abnormal
+    }))
+    recognizeNotice.value = result.notice
+    uni.hideLoading()
+    uni.showToast({ title: `已识别 ${result.indicators.length} 项指标`, icon: 'success' })
+  } catch (error: any) {
+    uni.hideLoading()
+    uni.showToast({ title: error?.message || '识别失败，请重试或手动填写', icon: 'none' })
+  } finally {
+    recognizing.value = false
+  }
 }
 
 function addIndicator() {
@@ -251,11 +304,15 @@ async function submitReport() {
   submitting.value = true
   uni.showLoading({ title: '生成分析中…' })
   try {
-    const sourceImage = imagePath.value ? await uploadImage(imagePath.value) : null
+    // 识别时已上传过就直接复用，避免同一张图上传两次
+    if (imagePath.value && !uploadedImageUrl.value) {
+      const uploaded = await uploadImage(imagePath.value)
+      uploadedImageUrl.value = uploaded.url
+    }
     const report = await createHealthReport({
       checkupDate: form.checkupDate,
       hospital,
-      sourceImageUrl: sourceImage?.url,
+      sourceImageUrl: uploadedImageUrl.value || undefined,
       indicators
     })
     uni.hideLoading()
@@ -280,53 +337,16 @@ async function submitReport() {
   min-height: 100vh;
 }
 
-.intro-card,
 .form-card {
   margin: 24rpx 24rpx 0;
   border-radius: 26rpx;
 }
 
-.intro-card {
-  display: flex;
-  align-items: center;
-  gap: 22rpx;
-  padding: 30rpx;
-  background:
-    radial-gradient(circle at 92% 6%, rgba(255, 255, 255, 0.2), transparent 32%),
-    linear-gradient(135deg, #285FBF 0%, #3B7CE7 100%);
-  color: #FFFFFF;
-  box-shadow: 0 16rpx 38rpx rgba(40, 99, 198, 0.2);
-}
-
-.intro-copy {
-  min-width: 0;
-}
-
-.intro-kicker,
 .section-kicker {
   display: block;
   font-size: 19rpx;
   font-weight: 800;
   letter-spacing: 3rpx;
-}
-
-.intro-kicker {
-  color: rgba(255, 255, 255, 0.62);
-}
-
-.intro-title {
-  display: block;
-  margin-top: 5rpx;
-  font-size: 34rpx;
-  font-weight: 800;
-}
-
-.intro-desc {
-  display: block;
-  margin-top: 7rpx;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 22rpx;
-  line-height: 1.55;
 }
 
 .form-card {
@@ -421,6 +441,56 @@ async function submitReport() {
   margin-top: 5rpx;
   color: #8D9AAF;
   font-size: 21rpx;
+}
+
+.recognize-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 18rpx;
+}
+
+.recognize-button {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 16rpx 26rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #2F73E8, #1F63D5);
+  box-shadow: 0 8rpx 18rpx rgba(47, 115, 232, 0.24);
+}
+
+.recognize-button-busy {
+  opacity: 0.6;
+}
+
+.recognize-text {
+  color: #FFFFFF;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.recognize-hint {
+  flex: 1;
+  color: #8D9AAF;
+  font-size: 21rpx;
+}
+
+.recognize-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+  margin-top: 14rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 14rpx;
+  background: rgba(47, 115, 232, 0.08);
+}
+
+.recognize-notice-text {
+  flex: 1;
+  color: #1F63D5;
+  font-size: 21rpx;
+  line-height: 1.5;
 }
 
 .image-preview {

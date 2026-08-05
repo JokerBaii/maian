@@ -184,7 +184,9 @@
           :class="'device-row-' + deviceStatusClass(device)"
           @tap="selectDevice(device)"
         >
-          <view class="device-status-rail"></view>
+          <view class="device-card-icon" :class="'device-icon-' + deviceStatusClass(device)">
+            <image class="device-card-glyph" :src="markerAsset(device)" mode="aspectFit" />
+          </view>
           <view class="device-card-center">
             <view class="device-card-name-row">
               <text class="device-card-name">{{ device.name }}</text>
@@ -196,16 +198,15 @@
               <text class="device-card-addr">{{ device.address }}</text>
             </view>
             <view class="device-card-bottom">
-              <view class="device-card-status" :class="'card-status-' + deviceStatusClass(device)">
+              <view class="status-chip" :class="'chip-' + deviceStatusClass(device)">
                 <view class="card-status-dot"></view>
                 <text class="card-status-text">{{ deviceStatusLabel(device) }}</text>
               </view>
-              <text class="device-card-separator">·</text>
               <text class="device-card-kind">{{ device.category }} / {{ device.type === 'fixed' ? '固定设备' : '移动设备' }}</text>
             </view>
           </view>
           <view class="device-card-right">
-            <text class="device-card-distance">{{ device._distance || '待定位' }}</text>
+            <text class="device-card-distance">{{ device._distance }}</text>
             <view class="nav-btn" @tap.stop="handleNavigate(device)">
               <text>导航</text>
               <app-icon class="nav-btn-icon" name="right" :size="13" color="#2E6DD1" />
@@ -232,8 +233,9 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import 'leaflet/dist/leaflet.css'
 // #endif
 import AppIcon from '@/components/AppIcon.vue'
-import { getCurrentGcj02Location } from '@/utils/location'
+import { getCurrentGcj02Location, FIXED_LOCATION } from '@/utils/location'
 import { loadAMap } from '@/common/amap'
+import { addBaseTileLayer } from '@/common/mapTiles'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
 
 const statusBarHeight = ref(0)
@@ -258,10 +260,24 @@ const radarNodes = [
 let mapInstance: any = null
 let mapProvider: 'amap' | 'leaflet' | null = null
 let leafletApi: any = null
-let markerMap: Record<string, any> = {}
+let markerMap: Record<string, {
+  marker: any
+  iconKey: string
+  longitude: number
+  latitude: number
+}> = {}
+let deviceById: Record<string, any> = {}
+/** 自身位置标记。H5 分支没有原生 show-location，需要自己画。 */
+let selfMarker: any = null
+/** 自身位置标记的内联结构。样式必须内联，原因见 buildLeafletIcon。 */
+const SELF_MARKER_HTML =
+  '<span style="position:relative;display:block;width:16px;height:16px;border-radius:50%;'
+  + 'background:rgba(47,115,232,0.22)">'
+  + '<i style="position:absolute;inset:4px;border-radius:50%;border:1.5px solid #FFFFFF;'
+  + 'background:#2F73E8;box-shadow:0 1px 4px rgba(47,115,232,0.5)"></i></span>'
 
-const myLocation = ref([120.15, 30.28])
-const locationReady = ref(false)
+// 位置固定可用，距离与排序无需等待定位授权
+const myLocation = ref([FIXED_LOCATION.longitude, FIXED_LOCATION.latitude])
 const remoteDevices = ref<any[] | null>(null)
 
 function calculateDistance(longitude: number, latitude: number) {
@@ -292,13 +308,6 @@ function mapRemoteDevice(device: EmergencyDeviceResponse) {
 
 const allDevices = computed(() => {
   const source = remoteDevices.value || []
-  if (!locationReady.value) {
-    return source.map(device => ({
-      ...device,
-      _distance: '',
-      _distanceValue: null
-    }))
-  }
   return source
     .map(device => {
       const distance = calculateDistance(device.longitude, device.latitude)
@@ -348,8 +357,8 @@ const nativeMarkers = computed(() => filteredDevices.value.map((device, index) =
   longitude: device.longitude,
   latitude: device.latitude,
   iconPath: markerAsset(device, true),
-  width: 32,
-  height: 40,
+  width: 24,
+  height: 30,
   callout: {
     content: device.category,
     color: '#1C2B45',
@@ -429,13 +438,15 @@ async function initMap() {
   mapProvider = 'amap'
   const AMap = (window as any).AMap
 
+  // 与 Leaflet 分支保持一致，统一以当前位置为中心
   mapInstance = new AMap.Map('map-container', {
-    zoom: 13,
-    center: [120.15, 30.28],
+    zoom: 14,
+    center: [...myLocation.value],
     mapStyle: 'amap://styles/whitesmoke',
     resizeEnable: true
   })
 
+  updateSelfMarker()
   addMarkers()
 }
 
@@ -447,13 +458,12 @@ async function initLeafletMap() {
     mapUnavailable.value = false
     mapInstance = leafletApi.map('map-container', {
       zoomControl: false,
-      attributionControl: true
-    }).setView([myLocation.value[1], myLocation.value[0]], 13)
-    leafletApi.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap'
-    }).addTo(mapInstance)
+      attributionControl: true,
+      preferCanvas: true
+    }).setView([myLocation.value[1], myLocation.value[0]], 14)
+    addBaseTileLayer(leafletApi, mapInstance)
     leafletApi.control.zoom({ position: 'bottomright' }).addTo(mapInstance)
+    updateSelfMarker()
     addMarkers()
   } catch {
     mapProvider = null
@@ -463,56 +473,158 @@ async function initLeafletMap() {
 }
 // #endif
 
-function addMarkers() {
-  if (!mapInstance || typeof window === 'undefined') return
+/** 画出或移动自身位置标记，让用户能看到自己与附近设备的相对位置。 */
+function updateSelfMarker() {
+  if (!mapInstance) return
+  const [longitude, latitude] = myLocation.value
+
   if (mapProvider === 'leaflet') {
-    Object.values(markerMap).forEach((marker: any) => marker.remove())
-    markerMap = {}
-    filteredDevices.value.forEach(device => {
-      const icon = leafletApi.divIcon({
-        className: 'rescue-leaflet-marker',
-        html: `<img src="${markerAsset(device)}" alt="">`,
-        iconSize: [36, 44],
-        iconAnchor: [18, 42]
-      })
-      const marker = leafletApi.marker([device.latitude, device.longitude], { icon })
-        .addTo(mapInstance)
-        .on('click', () => selectDevice(device))
-      markerMap[device.id] = marker
-    })
+    if (selfMarker) {
+      selfMarker.setLatLng([latitude, longitude])
+      return
+    }
+    selfMarker = leafletApi.marker([latitude, longitude], {
+      icon: leafletApi.divIcon({
+        className: 'rescue-self-marker',
+        html: SELF_MARKER_HTML,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      }),
+      zIndexOffset: 1000,
+      interactive: false
+    }).addTo(mapInstance)
     return
   }
-  if (mapProvider !== 'amap' || !(window as any).AMap) return
-  const AMap = (window as any).AMap
 
-  Object.values(markerMap).forEach((m: any) => mapInstance.remove(m))
-  markerMap = {}
+  const AMap = (window as any).AMap
+  if (!AMap) return
+  const position = new AMap.LngLat(longitude, latitude)
+  if (selfMarker) {
+    selfMarker.setPosition(position)
+    return
+  }
+  const content = document.createElement('div')
+  content.className = 'rescue-self-marker'
+  content.innerHTML = SELF_MARKER_HTML
+  selfMarker = new AMap.Marker({
+    position,
+    content,
+    offset: new AMap.Pixel(-8, -8),
+    zIndex: 200
+  })
+  mapInstance.add(selfMarker)
+}
+
+/** 标记外观只由类型和状态决定，用于判断是否需要重建图标。 */
+function markerIconKey(device: any) {
+  return `${device.type}-${deviceStatusClass(device)}`
+}
+
+/**
+ * 增量更新标记：按设备 id 复用已有标记，只处理新增、移除和真正变化的部分。
+ * 全量销毁重建会在每次筛选或搜索输入时重新创建 DOM 与图片请求，导致明显卡顿。
+ */
+function addMarkers() {
+  if (!mapInstance || typeof window === 'undefined') return
+  if (mapProvider !== 'leaflet' && (mapProvider !== 'amap' || !(window as any).AMap)) return
 
   const devices = filteredDevices.value
+  const nextIds = new Set(devices.map(device => String(device.id)))
+  deviceById = {}
   devices.forEach(device => {
-    const markerContent = document.createElement('div')
-    const markerImage = document.createElement('img')
-    markerImage.src = markerAsset(device)
-    markerImage.alt = ''
-    markerImage.width = 36
-    markerImage.height = 44
-    markerImage.style.display = 'block'
-    markerContent.appendChild(markerImage)
-
-    const marker = new AMap.Marker({
-      position: new AMap.LngLat(device.longitude, device.latitude),
-      content: markerContent,
-      offset: new AMap.Pixel(-18, -42),
-      title: device.name
-    })
-
-    marker.on('click', () => {
-      selectDevice(device)
-    })
-
-    mapInstance.add(marker)
-    markerMap[device.id] = marker
+    deviceById[String(device.id)] = device
   })
+
+  Object.keys(markerMap).forEach(id => {
+    if (nextIds.has(id)) return
+    const entry = markerMap[id]
+    if (mapProvider === 'leaflet') {
+      entry.marker.remove()
+    } else {
+      mapInstance.remove(entry.marker)
+    }
+    delete markerMap[id]
+  })
+
+  devices.forEach(device => {
+    const id = String(device.id)
+    const iconKey = markerIconKey(device)
+    const existing = markerMap[id]
+
+    if (existing) {
+      if (existing.iconKey !== iconKey) {
+        if (mapProvider === 'leaflet') {
+          existing.marker.setIcon(buildLeafletIcon(device))
+        } else {
+          existing.marker.setContent(buildAmapContent(device))
+        }
+        existing.iconKey = iconKey
+      }
+      if (existing.longitude !== device.longitude || existing.latitude !== device.latitude) {
+        if (mapProvider === 'leaflet') {
+          existing.marker.setLatLng([device.latitude, device.longitude])
+        } else {
+          existing.marker.setPosition(new (window as any).AMap.LngLat(device.longitude, device.latitude))
+        }
+        existing.longitude = device.longitude
+        existing.latitude = device.latitude
+      }
+      return
+    }
+
+    let marker: any
+    if (mapProvider === 'leaflet') {
+      marker = leafletApi.marker([device.latitude, device.longitude], { icon: buildLeafletIcon(device) })
+        .addTo(mapInstance)
+        .on('click', () => selectDeviceById(id))
+    } else {
+      const AMap = (window as any).AMap
+      marker = new AMap.Marker({
+        position: new AMap.LngLat(device.longitude, device.latitude),
+        content: buildAmapContent(device),
+        offset: new AMap.Pixel(-9, -21),
+        title: device.name
+      })
+      marker.on('click', () => selectDeviceById(id))
+      mapInstance.add(marker)
+    }
+
+    markerMap[id] = {
+      marker,
+      iconKey,
+      longitude: device.longitude,
+      latitude: device.latitude
+    }
+  })
+}
+
+function buildLeafletIcon(device: any) {
+  // 尺寸写在行内：uni-app 会给页面样式加 data-v 作用域属性，
+  // 而 divIcon 由 Leaflet 动态创建、拿不到该属性，外部 CSS 规则不会生效。
+  return leafletApi.divIcon({
+    className: 'rescue-leaflet-marker',
+    html: `<img src="${markerAsset(device)}" alt="" style="display:block;width:18px;height:22px;filter:drop-shadow(0 2px 4px rgba(28,54,82,0.22))">`,
+    iconSize: [18, 22],
+    iconAnchor: [9, 21]
+  })
+}
+
+function buildAmapContent(device: any) {
+  const markerContent = document.createElement('div')
+  const markerImage = document.createElement('img')
+  markerImage.src = markerAsset(device)
+  markerImage.alt = ''
+  markerImage.width = 18
+  markerImage.height = 22
+  markerImage.style.display = 'block'
+  markerContent.appendChild(markerImage)
+  return markerContent
+}
+
+/** 标记复用后点击回调不能捕获旧的设备对象，统一按 id 取当前数据。 */
+function selectDeviceById(id: string) {
+  const device = deviceById[id]
+  if (device) selectDevice(device)
 }
 
 function selectDevice(device: any) {
@@ -571,7 +683,7 @@ function handleSearch() {
 function locateMe(showResult = true) {
   const applyLocation = (longitude: number, latitude: number) => {
     myLocation.value = [longitude, latitude]
-    locationReady.value = true
+    updateSelfMarker()
     if (mapInstance) {
       if (mapProvider === 'leaflet') {
         mapInstance.setView([latitude, longitude], 14)
@@ -586,16 +698,9 @@ function locateMe(showResult = true) {
     if (showResult) uni.showToast({ title: '定位已更新', icon: 'success' })
   }
 
-  getCurrentGcj02Location()
-    .then((result) => {
-      applyLocation(result.longitude, result.latitude)
-    })
-    .catch(() => {
-      locationReady.value = false
-      if (showResult) {
-        uni.showToast({ title: '请授权使用位置信息', icon: 'none' })
-      }
-    })
+  getCurrentGcj02Location().then((result) => {
+    applyLocation(result.longitude, result.latitude)
+  })
 }
 
 function onDrawerTouchStart(e: any) {
@@ -655,15 +760,31 @@ onMounted(() => {
   })
 })
 
-watch([activeFilter, searchText, remoteDevices, myLocation], () => {
-  addMarkers()
-})
+// 搜索输入是逐字触发的，合并到一帧后再更新标记，避免每敲一个字都跑一遍。
+let markerUpdateTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleMarkerUpdate() {
+  if (markerUpdateTimer) clearTimeout(markerUpdateTimer)
+  markerUpdateTimer = setTimeout(() => {
+    markerUpdateTimer = null
+    addMarkers()
+  }, 120)
+}
+
+watch([activeFilter, searchText, remoteDevices, myLocation], scheduleMarkerUpdate)
 
 onUnmounted(() => {
+  if (markerUpdateTimer) {
+    clearTimeout(markerUpdateTimer)
+    markerUpdateTimer = null
+  }
   if (mapProvider === 'leaflet' && mapInstance) {
     mapInstance.remove()
     mapInstance = null
   }
+  markerMap = {}
+  deviceById = {}
+  selfMarker = null
 })
 </script>
 
@@ -675,9 +796,31 @@ onUnmounted(() => {
 }
 .rescue-leaflet-marker img {
   display: block;
-  width: 36px;
-  height: 44px;
-  filter: drop-shadow(0 4px 7px rgba(28, 54, 82, 0.22));
+  width: 18px;
+  height: 22px;
+  filter: drop-shadow(0 2px 4px rgba(28, 54, 82, 0.22));
+}
+
+/* 自身位置：蓝色圆点加光圈，与设备标记明显区分 */
+.rescue-self-marker {
+  background: transparent;
+  border: 0;
+}
+.rescue-self-marker span {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(47, 115, 232, 0.22);
+}
+.rescue-self-marker i {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1.5px solid #FFFFFF;
+  background: #2F73E8;
+  box-shadow: 0 1px 4px rgba(47, 115, 232, 0.5);
 }
 .leaflet-control-attribution {
   font-size: 9px;
@@ -739,10 +882,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.clear-icon {
-  font-size: 20rpx;
-  color: #FFFFFF;
 }
 .filter-tabs {
   display: flex;
@@ -1252,20 +1391,27 @@ onUnmounted(() => {
 .device-card:last-child {
   border-bottom: none;
 }
-.device-status-rail {
-  position: absolute;
-  top: 28rpx;
-  bottom: 28rpx;
-  left: 0;
-  width: 4rpx;
-  border-radius: 2rpx;
-  background: var(--network-faint);
+/* 类型图标：让列表首列有可扫读的图形锚点，不再是整片文字 */
+.device-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 60rpx;
+  width: 60rpx;
+  height: 60rpx;
+  margin-right: 16rpx;
+  border-radius: 16rpx;
+  background: rgba(46, 109, 209, 0.08);
 }
-.device-row-online .device-status-rail {
-  background: var(--network-online);
+.device-icon-offline {
+  background: rgba(201, 205, 212, 0.22);
 }
-.device-row-reserved .device-status-rail {
-  background: var(--network-warning);
+.device-icon-reserved {
+  background: rgba(217, 123, 18, 0.1);
+}
+.device-card-glyph {
+  width: 30rpx;
+  height: 36rpx;
 }
 .device-card-center {
   flex: 1;
@@ -1307,35 +1453,52 @@ onUnmounted(() => {
 .device-card-bottom {
   display: flex;
   align-items: center;
-  margin-top: 9rpx;
+  gap: 12rpx;
+  margin-top: 11rpx;
 }
-.device-card-status {
+/* 状态做成带底色的胶囊，让列表在纯文字之外有可扫读的层次 */
+.status-chip {
   display: flex;
   align-items: center;
   gap: 6rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+}
+.chip-online {
+  background: rgba(35, 149, 106, 0.1);
+}
+.chip-offline {
+  background: rgba(201, 205, 212, 0.24);
+}
+.chip-reserved {
+  background: rgba(217, 123, 18, 0.12);
 }
 .card-status-dot {
-  width: 12rpx;
-  height: 12rpx;
+  width: 10rpx;
+  height: 10rpx;
   border-radius: 50%;
 }
-.card-status-online .card-status-dot {
+.chip-online .card-status-dot {
   background: var(--network-online);
 }
-.card-status-offline .card-status-dot {
+.chip-offline .card-status-dot {
   background: #C9CDD4;
 }
-.card-status-reserved .card-status-dot {
+.chip-reserved .card-status-dot {
   background: var(--network-warning);
 }
 .card-status-text {
-  font-size: 22rpx;
-  color: var(--network-muted);
+  font-size: 21rpx;
+  font-weight: 600;
 }
-.device-card-separator {
-  margin: 0 8rpx;
-  color: var(--network-faint);
-  font-size: 20rpx;
+.chip-online .card-status-text {
+  color: #1C7A57;
+}
+.chip-offline .card-status-text {
+  color: #7A8494;
+}
+.chip-reserved .card-status-text {
+  color: #B4680C;
 }
 .device-card-kind {
   overflow: hidden;

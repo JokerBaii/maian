@@ -181,7 +181,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
-import { getCurrentGcj02Location } from '@/utils/location'
+import { FIXED_LOCATION, FIXED_LOCATION_SHORT_NAME } from '@/utils/location'
 import { scienceArticles, officialFirstAidVideos } from '@/data/editorial'
 
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
@@ -191,16 +191,17 @@ const homeArticles = scienceArticles.slice(0, 3)
 const homeVideos = officialFirstAidVideos.slice(0, 2)
 
 const deviceSnapshot = ref<EmergencyDeviceResponse[]>([])
-const currentCoordinates = ref<{ longitude: number; latitude: number } | null>(null)
+const currentCoordinates = ref<{ longitude: number; latitude: number } | null>({
+  longitude: FIXED_LOCATION.longitude,
+  latitude: FIXED_LOCATION.latitude
+})
 const devicesLoaded = ref(false)
 
 const availableDeviceCount = computed(() => (
   deviceSnapshot.value.filter(device => device.status === 'AVAILABLE').length
 ))
 
-const locationLabel = computed(() => (
-  currentCoordinates.value ? '当前位置已定位' : '杭州城区'
-))
+const locationLabel = FIXED_LOCATION_SHORT_NAME
 
 const networkSummary = computed(() => (
   devicesLoaded.value ? `${availableDeviceCount.value} 台设备可用` : '正在同步设备'
@@ -228,9 +229,8 @@ const healthBars = computed(() => {
 })
 
 async function loadHomeData() {
-  const [devicesResult, locationResult] = await Promise.allSettled([
+  const [devicesResult] = await Promise.allSettled([
     listEmergencyDevices(),
-    getCurrentGcj02Location(),
     loadMonitoring()
   ])
 
@@ -241,10 +241,6 @@ async function loadHomeData() {
     devicesLoaded.value = false
     deviceSnapshot.value = []
   }
-
-  currentCoordinates.value = locationResult.status === 'fulfilled'
-    ? locationResult.value
-    : null
 }
 
 function openSOS() {

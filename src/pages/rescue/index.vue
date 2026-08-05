@@ -95,7 +95,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import { uploadImage } from '@/api/files'
 import { ApiRequestError } from '@/api/http'
 import { createRescueCall, type RescueUrgency } from '@/api/rescue'
-import { getCurrentGcj02Location } from '@/utils/location'
+import { getCurrentGcj02Location, FIXED_LOCATION, FIXED_LOCATION_ADDRESS } from '@/utils/location'
 
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
 const isSubmitting = ref(false)
@@ -105,8 +105,12 @@ const selectedUrgency = ref('critical')
 const selectedSymptoms = ref<string[]>([])
 const description = ref('')
 const photoList = ref<string[]>([])
-const locationText = ref('正在获取当前位置')
-const rescueCoordinates = ref<{ latitude: number; longitude: number } | null>(null)
+const locationText = ref(FIXED_LOCATION_ADDRESS)
+// 位置固定，坐标从一开始就可用，呼救不会因缺少定位被拦住
+const rescueCoordinates = ref<{ latitude: number; longitude: number } | null>({
+  latitude: FIXED_LOCATION.latitude,
+  longitude: FIXED_LOCATION.longitude
+})
 const flowSteps = [
   { label: '获取定位', icon: 'location-filled' },
   { label: '智能匹配', icon: 'map-filled' },
@@ -128,16 +132,11 @@ const sosButtonText = computed(() => {
 async function refreshLocation() {
   if (isLocating.value) return false
   isLocating.value = true
-  locationText.value = '正在获取当前位置'
   try {
     const result = await getCurrentGcj02Location()
     rescueCoordinates.value = { latitude: result.latitude, longitude: result.longitude }
-    locationText.value = `定位已就绪 · ${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}`
+    locationText.value = FIXED_LOCATION_ADDRESS
     return true
-  } catch {
-    rescueCoordinates.value = null
-    locationText.value = '定位失败，点击重新获取'
-    return false
   } finally {
     isLocating.value = false
   }
@@ -164,16 +163,6 @@ function removePhoto(index: number) {
 
 async function triggerSOS() {
   if (isSubmitting.value || isLocating.value) return
-  if (!rescueCoordinates.value && !(await refreshLocation())) {
-    uni.showModal({
-      title: '暂时无法获取位置',
-      content: '请开启定位权限后重试；情况危急时请直接拨打 120。',
-      confirmText: '拨打 120',
-      cancelText: '稍后重试',
-      success: result => result.confirm && callEmergency()
-    })
-    return
-  }
   await submitRescue()
 }
 

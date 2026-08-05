@@ -33,17 +33,23 @@
       <view class="timeline-section">
         <view class="section-header">
           <view class="section-title-wrap">
-            <view class="section-title-bar"></view>
             <text class="section-title">体检记录</text>
           </view>
         </view>
 
-        <view class="timeline">
+        <view v-if="loading" class="archive-state">正在加载健康档案…</view>
+        <view v-else-if="!archive.length" class="archive-state">
+          <text class="archive-state-title">暂无体检报告</text>
+          <text class="archive-state-desc">点击右下角按钮上传报告原图，识别后即可生成分析</text>
+        </view>
+
+        <view v-else class="timeline">
           <view
             v-for="(record, idx) in archive"
             :key="idx"
             class="timeline-item"
             @tap="goReport(record)"
+            @longpress="confirmDelete(record)"
           >
             <view class="timeline-left">
               <view class="timeline-dot-wrap">
@@ -56,7 +62,7 @@
               </view>
             </view>
 
-            <view class="record-card" :class="'card-' + record.riskLevel">
+            <view class="record-card">
               <view class="record-header">
                 <view class="record-hospital-wrap">
                   <app-icon-tile name="hospital" tone="blue" size="small" />
@@ -76,20 +82,13 @@
                     </view>
                   </view>
                   <view class="record-stat">
-                    <text class="record-stat-label">风险等级</text>
-                    <view class="risk-level-bar">
-                      <view class="risk-level-track">
-                        <view
-                          class="risk-level-fill"
-                          :class="'fill-' + record.riskLevel"
-                          :style="{ width: riskWidth(record.riskLevel) + '%' }"
-                        ></view>
-                      </view>
-                    </view>
+                    <text class="record-stat-label">体检日期</text>
+                    <text class="record-stat-value">{{ record.date }}</text>
                   </view>
                 </view>
               </view>
               <view class="record-footer">
+                <text class="record-hint">长按删除</text>
                 <text class="record-action">查看详细报告</text>
                 <text class="record-arrow">></text>
               </view>
@@ -114,7 +113,7 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIconTile from '@/components/AppIconTile.vue'
-import { listHealthReports } from '@/api/reports'
+import { listHealthReports, deleteHealthReport } from '@/api/reports'
 
 interface ArchiveRecord {
   id: string
@@ -125,8 +124,9 @@ interface ArchiveRecord {
 }
 
 const archive = ref<ArchiveRecord[]>([])
+const loading = ref(true)
 
-onShow(async () => {
+async function loadArchive() {
   try {
     const reports = await listHealthReports()
     archive.value = reports.map(report => ({
@@ -138,8 +138,32 @@ onShow(async () => {
     }))
   } catch {
     uni.showToast({ title: '健康档案加载失败', icon: 'none' })
+  } finally {
+    loading.value = false
   }
-})
+}
+
+onShow(loadArchive)
+
+/** 长按删除报告。后端按当前用户校验归属，只能删自己的记录。 */
+function confirmDelete(record: ArchiveRecord) {
+  uni.showModal({
+    title: '删除这份报告',
+    content: `${record.hospital} · ${record.date}\n删除后无法恢复。`,
+    confirmText: '删除',
+    confirmColor: '#C93D46',
+    success: async (result) => {
+      if (!result.confirm) return
+      try {
+        await deleteHealthReport(record.id)
+        archive.value = archive.value.filter(item => item.id !== record.id)
+        uni.showToast({ title: '已删除', icon: 'success' })
+      } catch (error: any) {
+        uni.showToast({ title: error?.message || '删除失败，请重试', icon: 'none' })
+      }
+    }
+  })
+}
 
 const latestDate = computed(() => {
   if (archive.value.length > 0) {
@@ -165,11 +189,6 @@ const riskLevelMap: Record<string, string> = {
   low: '低风险',
   medium: '中风险',
   high: '高风险'
-}
-
-function riskWidth(level: string) {
-  const map: Record<string, number> = { low: 33, medium: 66, high: 100 }
-  return map[level] || 33
 }
 
 function goReport(record: any) {
@@ -279,13 +298,6 @@ function goUpload() {
   display: flex;
   align-items: center;
 }
-.section-title-bar {
-  width: 6rpx;
-  height: 28rpx;
-  border-radius: 3rpx;
-  background: #2E6DD1;
-  margin-right: 12rpx;
-}
 .section-title {
   font-size: 30rpx;
   font-weight: 700;
@@ -368,16 +380,12 @@ function goUpload() {
   border-radius: 20rpx;
   padding: 20rpx;
   box-shadow: 0 4rpx 20rpx rgba(43, 111, 240, 0.06);
-  border-left: 4rpx solid #E5E6EB;
   transition: all 0.2s ease;
 }
 .record-card:active {
   transform: scale(0.98);
   box-shadow: 0 2rpx 12rpx rgba(43, 111, 240, 0.1);
 }
-.card-low { border-left-color: #23956A; }
-.card-medium { border-left-color: #FF9A2E; }
-.card-high { border-left-color: #C93D46; }
 
 .record-header {
   display: flex;
@@ -445,6 +453,32 @@ function goUpload() {
   color: #86909C;
   font-weight: 500;
 }
+.record-stat-value {
+  font-size: 23rpx;
+  color: #4E5969;
+  font-weight: 600;
+}
+.archive-state {
+  margin-top: 20rpx;
+  padding: 60rpx 32rpx;
+  border-radius: 20rpx;
+  background: #FFFFFF;
+  text-align: center;
+  color: #86909C;
+  font-size: 25rpx;
+}
+.archive-state-title {
+  display: block;
+  color: #1C2B45;
+  font-size: 29rpx;
+  font-weight: 700;
+}
+.archive-state-desc {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 23rpx;
+  line-height: 1.6;
+}
 .abnormal-badge {
   min-width: 36rpx;
   height: 36rpx;
@@ -467,31 +501,6 @@ function goUpload() {
 .badge-has .abnormal-badge-text { color: #C93D46; }
 .badge-none .abnormal-badge-text { color: #23956A; }
 
-.risk-level-bar {
-  flex: 1;
-}
-.risk-level-track {
-  width: 120rpx;
-  height: 12rpx;
-  border-radius: 6rpx;
-  background: #F2F3F5;
-  overflow: hidden;
-}
-.risk-level-fill {
-  height: 100%;
-  border-radius: 6rpx;
-  transition: width 0.3s ease;
-}
-.fill-low {
-  background: linear-gradient(90deg, #23956A 0%, #4DC580 100%);
-}
-.fill-medium {
-  background: linear-gradient(90deg, #FF9A2E 0%, #FFCF8B 100%);
-}
-.fill-high {
-  background: linear-gradient(90deg, #C93D46 0%, #FF7D7D 100%);
-}
-
 .record-footer {
   display: flex;
   align-items: center;
@@ -499,6 +508,11 @@ function goUpload() {
   gap: 4rpx;
   padding-top: 12rpx;
   border-top: 1rpx solid #F2F3F5;
+}
+.record-hint {
+  margin-right: auto;
+  color: #B6BFCC;
+  font-size: 21rpx;
 }
 .record-action {
   font-size: 24rpx;
