@@ -1,32 +1,34 @@
 package cn.maian.health.service;
 
-import cn.maian.common.exception.HealthAnalysisUnavailableException;
 import cn.maian.health.dto.HealthAnalysisRequest;
 import cn.maian.health.dto.HealthAnalysisResponse;
 import cn.maian.health.dto.HealthIndicator;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.retry.NonTransientAiException;
-import org.springframework.ai.retry.TransientAiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.util.stream.Collectors;
 
 @Service
+@Primary
 @ConditionalOnProperty(name = "app.ai.enabled", havingValue = "true")
 public class SpringAiHealthAnalysisService implements HealthAnalysisService {
 
     private final ChatClient chatClient;
     private final Resource promptTemplate;
+    private final RuleBasedHealthAnalysisService fallback;
 
     public SpringAiHealthAnalysisService(
         ChatClient.Builder chatClientBuilder,
-        @Value("classpath:prompts/analyze-health-report.st") Resource promptTemplate
+        @Value("classpath:prompts/analyze-health-report.st") Resource promptTemplate,
+        RuleBasedHealthAnalysisService fallback
     ) {
         this.chatClient = chatClientBuilder.build();
         this.promptTemplate = promptTemplate;
+        this.fallback = fallback;
     }
 
     @Override
@@ -40,23 +42,14 @@ public class SpringAiHealthAnalysisService implements HealthAnalysisService {
                     .param("indicators", formatIndicators(request)))
                 .call()
                 .entity(HealthAnalysisResponse.class);
-        } catch (TransientAiException exception) {
-            throw new HealthAnalysisUnavailableException(
-                "AI 健康分析暂时繁忙，请稍后重试",
-                exception
-            );
-        } catch (NonTransientAiException exception) {
-            throw new HealthAnalysisUnavailableException(
-                "AI 健康分析配置不可用，请联系管理员",
-                exception
-            );
+        } catch (Exception exception) {
+            // AI 不可用（余额不足、网络中断、超时）时自动降级到规则分析，
+            // 保证体检报告保存不失败。规则结果 analysisSource 为 RULE_BASED。
+            return fallback.analyze(request);
         }
 
         if (result == null) {
-            throw new HealthAnalysisUnavailableException(
-                "AI 未返回可解析的健康分析结果",
-                null
-            );
+            return fallback.analyze(request);
         }
 
         return new HealthAnalysisResponse(

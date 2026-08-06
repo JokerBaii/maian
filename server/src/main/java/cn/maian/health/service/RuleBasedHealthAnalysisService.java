@@ -4,17 +4,16 @@ import cn.maian.health.domain.HealthRiskLevel;
 import cn.maian.health.dto.HealthAnalysisRequest;
 import cn.maian.health.dto.HealthAnalysisResponse;
 import cn.maian.health.dto.HealthIndicator;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * 规则分析：始终注册，作为 AI 分析失败时的自动降级。
+ * AI 启用时由 SpringAiHealthAnalysisService 优先（@Primary），
+ * AI 不可用（余额不足、网络中断、未配置 key）时回退到这里，保证报告保存不失败。
+ */
 @Service
-@ConditionalOnProperty(
-    name = "app.ai.enabled",
-    havingValue = "false",
-    matchIfMissing = true
-)
 public class RuleBasedHealthAnalysisService implements HealthAnalysisService {
 
     @Override
