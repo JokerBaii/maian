@@ -14,7 +14,7 @@
         <text class="title">{{ item.title }}</text>
         <text class="content">{{ item.content }}</text>
         <image v-if="item.coverImageUrl" class="cover" :src="item.coverImageUrl" mode="aspectFill" />
-        <view class="actions">
+        <view class="actions" :class="{ 'actions-busy': reviewingId === item.id }">
           <view class="reject" @tap="review(item, false)">驳回</view>
           <view class="approve" @tap="review(item, true)">审核通过</view>
         </view>
@@ -57,7 +57,11 @@ function formatTime(value: string) {
   return Number.isNaN(date.getTime()) ? value : `${date.getMonth() + 1}月${date.getDate()}日`
 }
 
+const reviewingId = ref('')
+
 function review(item: ScienceSubmissionResponse, approved: boolean) {
+  if (reviewingId.value) return
+  reviewingId.value = item.id
   uni.showModal({
     title: approved ? '通过投稿' : '驳回投稿',
     content: approved ? `确认通过《${item.title}》？` : `确认驳回《${item.title}》？`,
@@ -66,14 +70,22 @@ function review(item: ScienceSubmissionResponse, approved: boolean) {
     confirmText: approved ? '通过' : '驳回',
     confirmColor: approved ? '#23956A' : '#C93D46',
     success: async result => {
-      if (!result.confirm) return
+      if (!result.confirm) {
+        reviewingId.value = ''
+        return
+      }
       try {
         await reviewScienceSubmission(item.id, approved, result.content?.trim() || undefined)
         submissions.value = submissions.value.filter(candidate => candidate.id !== item.id)
         uni.showToast({ title: approved ? '审核已通过' : '投稿已驳回', icon: 'success' })
       } catch (error: any) {
         uni.showToast({ title: error?.message || '审核失败', icon: 'none' })
+      } finally {
+        reviewingId.value = ''
       }
+    },
+    fail: () => {
+      reviewingId.value = ''
     }
   })
 }
@@ -98,6 +110,7 @@ onShow(loadSubmissions)
 .content { display: -webkit-box; margin-top: 12rpx; overflow: hidden; color: #607187; font-size: 24rpx; line-height: 1.7; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
 .cover { width: 100%; height: 240rpx; margin-top: 18rpx; border-radius: 14rpx; }
 .actions { display: flex; gap: 16rpx; margin-top: 24rpx; }
+.actions-busy { opacity: 0.55; }
 .reject,
 .approve { flex: 1; padding: 18rpx; border-radius: 14rpx; text-align: center; font-size: 25rpx; font-weight: 650; }
 .reject { background: #F7EDEF; color: #A33D45; }

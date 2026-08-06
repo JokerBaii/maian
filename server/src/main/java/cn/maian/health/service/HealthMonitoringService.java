@@ -93,7 +93,9 @@ public class HealthMonitoringService {
                 ))
                 .orElseGet(() -> new HealthMonitoringResponse.WearableDevice(
                     "未绑定设备", "none", false, 0
-                ))
+                )),
+            settings.getMinHeartRate(),
+            settings.getMaxHeartRate()
         );
     }
 

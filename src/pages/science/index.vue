@@ -59,7 +59,11 @@
         @tap="goDetail(item)"
       >
         <view class="card-cover">
-          <image class="card-cover-image" :src="item.cover" mode="aspectFill" />
+          <image
+            class="card-cover-image"
+            :src="item.cover.startsWith('/uploads/') ? resolveApiUrl(item.cover) : item.cover"
+            mode="aspectFill"
+          />
         </view>
         <view class="card-body">
           <text class="card-title">{{ item.title }}</text>
@@ -131,8 +135,11 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
+import { resolveApiUrl } from '@/api/http'
 import { scienceArticles, scienceCategories, officialFirstAidVideos } from '@/data/editorial'
+import { listApprovedScienceSubmissions } from '@/api/science'
 
 const statusBarHeight = ref(0)
 const systemInfo = uni.getSystemInfoSync()
@@ -148,8 +155,38 @@ const contentModes = [
   { key: 'quiz', label: '急救自测', icon: 'science-update' }
 ] as const
 
+/** 已审核通过的投稿，与官方文章合并展示，形成"投稿→审核→上架"闭环。 */
+const approvedSubmissions = ref<any[]>([])
+
+onShow(async () => {
+  try {
+    const page = await listApprovedScienceSubmissions()
+    approvedSubmissions.value = page.content.map(submission => ({
+      id: 'submission-' + submission.id,
+      isSubmission: true,
+      submissionId: submission.id,
+      title: submission.title,
+      category: submission.category,
+      categoryLabel: ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[submission.category] || '科普投稿',
+      cover: submission.coverImageUrl || '',
+      author: '用户投稿',
+      summary: submission.content,
+      content: submission.content,
+      viewCount: 0,
+      likeCount: 0,
+      collectCount: 0,
+      publishTime: (submission.submittedAt || '').slice(0, 10),
+      isLiked: false,
+      isCollected: false,
+      media: { type: 'image', url: '', poster: '', images: [] }
+    }))
+  } catch {
+    // 投稿接口异常不影响官方内容展示
+  }
+})
+
 const filteredContents = computed(() => {
-  let list = scienceArticles
+  let list = [...scienceArticles, ...approvedSubmissions.value]
   if (activeCategory.value !== 'all') {
     list = list.filter(c => c.category === activeCategory.value)
   }
@@ -174,7 +211,7 @@ function goBack() {
 }
 
 function goDetail(item: any) {
-  uni.navigateTo({ url: '/pages/science/detail?id=' + item.id })
+  uni.navigateTo({ url: '/pages/science/detail?id=' + encodeURIComponent(item.id) })
 }
 
 function goQuiz() {

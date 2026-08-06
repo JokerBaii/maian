@@ -1,10 +1,11 @@
 <template>
   <view class="page">
+    <view class="page-scroll">
     <view class="cover-area">
       <view class="cover-image-area">
         <image
           class="cover-image"
-          :src="article.cover"
+          :src="article.cover.startsWith('/uploads/') ? resolveApiUrl(article.cover) : article.cover"
           mode="aspectFill"
         />
         <view class="cover-gradient"></view>
@@ -62,7 +63,7 @@
         </view>
       </view>
 
-      <view class="action-bar-placeholder"></view>
+    </view>
     </view>
 
     <view class="action-bar">
@@ -109,8 +110,10 @@ import { ref, computed, onMounted } from 'vue'
 import { scienceArticles } from '@/data/editorial'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
+import { resolveApiUrl } from '@/api/http'
 import {
   getScienceArticleInteraction,
+  listApprovedScienceSubmissions,
   updateScienceArticleInteraction
 } from '@/api/science'
 
@@ -121,7 +124,25 @@ if (currentPage?.options?.id) {
   articleId.value = currentPage.options.id
 }
 
+/** 投稿类文章（用户投稿审核通过后上架，id 形如 submission-{uuid}）。 */
+const submissionArticle = ref<{
+  title: string
+  categoryLabel: string
+  cover: string
+  author: string
+  publishTime: string
+  viewCount: number
+  likeCount: number
+  collectCount: number
+  content: string
+  summary: string
+  isLiked: boolean
+  isCollected: boolean
+  media: { type: string; url: string; poster: string; images: string[] }
+} | null>(null)
+
 const article = computed(() => {
+  if (submissionArticle.value) return submissionArticle.value
   const found = scienceArticles.find(c => c.id === articleId.value)
   return found || scienceArticles[0]
 })
@@ -131,6 +152,7 @@ const isCollected = ref(article.value.isCollected)
 const interactionSaving = ref(false)
 
 async function loadInteraction() {
+  if (articleId.value.startsWith('submission-')) return
   try {
     const interaction = await getScienceArticleInteraction(articleId.value)
     isLiked.value = interaction.liked
@@ -216,14 +238,54 @@ function previewImage(idx: number) {
   }
 }
 
-onMounted(loadInteraction)
+onMounted(async () => {
+  if (articleId.value.startsWith('submission-')) {
+    try {
+      const page = await listApprovedScienceSubmissions()
+      const found = page.content.find(item => 'submission-' + item.id === articleId.value)
+      if (found) {
+        submissionArticle.value = {
+          title: found.title,
+          categoryLabel: ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[found.category] || '科普投稿',
+          cover: found.coverImageUrl || '',
+          author: '用户投稿',
+          publishTime: (found.submittedAt || '').slice(0, 10),
+          summary: found.content,
+          isLiked: false,
+          isCollected: false,
+          viewCount: 0,
+          likeCount: 0,
+          collectCount: 0,
+          content: found.content,
+          media: { type: 'image', url: '', poster: '', images: [] }
+        }
+      }
+    } catch {
+      uni.showToast({ title: '投稿加载失败', icon: 'none' })
+    }
+    return
+  }
+  loadInteraction()
+})
 
 </script>
 
 <style lang="scss" scoped>
+/* 扣掉导航栏高度，避免 body 多出可滚空间导致底部操作栏跟随滚动 */
 .page {
-  min-height: 100vh;
+  height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px));
+  height: calc(100dvh - var(--window-top, 0px) - var(--window-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #F3F7FA;
+}
+
+.page-scroll {
+  flex: 1;
+  height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .cover-area {
@@ -373,16 +435,8 @@ onMounted(loadInteraction)
   flex-shrink: 0;
 }
 
-.action-bar-placeholder {
-  height: 140rpx;
-}
-
 .action-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
+  flex-shrink: 0;
   background: #FFFFFF;
   border-top: 1rpx solid #F2F3F5;
   padding-bottom: env(safe-area-inset-bottom);

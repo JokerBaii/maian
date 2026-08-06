@@ -15,7 +15,7 @@
         <text class="device-address">{{ device.address }}</text>
         <text v-if="device.vehicleInfo" class="device-detail">车辆信息：{{ device.vehicleInfo }}</text>
         <text v-if="device.expireDate" class="device-detail">有效期：{{ device.expireDate }}</text>
-        <view class="actions">
+        <view class="actions" :class="{ 'actions-busy': reviewingId === device.id }">
           <view class="reject-btn" @tap="review(device, false)">驳回</view>
           <view class="approve-btn" @tap="review(device, true)">审核通过</view>
         </view>
@@ -43,20 +43,32 @@ async function load() {
   }
 }
 
+const reviewingId = ref('')
+
 function review(device: EmergencyDeviceResponse, approved: boolean) {
+  if (reviewingId.value) return
+  reviewingId.value = device.id
   uni.showModal({
     title: approved ? '确认审核通过' : '确认驳回',
     content: approved ? `“${device.name}”将进入地图和调度候选。` : `“${device.name}”将退回用户修改。`,
     confirmColor: approved ? '#1F63D5' : '#C93D46',
     success: async result => {
-      if (!result.confirm) return
+      if (!result.confirm) {
+        reviewingId.value = ''
+        return
+      }
       try {
         await reviewEmergencyDevice(device.id, approved, approved ? '资料审核通过' : '资料需补充后重新提交')
         devices.value = devices.value.filter(item => item.id !== device.id)
         uni.showToast({ title: approved ? '已通过' : '已驳回', icon: 'success' })
       } catch (error: any) {
         uni.showToast({ title: error?.message || '审核失败', icon: 'none' })
+      } finally {
+        reviewingId.value = ''
       }
+    },
+    fail: () => {
+      reviewingId.value = ''
     }
   })
 }
@@ -77,6 +89,7 @@ onShow(load)
 .device-meta, .device-address, .device-detail { display: block; margin-top: 12rpx; font-size: 25rpx; color: #56627A; }
 .device-address { color: #26364D; }
 .actions { display: flex; gap: 16rpx; margin-top: 26rpx; }
+.actions-busy { opacity: 0.55; }
 .reject-btn, .approve-btn { flex: 1; padding: 20rpx 0; border-radius: 14rpx; text-align: center; font-size: 26rpx; font-weight: 600; }
 .reject-btn { color: #C93D46; background: #FFF0F0; }
 .approve-btn { color: #FFFFFF; background: #1F63D5; }

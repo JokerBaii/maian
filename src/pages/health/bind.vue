@@ -195,12 +195,37 @@ function toggleScan() {
   // #endif
   // #ifndef APP-PLUS
   uni.showModal({
-    title: '请使用移动端',
-    content: '浏览器无法稳定访问低功耗蓝牙设备，请在 iOS App 中完成扫描和绑定。',
-    showCancel: false,
-    confirmText: '知道了'
+    title: '演示环境无法扫描蓝牙',
+    content: '浏览器无法访问低功耗蓝牙设备。可绑定一台演示设备，展示连接与心率同步流程。',
+    confirmText: '绑定演示设备',
+    cancelText: '取消',
+    success: (result) => {
+      if (result.confirm) demoBind()
+    }
   })
   // #endif
+}
+
+/** H5 演示兜底：直接绑定后端种子穿戴设备，跳过蓝牙扫描环节。 */
+async function demoBind() {
+  const demoDevice = { name: '演示心率手环', type: 'bluetooth', connected: true }
+  try {
+    const saved = await saveWearableDevice({
+      deviceIdentifier: 'demo-h5-band',
+      name: demoDevice.name,
+      type: demoDevice.type,
+      connected: true,
+      battery: 86
+    })
+    updateWearable(saved)
+    boundDeviceName.value = saved.name
+    showBindSuccess.value = true
+    setTimeout(() => {
+      showBindSuccess.value = false
+    }, 1800)
+  } catch {
+    uni.showToast({ title: '演示设备绑定失败，请重试', icon: 'none' })
+  }
 }
 
 // #ifdef APP-PLUS

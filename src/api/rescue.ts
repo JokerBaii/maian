@@ -98,3 +98,31 @@ export function updateResponderProgress(id: string, status: 'RESCUING' | 'COMPLE
     { method: 'PATCH' as UniNamespace.RequestOptions['method'], data: { status } }
   )
 }
+
+/** 呼救方取消未结束的呼救（后端状态机只允许呼救者发起取消）。 */
+export function cancelRescueCall(id: string) {
+  return request<RescueCallResponse>(
+    `/api/v1/rescue-calls/${encodeURIComponent(id)}/status`,
+    { method: 'PATCH' as UniNamespace.RequestOptions['method'], data: { status: 'CANCELLED' } }
+  )
+}
+
+export interface RescueFeedbackResponse {
+  rescueCallId: string
+  fromUserId: string
+  toUserId?: string
+  rating: number
+  comment?: string
+  createdAt: string
+}
+
+export function submitRescueFeedback(id: string, payload: { rating: number; comment?: string }) {
+  return request<RescueFeedbackResponse>(
+    `/api/v1/rescue-calls/${encodeURIComponent(id)}/feedback`,
+    { method: 'POST', data: payload }
+  )
+}
+
+export function getRescueFeedback(id: string) {
+  return request<RescueFeedbackResponse>(`/api/v1/rescue-calls/${encodeURIComponent(id)}/feedback`)
+}

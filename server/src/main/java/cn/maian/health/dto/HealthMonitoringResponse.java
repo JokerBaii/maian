@@ -13,7 +13,9 @@ public record HealthMonitoringResponse(
     List<DailyHeartRate> weekData,
     List<DailyHeartRate> monthData,
     List<HeartRateAlert> alerts,
-    WearableDevice wearable
+    WearableDevice wearable,
+    int minHeartRate,
+    int maxHeartRate
 ) {
     public record HeartRatePoint(String time, int value, String scene) {
     }

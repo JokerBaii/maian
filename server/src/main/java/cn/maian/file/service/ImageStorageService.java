@@ -46,7 +46,9 @@ public class ImageStorageService {
             throw new IllegalArgumentException("请选择需要上传的图片");
         }
         if (file.getSize() > maxFileSize) {
-            throw new IllegalArgumentException("图片大小不能超过 5MB");
+            throw new IllegalArgumentException(
+                "图片大小不能超过 " + (maxFileSize / 1024 / 1024) + "MB"
+            );
         }
 
         var imageType = SUPPORTED_TYPES.get(file.getContentType());

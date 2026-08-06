@@ -26,6 +26,7 @@
           v-for="record in initiatedRecords"
           :key="record.id"
           class="record-card"
+          @tap="goDetail(record.id)"
         >
           <view class="record-header">
             <view class="urgency-badge" :class="'urgency-' + record.urgency">
@@ -61,6 +62,7 @@
           v-for="record in participatedRecords"
           :key="record.id"
           class="record-card"
+          @tap="goDetail(record.id)"
         >
           <view class="record-header">
             <view class="urgency-badge" :class="'urgency-' + record.urgency">
@@ -131,6 +133,10 @@ function toRecord(call: RescueCallResponse): RescueRecordView {
     status: call.status.toLowerCase(),
     createTime: formatTime(call.createdAt)
   }
+}
+
+function goDetail(rescueId: string) {
+  uni.navigateTo({ url: `/pages/rescue/detail?id=${encodeURIComponent(rescueId)}` })
 }
 
 async function loadRecords() {

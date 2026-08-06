@@ -50,6 +50,11 @@ public class ScienceSubmissionController {
         return ApiResponse.ok(PageResponse.from(scienceSubmissionService.findAll(pageable)));
     }
 
+    @GetMapping("/approved")
+    public ApiResponse<PageResponse<ScienceSubmissionResponse>> findApproved(Pageable pageable) {
+        return ApiResponse.ok(PageResponse.from(scienceSubmissionService.findApproved(pageable)));
+    }
+
     @GetMapping("/reviews/pending")
     public ApiResponse<PageResponse<ScienceSubmissionResponse>> findPendingReviews(Pageable pageable) {
         return ApiResponse.ok(PageResponse.from(scienceSubmissionService.findPendingReviews(pageable)));

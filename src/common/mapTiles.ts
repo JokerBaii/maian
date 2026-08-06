@@ -17,7 +17,28 @@ const TILE_OPTIONS = {
   attribution: '© 高德地图'
 }
 
-/** 在给定 Leaflet 实例上挂载底图。 */
-export function addBaseTileLayer(leafletApi: any, mapInstance: any) {
-  return leafletApi.tileLayer(TILE_URL, TILE_OPTIONS).addTo(mapInstance)
+/** 挂载底图。瓦片是异步图片请求拿不到异常，连续失败时通过 onUnavailable 通知调用方。 */
+export function addBaseTileLayer(
+  leafletApi: any,
+  mapInstance: any,
+  onUnavailable?: () => void
+) {
+  const layer = leafletApi.tileLayer(TILE_URL, TILE_OPTIONS).addTo(mapInstance)
+
+  if (onUnavailable) {
+    let errorCount = 0
+    let notified = false
+    layer.on('tileerror', () => {
+      errorCount += 1
+      if (!notified && errorCount >= 6) {
+        notified = true
+        onUnavailable()
+      }
+    })
+    layer.on('tileload', () => {
+      errorCount = 0
+    })
+  }
+
+  return layer
 }

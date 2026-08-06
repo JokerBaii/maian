@@ -1,6 +1,7 @@
 <template>
   <view v-if="lesson" class="page">
     <video
+      v-if="!videoFailed"
       class="video-player"
       :src="lesson.url"
       :poster="lesson.poster"
@@ -10,7 +11,16 @@
       show-fullscreen-btn
       show-play-btn
       object-fit="contain"
+      @error="videoFailed = true"
     />
+    <view v-else class="video-fallback">
+      <image class="video-fallback-poster" :src="lesson.poster" mode="aspectFill" />
+      <view class="video-fallback-mask">
+        <text class="video-fallback-title">视频源暂不可用</text>
+        <text class="video-fallback-desc">可前往原始发布页观看完整课程</text>
+        <view class="video-fallback-btn" @tap="openSource">查看原始发布</view>
+      </view>
+    </view>
     <view class="lesson-card">
       <text class="lesson-label">急救视频课堂</text>
       <text class="lesson-title">{{ lesson.title }}</text>
@@ -40,6 +50,7 @@ import { officialFirstAidVideos } from '@/data/editorial'
 import { openExternalUrl } from '@/utils/external'
 
 const lesson = ref<(typeof officialFirstAidVideos)[number] | null>(null)
+const videoFailed = ref(false)
 
 onLoad((query) => {
   lesson.value = officialFirstAidVideos.find(item => item.id === query?.id) || null
@@ -57,6 +68,12 @@ function openQuiz() {
 <style lang="scss" scoped>
 .page { min-height: 100vh; padding-bottom: 50rpx; background: #F3F7FA; color: #20364D; }
 .video-player { width: 100%; height: 460rpx; background: #101820; }
+.video-fallback { position: relative; width: 100%; height: 460rpx; overflow: hidden; background: #101820; }
+.video-fallback-poster { width: 100%; height: 100%; opacity: 0.35; }
+.video-fallback-mask { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12rpx; }
+.video-fallback-title { color: #FFFFFF; font-size: 30rpx; font-weight: 700; }
+.video-fallback-desc { color: rgba(255, 255, 255, 0.72); font-size: 23rpx; }
+.video-fallback-btn { margin-top: 8rpx; padding: 14rpx 32rpx; border: 1rpx solid rgba(255, 255, 255, 0.6); border-radius: 999rpx; color: #FFFFFF; font-size: 24rpx; font-weight: 650; }
 .lesson-card, .learning-note { margin: 20rpx 24rpx 0; padding: 26rpx; border: 1rpx solid #DDE6EE; border-radius: 18rpx; background: #FFFFFF; }
 .lesson-label { display: block; color: #A9212B; font-size: 20rpx; font-weight: 700; }
 .lesson-title { display: block; margin-top: 9rpx; color: #20364D; font-size: 33rpx; font-weight: 760; line-height: 1.35; }

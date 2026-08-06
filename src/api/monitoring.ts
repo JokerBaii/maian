@@ -41,6 +41,8 @@ export interface HealthMonitoringResponse {
   monthData: DailyHeartRate[]
   alerts: HeartRateAlert[]
   wearable: WearableDevice
+  minHeartRate: number
+  maxHeartRate: number
 }
 
 export function getHealthMonitoring() {

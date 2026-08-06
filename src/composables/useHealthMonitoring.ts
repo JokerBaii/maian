@@ -21,7 +21,9 @@ const monitoring = ref<HealthMonitoringResponse>({
     type: 'none',
     connected: false,
     battery: 0
-  }
+  },
+  minHeartRate: 50,
+  maxHeartRate: 120
 })
 
 let loadingPromise: Promise<HealthMonitoringResponse> | null = null

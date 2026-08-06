@@ -53,8 +53,12 @@
 
         <view class="trend-chart">
           <canvas canvas-id="healthTrendCanvas" id="healthTrendCanvas" class="trend-canvas"></canvas>
+          <view v-if="!hasTodayTrend" class="trend-empty">
+            <text class="trend-empty-text">今日暂无心率记录</text>
+            <text class="trend-empty-hint">连接穿戴设备后自动同步</text>
+          </view>
         </view>
-        <view class="trend-labels">
+        <view v-if="hasTodayTrend" class="trend-labels">
           <text>0时</text>
           <text>6时</text>
           <text>12时</text>
@@ -155,6 +159,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
@@ -188,6 +193,9 @@ const sceneLabel = computed(() => {
 const trendModeLabel = computed(() =>
   isDeviceConnected.value ? '设备同步记录' : '连接设备后显示趋势'
 )
+
+const hasTodayTrend = computed(() => heartRateData.value.todayData.length >= 2)
+
 async function drawTrendChart() {
   const data = heartRateData.value.todayData
   if (data.length < 2) return
@@ -248,6 +256,17 @@ async function drawTrendChart() {
 }
 
 onMounted(async () => {
+  await loadHealthData()
+})
+
+// 健康页是 tab 页：切回时重新拉数据，保证新绑定设备、新预警立即可见。
+onShow(() => {
+  if (initializedRef) loadHealthData()
+})
+
+let initializedRef = false
+
+async function loadHealthData() {
   const [monitoring, reports] = await Promise.allSettled([
     loadMonitoring(),
     listHealthReports()
@@ -261,7 +280,8 @@ onMounted(async () => {
   if (reports.status === 'fulfilled') {
     healthReports.value = reports.value
   }
-})
+  initializedRef = true
+}
 
 function goDetail() {
   uni.navigateTo({ url: '/pages/health/detail' })
@@ -535,6 +555,21 @@ function goArchive() {
   overflow: hidden;
 }
 .trend-canvas { width: 100%; height: 190rpx; }
+
+.trend-empty {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+.trend-empty-text { color: #68758A; font-size: 25rpx; font-weight: 600; }
+.trend-empty-hint { color: #A8B4C4; font-size: 21rpx; }
 
 .trend-labels {
   display: flex;

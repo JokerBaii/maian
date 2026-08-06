@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -71,6 +72,16 @@ public class GlobalExceptionHandler {
         log.warn("Database constraint conflict", exception);
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ApiResponse.error("DATA_CONFLICT", "请求与已有数据冲突，请刷新后重试"));
+    }
+
+    // Spring 在进入 controller 前抛出，业务层的大小校验来不及执行
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUploadTooLarge(
+        MaxUploadSizeExceededException exception
+    ) {
+        log.warn("Upload exceeds multipart limit", exception);
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+            .body(ApiResponse.error("UPLOAD_TOO_LARGE", "图片过大，请压缩后重新上传"));
     }
 
     @ExceptionHandler(Exception.class)

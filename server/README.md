@@ -89,8 +89,10 @@ POST            /api/v1/rescue-calls/{id}/accept
 PATCH           /api/v1/rescue-calls/{id}/responder-progress
 PATCH           /api/v1/rescue-calls/{id}/status
 POST            /api/v1/rescue-calls/{id}/match-attempts
+GET/POST        /api/v1/rescue-calls/{id}/feedback
 GET/POST        /api/v1/health-reports
 GET/DELETE      /api/v1/health-reports/{id}
+POST            /api/v1/health-reports/recognition
 GET             /api/v1/health-monitoring
 POST            /api/v1/heart-rate-readings
 GET/PUT/DELETE  /api/v1/wearable-device
@@ -100,6 +102,7 @@ PUT/DELETE      /api/v1/emergency-contacts/{id}
 GET             /api/v1/profile
 POST            /api/v1/profile/identity-verification
 GET/POST        /api/v1/science-submissions
+GET             /api/v1/science-submissions/approved
 GET             /api/v1/science-submissions/reviews/pending
 GET/DELETE      /api/v1/science-submissions/{id}
 PATCH           /api/v1/science-submissions/{id}/review
@@ -116,16 +119,18 @@ GET/POST        /api/v1/files/images
 
 1. MySQL 通过 `category + status + latitude + longitude` 索引和地理包围盒快速缩小候选集；
 2. 剔除超过 120 秒未上报位置的移动设备、超过车主服务半径的设备；
-3. 用 Haversine 精确距离计算 ETA。移动 AED 按车辆送达时间计算，固定 AED 按往返取送时间计算；
+3. 用 Haversine 精确距离计算 ETA。移动 AED 按车辆送达时间计算，固定 AED 按骑行往返取送时间计算；
 4. 按 ETA 而非单纯直线距离排序，并用条件 `UPDATE` 原子占用设备，避免并发重复派单；
-5. 暂无候选时，救援详情页每 3 秒发起一次受锁保护的重试。
+5. 暂无候选时，救援详情页轮询期间每 3 轮（约 9 秒）发起一次受锁保护的重试，累计上限 60 次。
 
-调度参数可通过 `DISPATCH_*` 环境变量调整，默认搜索半径 15km、候选上限 80、移动位置有效期 120 秒。
+调度参数可通过 `DISPATCH_*` 环境变量调整，默认搜索半径 3km、候选上限 80、移动位置有效期 120 秒、移动设备 35km/h、固定设备取回 18km/h。搜索半径按"能及时取回"设定：半径过大会把数公里外的设备算作候选，预计到达时间失去参考意义。
 
 当前 Java 评分器的回归性能门禁为 25 万候选不超过 2 秒；本地测试约 52ms。当前耗时主要在数据库候选检索与网络 I/O，因此暂不引入 JNI/Rust FFI。候选规模达到百万级或接入大规模路网矩阵后，再考虑将纯计算评分内核迁移到 Rust。
 
 ## 数据真实性
 
-健康监测、穿戴设备绑定、提醒设置、科普投稿、体检报告、设备与救援记录均已由 MySQL 持久化。没有心率记录时接口返回空数据状态，不再生成模拟读数。设备修改、救援查询和投稿管理均按当前用户隔离。
+健康监测、穿戴设备绑定、提醒设置、科普投稿、体检报告、救援评价、设备与救援记录均已由 MySQL 持久化。没有心率记录时接口返回空数据状态，不再生成模拟读数。设备修改、救援查询、投稿管理和评价提交均按当前用户隔离：评价只允许呼救方在救援完成后提交一次。
+
+体检报告识别（`POST /api/v1/health-reports/recognition`）当前返回预置指标样例，按图片地址稳定选取以便复现，尚未接入 OCR 引擎；响应中的提示要求用户逐项核对后再保存。
 
 首次建库会写入一组比赛展示数据，用于开箱展示地图点位、健康趋势、报告和多角色审核流程；界面按正常业务数据呈现。正式接入实际业务前，应以审核后的现场采集数据替换这组展示数据。

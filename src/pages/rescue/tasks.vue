@@ -8,7 +8,7 @@
     <view v-if="loading" class="empty">正在同步救援任务…</view>
     <view v-else-if="!tasks.length" class="empty">暂无可响应或已参与的任务</view>
     <view v-else class="task-list">
-      <view v-for="task in tasks" :key="task.id" class="task-card">
+      <view v-for="task in tasks" :key="task.id" class="task-card" @tap="goDetail(task)">
         <view class="task-head">
           <text class="urgency">{{ urgencyLabel(task.urgency) }}</text>
           <text class="status">{{ statusLabel(task.status) }}</text>
@@ -17,9 +17,24 @@
         <text class="task-desc">{{ task.description || task.symptoms.join('、') || '现场需要急救支援' }}</text>
         <text v-if="task.matchedAed" class="aed">已匹配：{{ task.matchedAed.name }} · 约{{ formatEta(task.matchedAed.estimatedArrivalSeconds) }}</text>
         <view class="actions">
-          <view v-if="task.status === 'MATCHING'" class="primary" @tap="accept(task)">立即接单</view>
-          <view v-else-if="task.status === 'ACCEPTED'" class="primary" @tap="progress(task, 'RESCUING')">开始赶往现场</view>
-          <view v-else-if="task.status === 'RESCUING'" class="complete" @tap="progress(task, 'COMPLETED')">完成救援</view>
+          <view
+            v-if="task.status === 'MATCHING'"
+            class="primary"
+            :class="{ 'action-busy': busyTaskId === task.id }"
+            @tap.stop="accept(task)"
+          >{{ busyTaskId === task.id ? '处理中…' : '立即接单' }}</view>
+          <view
+            v-else-if="task.status === 'ACCEPTED'"
+            class="primary"
+            :class="{ 'action-busy': busyTaskId === task.id }"
+            @tap.stop="progress(task, 'RESCUING')"
+          >{{ busyTaskId === task.id ? '处理中…' : '开始赶往现场' }}</view>
+          <view
+            v-else-if="task.status === 'RESCUING'"
+            class="complete"
+            :class="{ 'action-busy': busyTaskId === task.id }"
+            @tap.stop="progress(task, 'COMPLETED')"
+          >{{ busyTaskId === task.id ? '处理中…' : '完成救援' }}</view>
           <view v-else class="done">任务已结束</view>
         </view>
       </view>
@@ -46,22 +61,36 @@ async function load() {
   }
 }
 
+function goDetail(task: RescueCallResponse) {
+  uni.navigateTo({ url: `/pages/rescue/detail?id=${encodeURIComponent(task.id)}` })
+}
+
+const busyTaskId = ref('')
+
 async function accept(task: RescueCallResponse) {
+  if (busyTaskId.value) return
+  busyTaskId.value = task.id
   try {
     Object.assign(task, await acceptRescueTask(task.id))
     uni.showToast({ title: '接单成功', icon: 'success' })
   } catch (error: any) {
     uni.showToast({ title: error?.message || '接单失败', icon: 'none' })
     await load()
+  } finally {
+    busyTaskId.value = ''
   }
 }
 
 async function progress(task: RescueCallResponse, status: 'RESCUING' | 'COMPLETED') {
+  if (busyTaskId.value) return
+  busyTaskId.value = task.id
   try {
     Object.assign(task, await updateResponderProgress(task.id, status))
     uni.showToast({ title: status === 'RESCUING' ? '已开始救援' : '救援已完成', icon: 'success' })
   } catch (error: any) {
     uni.showToast({ title: error?.message || '状态更新失败', icon: 'none' })
+  } finally {
+    busyTaskId.value = ''
   }
 }
 
@@ -97,4 +126,5 @@ onShow(load)
 .primary { color: #1F63D5; background: #FFFFFF; border: 1rpx solid #1F63D5; }
 .complete { color: #147452; background: #FFFFFF; border: 1rpx solid #158F63; }
 .done { color: #8D9AAF; background: #F5F7FA; border: 1rpx solid #E1E8F0; }
+.action-busy { opacity: 0.55; }
 </style>

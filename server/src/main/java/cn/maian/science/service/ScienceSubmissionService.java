@@ -61,6 +61,14 @@ public class ScienceSubmissionService {
         return ScienceSubmissionResponse.from(findOwned(id));
     }
 
+    /** 已审核通过的投稿，供科普频道展示。 */
+    @Transactional(readOnly = true)
+    public Page<ScienceSubmissionResponse> findApproved(Pageable pageable) {
+        return scienceSubmissionRepository
+            .findAllByStatus(SubmissionStatus.APPROVED, pageable)
+            .map(ScienceSubmissionResponse::from);
+    }
+
     @Transactional(readOnly = true)
     public Page<ScienceSubmissionResponse> findPendingReviews(Pageable pageable) {
         currentUserService.requireAnyRole("ADMIN");

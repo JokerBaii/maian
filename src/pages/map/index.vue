@@ -229,6 +229,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 // #ifdef H5
 import 'leaflet/dist/leaflet.css'
 // #endif
@@ -461,7 +462,10 @@ async function initLeafletMap() {
       attributionControl: true,
       preferCanvas: true
     }).setView([myLocation.value[1], myLocation.value[0]], 14)
-    addBaseTileLayer(leafletApi, mapInstance)
+    addBaseTileLayer(leafletApi, mapInstance, () => {
+      mapUnavailable.value = true
+      uni.showToast({ title: '底图加载失败，已切换为资源视图', icon: 'none', duration: 2000 })
+    })
     leafletApi.control.zoom({ position: 'bottomright' }).addTo(mapInstance)
     updateSelfMarker()
     addMarkers()
@@ -520,10 +524,7 @@ function markerIconKey(device: any) {
   return `${device.type}-${deviceStatusClass(device)}`
 }
 
-/**
- * 增量更新标记：按设备 id 复用已有标记，只处理新增、移除和真正变化的部分。
- * 全量销毁重建会在每次筛选或搜索输入时重新创建 DOM 与图片请求，导致明显卡顿。
- */
+// 按 id 复用标记，只处理增删和真正变化的部分；全量重建会导致明显卡顿
 function addMarkers() {
   if (!mapInstance || typeof window === 'undefined') return
   if (mapProvider !== 'leaflet' && (mapProvider !== 'amap' || !(window as any).AMap)) return
@@ -598,9 +599,8 @@ function addMarkers() {
   })
 }
 
+// divIcon 由 Leaflet 动态创建，拿不到 scoped 的 data-v 属性，尺寸必须内联
 function buildLeafletIcon(device: any) {
-  // 尺寸写在行内：uni-app 会给页面样式加 data-v 作用域属性，
-  // 而 divIcon 由 Leaflet 动态创建、拿不到该属性，外部 CSS 规则不会生效。
   return leafletApi.divIcon({
     className: 'rescue-leaflet-marker',
     html: `<img src="${markerAsset(device)}" alt="" style="display:block;width:18px;height:22px;filter:drop-shadow(0 2px 4px rgba(28,54,82,0.22))">`,
@@ -757,11 +757,21 @@ onMounted(() => {
     // #ifdef H5
     await mapPromise
     // #endif
+    initializedRef = true
   })
+})
+
+// 地图是 tab 页：切回时重新拉设备，保证"审核上架新设备"等变化立即可见。
+// initMap 只跑一次，这里只刷数据不重建地图。
+onShow(() => {
+  if (!initializedRef) return
+  loadDevices()
+  scheduleMarkerUpdate()
 })
 
 // 搜索输入是逐字触发的，合并到一帧后再更新标记，避免每敲一个字都跑一遍。
 let markerUpdateTimer: ReturnType<typeof setTimeout> | null = null
+let initializedRef = false
 
 function scheduleMarkerUpdate() {
   if (markerUpdateTimer) clearTimeout(markerUpdateTimer)

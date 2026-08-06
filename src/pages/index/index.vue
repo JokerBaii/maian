@@ -213,8 +213,8 @@ const heartValue = computed(() => (
 
 const heartState = computed(() => {
   if (!healthMonitoring.value.current) return '暂无心率记录'
-  if (healthMonitoring.value.status === 'warning') return '最近心率偏高'
-  if (healthMonitoring.value.status === 'danger') return '最近心率偏低'
+  if (healthMonitoring.value.status === 'high') return '最近心率偏高'
+  if (healthMonitoring.value.status === 'low') return '最近心率偏低'
   return '最近心率正常'
 })
 

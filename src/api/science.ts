@@ -73,6 +73,19 @@ export function deleteScienceSubmission(id: string) {
   return request<void>(`/api/v1/science-submissions/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
+/** 已审核通过的投稿，用于科普频道展示。 */
+export function listApprovedScienceSubmissions() {
+  return request<{
+    content: ScienceSubmissionResponse[]
+    page: number
+    size: number
+    totalElements: number
+    totalPages: number
+    first: boolean
+    last: boolean
+  }>('/api/v1/science-submissions/approved?page=0&size=100&sort=submittedAt,desc')
+}
+
 export function listPendingScienceSubmissions() {
   return request<{
     content: ScienceSubmissionResponse[]

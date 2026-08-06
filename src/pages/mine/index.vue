@@ -36,9 +36,12 @@
             </view>
             <text class="phone">{{ user.phone }}</text>
             <view class="verify-row">
-              <view class="verify-badge">
+              <view v-if="user.isVerified" class="verify-badge">
                 <app-icon class="verify-icon" name="checkmarkempty" :size="12" color="#FFFFFF" />
                 <text class="verify-text">已校验</text>
+              </view>
+              <view v-else class="verify-badge verify-badge-unverified">
+                <text class="verify-text">未校验</text>
               </view>
             </view>
           </view>
@@ -368,6 +371,15 @@ onShow(loadStats)
   border-radius: 8rpx;
   padding: 4rpx 14rpx;
   border: 1rpx solid rgba(0, 180, 42, 0.4);
+}
+
+.verify-badge-unverified {
+  background: rgba(169, 180, 194, 0.22);
+  border-color: rgba(169, 180, 194, 0.4);
+}
+
+.verify-badge-unverified .verify-text {
+  color: #68758A;
 }
 .verify-icon {
   font-size: 20rpx;

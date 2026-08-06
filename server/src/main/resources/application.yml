@@ -25,14 +25,18 @@ spring:
     enabled: true
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 6MB
+      # 手机直接拍照的原图通常 4-8MB，上限留足余量；
+      # 业务侧真正的大小校验在 ImageStorageService（app.upload.max-file-size）。
+      max-file-size: 20MB
+      max-request-size: 22MB
   ai:
     openai:
+      # 部署指向 DeepSeek 的 OpenAI 兼容端点；换回 OpenAI 时改这里
+      base-url: https://api.deepseek.com
       api-key: ${OPENAI_API_KEY:disabled}
       chat:
         options:
-          model: ${OPENAI_MODEL:gpt-4o-mini}
+          model: ${OPENAI_MODEL:deepseek-chat}
           temperature: 0.2
 
 app:
@@ -42,7 +46,7 @@ app:
     enabled: ${APP_AI_ENABLED:false}
   upload:
     directory: ${UPLOAD_DIRECTORY:./data/uploads}
-    max-file-size: ${UPLOAD_MAX_FILE_SIZE:5242880}
+    max-file-size: ${UPLOAD_MAX_FILE_SIZE:15728640}
   dispatch:
     # AED 取回属于争分夺秒的场景，搜索半径按"跑得到"来定，
     # 半径过大时会把几公里外的设备也算作候选，预计到达时间失去意义。

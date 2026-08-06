@@ -199,6 +199,55 @@
           </view>
         </view>
 
+        <view
+          v-if="['PENDING', 'MATCHING', 'ACCEPTED', 'RESCUING'].includes(rescueCall.status)"
+          class="cancel-card"
+        >
+          <text class="cancel-desc">误发或现场已缓解？可以取消这次呼救</text>
+          <view class="cancel-button" @tap="confirmCancel">取消呼救</view>
+        </view>
+
+        <view v-if="feedbackCard" class="feedback-card">
+          <template v-if="feedbackSubmitted">
+            <view class="feedback-head">
+              <view class="feedback-stars">
+                <text
+                  v-for="star in 5"
+                  :key="star"
+                  class="feedback-star"
+                  :class="{ 'star-filled': star <= feedbackSubmitted.rating }"
+                >★</text>
+              </view>
+              <text class="feedback-done">已评价</text>
+            </view>
+            <text v-if="feedbackSubmitted.comment" class="feedback-comment">
+              {{ feedbackSubmitted.comment }}
+            </text>
+          </template>
+          <template v-else>
+            <text class="feedback-title">为这次救援评分</text>
+            <view class="feedback-stars">
+              <text
+                v-for="star in 5"
+                :key="star"
+                class="feedback-star"
+                :class="{ 'star-filled': star <= feedbackRating }"
+                @tap="feedbackRating = star"
+              >★</text>
+            </view>
+            <textarea
+              v-model="feedbackComment"
+              class="feedback-input"
+              placeholder="感谢语或补充说明（选填）"
+              maxlength="500"
+              :auto-height="true"
+            />
+            <view class="feedback-submit" :class="{ 'feedback-submit-busy': feedbackSubmitting }" @tap="submitFeedback">
+              <text>{{ feedbackSubmitting ? '提交中…' : '提交评价' }}</text>
+            </view>
+          </template>
+        </view>
+
         <view class="bottom-space"></view>
       </template>
     </view>
@@ -216,9 +265,13 @@ import AppIconTile from '@/components/AppIconTile.vue'
 import { addBaseTileLayer } from '@/common/mapTiles'
 import { resolveApiUrl } from '@/api/http'
 import {
+  cancelRescueCall,
   getRescueCall,
+  getRescueFeedback,
   retryRescueMatch,
+  submitRescueFeedback,
   type RescueCallResponse,
+  type RescueFeedbackResponse,
   type RescueStatus
 } from '@/api/rescue'
 
@@ -234,6 +287,63 @@ let renderedGeometryKey = ''
 let matchRetryCount = 0
 /** 约 3 分钟内的重试上限（每 3 轮轮询触发一次，轮询间隔 3 秒）。 */
 const MATCH_RETRY_LIMIT = 60
+
+const feedbackRating = ref(0)
+const feedbackComment = ref('')
+const feedbackSubmitting = ref(false)
+const feedbackSubmitted = ref<RescueFeedbackResponse | null>(null)
+
+/** 完成后展示评价卡片；呼救方对已完成的救援只能评价一次。 */
+const feedbackCard = computed(() => rescueCall.value?.status === 'COMPLETED')
+
+async function loadFeedback() {
+  if (!rescueId.value || rescueCall.value?.status !== 'COMPLETED') return
+  try {
+    feedbackSubmitted.value = await getRescueFeedback(rescueId.value)
+  } catch {
+    feedbackSubmitted.value = null
+  }
+}
+
+async function submitFeedback() {
+  if (feedbackSubmitting.value || !rescueId.value) return
+  if (feedbackRating.value < 1) {
+    uni.showToast({ title: '请先选择星级', icon: 'none' })
+    return
+  }
+  feedbackSubmitting.value = true
+  try {
+    feedbackSubmitted.value = await submitRescueFeedback(rescueId.value, {
+      rating: feedbackRating.value,
+      comment: feedbackComment.value.trim() || undefined
+    })
+    uni.showToast({ title: '感谢评价', icon: 'success' })
+  } catch (error: any) {
+    uni.showToast({ title: error?.message || '评价提交失败，请重试', icon: 'none' })
+  } finally {
+    feedbackSubmitting.value = false
+  }
+}
+
+function confirmCancel() {
+  uni.showModal({
+    title: '取消这次呼救？',
+    content: '取消后已匹配的设备将释放，如需帮助请重新发起呼救。',
+    confirmText: '取消呼救',
+    confirmColor: '#C93D46',
+    success: async (result) => {
+      if (!result.confirm || !rescueId.value) return
+      try {
+        const updated = await cancelRescueCall(rescueId.value)
+        rescueCall.value = updated
+        stopPolling()
+        uni.showToast({ title: '已取消呼救', icon: 'success' })
+      } catch (error: any) {
+        uni.showToast({ title: error?.message || '取消失败，请重试', icon: 'none' })
+      }
+    }
+  })
+}
 
 const progressSteps = ['已呼救', '匹配中', '救援中', '已完成']
 const statusMap: Record<RescueStatus, { label: string; description: string; step: number }> = {
@@ -319,8 +429,7 @@ async function loadDetail(showLoading = true) {
   errorMessage.value = ''
   try {
     let latest = await getRescueCall(rescueId.value)
-    // 重新匹配是写操作（跑完整调度评分并锁设备），不能跟着 3 秒轮询一起打。
-    // 每 3 轮（约 9 秒）尝试一次，并设上限，避免长时间无候选设备时持续压数据库。
+    // 重新匹配是写操作，每 3 轮（约 9 秒）才试一次并设上限
     if (!latest.matchedAed && latest.status === 'MATCHING' && !showLoading) {
       matchRetryCount += 1
       if (matchRetryCount % 3 === 1 && matchRetryCount <= MATCH_RETRY_LIMIT) {
@@ -337,6 +446,7 @@ async function loadDetail(showLoading = true) {
     // #endif
     if (['COMPLETED', 'CANCELLED'].includes(rescueCall.value.status)) {
       stopPolling()
+      await loadFeedback()
     }
   } catch (error: any) {
     if (showLoading) {
@@ -360,12 +470,14 @@ async function initMap() {
         attributionControl: true,
         preferCanvas: true
       }).setView([latitude, longitude], 15)
-      addBaseTileLayer(Leaflet, mapInstance)
+      addBaseTileLayer(Leaflet, mapInstance, () => {
+        mapUnavailable.value = true
+      })
       mapDataLayer = Leaflet.layerGroup().addTo(mapInstance)
+      mapUnavailable.value = false
     }
 
-    // 详情页每 3 秒轮询一次，只有位置或匹配结果真的变了才重绘图层，
-    // 否则每轮都会清空标记并重新 fitBounds，画面持续抖动。
+    // 只有位置或匹配结果变化才重绘，否则每轮 fitBounds 会让画面抖动
     const matched = rescueCall.value.matchedAed
     const geometryKey = [
       latitude,
@@ -375,7 +487,6 @@ async function initMap() {
       matched?.longitude ?? ''
     ].join('|')
     if (geometryKey === renderedGeometryKey) {
-      mapUnavailable.value = false
       return
     }
     renderedGeometryKey = geometryKey
@@ -406,7 +517,6 @@ async function initMap() {
         { padding: [42, 42], maxZoom: 15 }
       )
     }
-    mapUnavailable.value = false
   } catch {
     mapUnavailable.value = true
   }
@@ -997,6 +1107,110 @@ onUnmounted(() => {
   padding: 24rpx;
   background: #FFF2F2;
   border: 1rpx solid #FAD6D8;
+}
+
+.cancel-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24rpx 24rpx 0;
+  padding: 22rpx 26rpx;
+  border: 1rpx solid #E1E8F0;
+  border-radius: 22rpx;
+  background: #FFFFFF;
+}
+
+.cancel-desc {
+  color: #68758A;
+  font-size: 23rpx;
+}
+
+.cancel-button {
+  padding: 10rpx 22rpx;
+  border: 1rpx solid #C93D46;
+  border-radius: 999rpx;
+  color: #C93D46;
+  font-size: 23rpx;
+  font-weight: 650;
+}
+
+.feedback-card {
+  margin: 24rpx 24rpx 0;
+  padding: 30rpx;
+  border: 1rpx solid #E1E8F0;
+  border-radius: 22rpx;
+  background: #FFFFFF;
+}
+
+.feedback-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.feedback-title {
+  display: block;
+  color: #1C2B45;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.feedback-done {
+  color: #23956A;
+  font-size: 23rpx;
+  font-weight: 650;
+}
+
+.feedback-stars {
+  display: flex;
+  gap: 10rpx;
+  margin-top: 20rpx;
+}
+
+.feedback-star {
+  color: #D9E1EA;
+  font-size: 52rpx;
+  line-height: 1;
+}
+
+.feedback-star.star-filled {
+  color: #F5A623;
+}
+
+.feedback-comment {
+  display: block;
+  margin-top: 18rpx;
+  color: #4E5969;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.feedback-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 20rpx;
+  padding: 18rpx;
+  border: 1rpx solid #E1E8F0;
+  border-radius: 14rpx;
+  background: #F7F9FC;
+  color: #1C2B45;
+  font-size: 24rpx;
+  min-height: 100rpx;
+}
+
+.feedback-submit {
+  margin-top: 20rpx;
+  padding: 20rpx 0;
+  border: 1rpx solid #2E6DD1;
+  border-radius: 14rpx;
+  text-align: center;
+  color: #2E6DD1;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.feedback-submit-busy {
+  opacity: 0.6;
 }
 
 .safety-copy {
