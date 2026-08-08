@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page">
     <view class="settings-scroll">
       <view class="settings-section">
         <text class="section-title">通知设置</text>
@@ -175,6 +175,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { getUserSettings, updateUserSettings } from '@/api/user'
+import { userFacingError } from '@/utils/presentation'
 
 const SETTINGS_STORAGE_KEY = 'maian:user-settings'
 const settings = reactive({
@@ -234,7 +235,7 @@ watch(settings, (value) => {
       const remote = await updateUserSettings({ ...settings })
       applySettings(remote)
     } catch (error: any) {
-      uni.showToast({ title: error?.message || '设置保存失败', icon: 'none' })
+      uni.showToast({ title: userFacingError(error, '设置保存失败，请稍后重试'), icon: 'none' })
     }
   }, 350)
 }, { deep: true })
@@ -485,7 +486,7 @@ function goLegal(type: 'privacy' | 'terms' | 'medical') {
   display: block;
 }
 .popup-submit {
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   border-radius: 48rpx;
   padding: 24rpx 0;
   text-align: center;

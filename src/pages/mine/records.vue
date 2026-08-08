@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-list">
     <view class="tab-bar">
       <view
         class="tab-item"
@@ -29,10 +29,10 @@
           @tap="goDetail(record.id)"
         >
           <view class="record-header">
-            <view class="urgency-badge" :class="'urgency-' + record.urgency">
+            <view class="urgency-badge" :class="'urgency-' + record.urgency.toLowerCase()">
               <text class="urgency-text">{{ urgencyLabel(record.urgency) }}</text>
             </view>
-            <view class="status-badge" :class="'status-' + record.status">
+            <view class="status-badge" :class="'status-' + statusTone(record.status)">
               <text class="status-text">{{ statusLabel(record.status) }}</text>
             </view>
           </view>
@@ -65,10 +65,10 @@
           @tap="goDetail(record.id)"
         >
           <view class="record-header">
-            <view class="urgency-badge" :class="'urgency-' + record.urgency">
+            <view class="urgency-badge" :class="'urgency-' + record.urgency.toLowerCase()">
               <text class="urgency-text">{{ urgencyLabel(record.urgency) }}</text>
             </view>
-            <view class="status-badge" :class="'status-' + record.status">
+            <view class="status-badge" :class="'status-' + statusTone(record.status)">
               <text class="status-text">{{ statusLabel(record.status) }}</text>
             </view>
           </view>
@@ -106,6 +106,7 @@ import {
   type ResponderTaskResponse
 } from '@/api/rescue'
 import { demoUsers, getDemoUserId } from '@/utils/demoSession'
+import { rescueStatusLabel, rescueUrgencyLabel } from '@/utils/presentation'
 
 const currentTab = ref<'initiated' | 'participated'>('initiated')
 
@@ -134,8 +135,8 @@ function toRecord(call: RescueCallResponse): RescueRecordView {
     id: call.id,
     address: call.address,
     description: call.description || call.symptoms.join('、') || '紧急救援请求',
-    urgency: call.urgency.toLowerCase(),
-    status: call.status.toLowerCase(),
+    urgency: call.urgency,
+    status: call.status,
     createTime: formatTime(call.createdAt)
   }
 }
@@ -145,8 +146,8 @@ function responderToRecord(call: ResponderTaskResponse): RescueRecordView {
     id: call.id,
     address: call.address || '接单后可查看精确位置',
     description: call.description || call.symptoms.join('、') || '紧急救援请求',
-    urgency: call.urgency.toLowerCase(),
-    status: call.status.toLowerCase(),
+    urgency: call.urgency,
+    status: call.status,
     createTime: formatTime(call.createdAt)
   }
 }
@@ -171,26 +172,15 @@ async function loadRecords() {
   }
 }
 
-function urgencyLabel(urgency: string) {
-  const map: Record<string, string> = {
-    critical: '紧急',
-    high: '高',
-    medium: '中',
-    low: '低'
-  }
-  return map[urgency] || urgency
-}
+const urgencyLabel = rescueUrgencyLabel
+const statusLabel = rescueStatusLabel
 
-function statusLabel(status: string) {
-  const map: Record<string, string> = {
-    pending: '等待中',
-    matching: '匹配中',
-    accepted: '已接单',
-    rescuing: '救援中',
-    completed: '已完成',
-    cancelled: '已取消'
-  }
-  return map[status] || status
+function statusTone(status: string) {
+  if (status === 'COMPLETED') return 'completed'
+  if (['EN_ROUTE_TO_AED', 'EN_ROUTE_TO_REQUESTER', 'ARRIVED', 'RESCUING'].includes(status)) return 'active'
+  if (['PENDING', 'MATCHING', 'PENDING_CONFIRMATION'].includes(status)) return 'waiting'
+  if (['NO_RESOURCE', 'EXPIRED', 'SYSTEM_FAILED'].includes(status)) return 'attention'
+  return 'ended'
 }
 
 onShow(loadRecords)
@@ -235,24 +225,45 @@ onShow(loadRecords)
   width: 48rpx;
   height: 6rpx;
   border-radius: 3rpx;
-  background: linear-gradient(90deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
 }
 
 .record-scroll {
   min-height: calc(100vh - 120rpx);
   box-sizing: border-box;
+  animation: recordSegmentChange 300ms cubic-bezier(.2, .72, .2, 1) both;
+}
+@keyframes recordSegmentChange {
+  from { opacity: 0; transform: translateY(8rpx); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .record-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-  padding: 24rpx 32rpx;
+  margin: 24rpx;
+  overflow: hidden;
+  border: 1rpx solid #E0E7EE;
+  border-radius: 22rpx;
+  background: #FFFFFF;
+  box-shadow: 0 12rpx 34rpx rgba(36, 58, 82, .06);
 }
 .record-card {
+  position: relative;
   background: #FFFFFF;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(43, 111, 240, 0.06);
+  padding: 26rpx 24rpx;
+}
+.record-card::after {
+  content: '';
+  position: absolute;
+  right: 24rpx;
+  bottom: 0;
+  left: 24rpx;
+  height: 1rpx;
+  background: #E8EDF2;
+}
+.record-card:last-child::after {
+  display: none;
+}
+.record-card:active {
+  background: #F8FAFC;
 }
 
 .record-header {
@@ -300,13 +311,16 @@ onShow(loadRecords)
 .status-completed {
   background: rgba(0, 180, 42, 0.1);
 }
-.status-rescuing {
+.status-active {
   background: rgba(43, 111, 240, 0.1);
 }
-.status-pending {
+.status-waiting {
   background: rgba(255, 154, 46, 0.1);
 }
-.status-cancelled {
+.status-attention {
+  background: rgba(201, 61, 70, 0.09);
+}
+.status-ended {
   background: rgba(134, 144, 156, 0.1);
 }
 .status-text {
@@ -316,13 +330,16 @@ onShow(loadRecords)
 .status-completed .status-text {
   color: #23956A;
 }
-.status-rescuing .status-text {
+.status-active .status-text {
   color: #2E6DD1;
 }
-.status-pending .status-text {
+.status-waiting .status-text {
   color: #FF9A2E;
 }
-.status-cancelled .status-text {
+.status-attention .status-text {
+  color: #B52F3A;
+}
+.status-ended .status-text {
   color: #86909C;
 }
 

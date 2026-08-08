@@ -1,0 +1,197 @@
+page {
+  --motion-fast: 140ms;
+  --motion-standard: 260ms;
+  --motion-slow: 360ms;
+  --motion-enter: cubic-bezier(.2, .72, .2, 1);
+  --motion-exit: cubic-bezier(.4, 0, 1, 1);
+  --motion-press-scale: .98;
+}
+
+/* #ifdef H5 */
+uni-modal .uni-modal,
+uni-toast .uni-toast,
+.uni-popup__wrapper {
+  transform-origin: 50% 100%;
+  animation: surfaceEnter 220ms var(--motion-enter) both;
+}
+/* #endif */
+
+.motion-page-focus {
+  transform-origin: 50% 24%;
+  animation: pageFocus 380ms var(--motion-enter) both;
+}
+
+.motion-page-sheet {
+  animation: pageSheet 440ms cubic-bezier(.18, .82, .22, 1) both;
+}
+
+.motion-page-list {
+  animation: pageDissolve 280ms ease-out both;
+}
+
+.motion-page-list :is(.record-card, .device-card, .content-card, .submission-card, .archive-card, .review-card) {
+  animation: listItemSettle 420ms var(--motion-enter) both;
+}
+
+.motion-page-list :is(.record-card, .device-card, .content-card, .submission-card, .archive-card, .review-card):nth-child(2) { animation-delay: 35ms; }
+.motion-page-list :is(.record-card, .device-card, .content-card, .submission-card, .archive-card, .review-card):nth-child(3) { animation-delay: 70ms; }
+.motion-page-list :is(.record-card, .device-card, .content-card, .submission-card, .archive-card, .review-card):nth-child(n+4) { animation-delay: 95ms; }
+
+button,
+[class$='-button'],
+[class$='-action'],
+[class*=' action-'],
+[class*='-action '],
+.app-motion-control {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--motion-fast) var(--motion-enter),
+    opacity var(--motion-fast) ease,
+    background-color var(--motion-standard) ease,
+    border-color var(--motion-standard) ease,
+    box-shadow var(--motion-standard) ease;
+}
+
+button:active,
+[class$='-button']:active,
+[class$='-action']:active,
+[class*=' action-']:active,
+[class*='-action ']:active,
+.app-motion-control:active {
+  transform: scale(var(--motion-press-scale));
+}
+
+.motion-enter {
+  animation: contentEnter var(--motion-slow) var(--motion-enter) both;
+}
+
+.motion-enter-delay-1 { animation-delay: 45ms; }
+.motion-enter-delay-2 { animation-delay: 90ms; }
+.motion-enter-delay-3 { animation-delay: 135ms; }
+
+/* Most screens are assembled from semantic sections instead of explicit
+   motion wrappers. Give those sections a restrained, staggered settle so a
+   route change never lands as a dead frame. Fixed overlays are excluded. */
+.motion-page-focus :is(.page-scroll, .scroll-content) > :not(.nav-bar),
+.motion-page-sheet :is(.page-scroll, .scroll-content) > :not(.nav-bar),
+.motion-page-sheet > :not(.nav-bar):not(.matching-layer):not(.success-overlay):not(.popup-mask):not(.location-picker-overlay) {
+  animation: sectionSettle 420ms var(--motion-enter) both;
+}
+
+.motion-page-focus :is(.page-scroll, .scroll-content) > :nth-child(2),
+.motion-page-sheet :is(.page-scroll, .scroll-content) > :nth-child(2),
+.motion-page-sheet > :nth-child(3) { animation-delay: 45ms; }
+
+.motion-page-focus :is(.page-scroll, .scroll-content) > :nth-child(3),
+.motion-page-sheet :is(.page-scroll, .scroll-content) > :nth-child(3),
+.motion-page-sheet > :nth-child(4) { animation-delay: 85ms; }
+
+.motion-page-focus :is(.page-scroll, .scroll-content) > :nth-child(n+4),
+.motion-page-sheet :is(.page-scroll, .scroll-content) > :nth-child(n+4),
+.motion-page-sheet > :nth-child(n+5) { animation-delay: 115ms; }
+
+.apple-page :is(
+  .nav-back,
+  .tab-item,
+  .menu-item,
+  .quick-action,
+  .manage-link,
+  .refresh-button,
+  .contact-card,
+  .device-card,
+  .record-card,
+  .content-card
+) {
+  transition:
+    transform var(--motion-fast) var(--motion-enter),
+    opacity var(--motion-fast) ease,
+    background-color var(--motion-standard) ease,
+    border-color var(--motion-standard) ease,
+    box-shadow var(--motion-standard) ease;
+}
+
+.apple-page :is(
+  .nav-back,
+  .tab-item,
+  .menu-item,
+  .quick-action,
+  .manage-link,
+  .refresh-button,
+  .contact-card,
+  .device-card,
+  .record-card,
+  .content-card
+):active {
+  transform: scale(.985);
+  opacity: .82;
+}
+
+.motion-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #E8EEF3;
+}
+
+.motion-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.7) 48%, transparent 76%);
+  transform: translateX(-100%);
+  animation: skeletonSweep 1.45s ease-in-out infinite;
+}
+
+@keyframes pageFocus {
+  from { opacity: 0; transform: translate3d(0, 10rpx, 0) scale(.992); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pageSheet {
+  from { opacity: 0; transform: translate3d(0, 30rpx, 0); }
+  55% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pageDissolve {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pageDesktopReveal {
+  0% { opacity: 0; }
+  42% { opacity: .72; }
+  100% { opacity: 1; }
+}
+
+@keyframes listItemSettle {
+  from { opacity: 0; transform: translate3d(0, 16rpx, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes surfaceEnter {
+  from { opacity: 0; transform: translate3d(0, 18rpx, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes contentEnter {
+  from { opacity: 0; transform: translate3d(0, 22rpx, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sectionSettle {
+  from { opacity: 0; transform: translate3d(0, 14rpx, 0) scale(.996); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes skeletonSweep {
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

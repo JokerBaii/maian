@@ -1,15 +1,15 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-list">
     <view class="scroll-content">
       <view class="summary-card">
-        <view class="summary-bg"></view>
         <view class="summary-content">
           <view class="summary-top">
-            <app-icon-tile name="folder-add-filled" tone="violet" />
+            <app-icon-tile name="folder-add-filled" tone="blue" />
             <view class="summary-info">
-              <text class="summary-title">我的健康档案</text>
-              <text class="summary-sub">持续记录，守护健康</text>
+              <text class="summary-title">健康档案</text>
+              <text class="summary-sub">最近一次体检：{{ latestDate }}</text>
             </view>
+            <view class="latest-risk" :class="'latest-risk-' + latestRisk">{{ latestRiskLabel }}风险</view>
           </view>
           <view class="summary-stats">
             <view class="stat-item">
@@ -43,54 +43,33 @@
           <text class="archive-state-desc">点击右下角按钮上传报告原图，识别后即可生成分析</text>
         </view>
 
-        <view v-else class="timeline">
+        <view v-else class="record-list">
           <view
             v-for="(record, idx) in archive"
             :key="idx"
-            class="timeline-item"
+            class="record-item"
             @tap="goReport(record)"
             @longpress="confirmDelete(record)"
           >
-            <view class="timeline-left">
-              <view class="timeline-dot-wrap">
-                <view class="timeline-dot" :class="'dot-' + record.riskLevel"></view>
-                <view v-if="idx < archive.length - 1" class="timeline-line"></view>
-              </view>
-              <view class="timeline-date">
-                <text class="date-year">{{ record.date.split('-')[0] }}</text>
-                <text class="date-md">{{ record.date.split('-').slice(1).join('/') }}</text>
-              </view>
+            <view class="record-date">
+              <text class="date-md">{{ record.date.split('-').slice(1).join('/') }}</text>
+              <text class="date-year">{{ record.date.split('-')[0] }}</text>
             </view>
 
             <view class="record-card">
               <view class="record-header">
-                <view class="record-hospital-wrap">
-                  <app-icon-tile name="hospital" tone="blue" size="small" />
-                  <text class="record-hospital">{{ record.hospital }}</text>
-                </view>
+                <text class="record-hospital">{{ record.hospital }}</text>
                 <view class="risk-indicator" :class="'indicator-' + record.riskLevel">
                   <view class="indicator-dot"></view>
                   <text class="indicator-text">{{ riskLevelMap[record.riskLevel] }}</text>
                 </view>
               </view>
               <view class="record-body">
-                <view class="record-stat-row">
-                  <view class="record-stat">
-                    <text class="record-stat-label">异常指标</text>
-                    <view class="abnormal-badge" :class="record.abnormalCount > 0 ? 'badge-has' : 'badge-none'">
-                      <text class="abnormal-badge-text">{{ record.abnormalCount }}</text>
-                    </view>
-                  </view>
-                  <view class="record-stat">
-                    <text class="record-stat-label">体检日期</text>
-                    <text class="record-stat-value">{{ record.date }}</text>
-                  </view>
-                </view>
+                <text :class="record.abnormalCount > 0 ? 'abnormal-has' : 'abnormal-none'">{{ record.abnormalCount }} 项异常指标</text>
               </view>
               <view class="record-footer">
-                <text class="record-hint">长按删除</text>
-                <text class="record-action">查看详细报告</text>
-                <text class="record-arrow">></text>
+                <text class="record-action">查看报告</text>
+                <text class="record-arrow">›</text>
               </view>
             </view>
           </view>
@@ -114,6 +93,7 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { listHealthReports, deleteHealthReport } from '@/api/reports'
+import { userFacingError } from '@/utils/presentation'
 
 interface ArchiveRecord {
   id: string
@@ -159,7 +139,7 @@ function confirmDelete(record: ArchiveRecord) {
         archive.value = archive.value.filter(item => item.id !== record.id)
         uni.showToast({ title: '已删除', icon: 'success' })
       } catch (error: any) {
-        uni.showToast({ title: error?.message || '删除失败，请重试', icon: 'none' })
+        uni.showToast({ title: userFacingError(error, '删除失败，请重试'), icon: 'none' })
       }
     }
   })
@@ -213,31 +193,15 @@ function goUpload() {
   padding-bottom: 160rpx;
 }
 
-.summary-card {
-  position: relative;
-  margin: 24rpx 24rpx 0;
-  border-radius: 24rpx;
-  overflow: hidden;
-  box-shadow: 0 8rpx 40rpx rgba(43, 111, 240, 0.12);
-}
-.summary-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, #2E6DD1 0%, #1A4FD0 40%, #0D3AAF 100%);
-}
+.summary-card { margin: 24rpx 24rpx 0; overflow: hidden; border: 1rpx solid rgba(60,60,67,.14); border-radius: 22rpx; background: #FFFFFF; box-shadow: none; }
 .summary-content {
-  position: relative;
-  padding: 32rpx;
-  z-index: 2;
+  padding: 24rpx;
 }
 .summary-top {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  margin-bottom: 24rpx;
+  margin-bottom: 20rpx;
 }
 .summary-info {
   display: flex;
@@ -245,21 +209,20 @@ function goUpload() {
   gap: 4rpx;
 }
 .summary-title {
-  font-size: 32rpx;
+  font-size: 29rpx;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #20364D;
 }
 .summary-sub {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 20rpx;
+  color: #8190A2;
 }
+.latest-risk { margin-left: auto; padding: 6rpx 10rpx; border-radius: 9rpx; font-size: 18rpx; font-weight: 700; }.latest-risk-low { background: #E9F5F0; color: #197C59; }.latest-risk-medium { background: #FFF3E3; color: #A86B1F; }.latest-risk-high { background: #F9EAEC; color: #B52B36; }
 .summary-stats {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 16rpx;
-  padding: 20rpx 0;
-  backdrop-filter: blur(4px);
+  border-top: 1rpx solid #E8EDF2;
+  padding: 18rpx 0 0;
 }
 .stat-item {
   flex: 1;
@@ -269,23 +232,21 @@ function goUpload() {
   gap: 6rpx;
 }
 .stat-num {
-  font-size: 36rpx;
+  font-size: 29rpx;
   font-weight: 800;
-  color: #FFFFFF;
+  color: #29435D;
   line-height: 1;
 }
-.stat-low { color: #4DC580; }
-.stat-medium { color: #FFCF8B; }
-.stat-high { color: #FF7D7D; }
+.stat-low { color: #23956A; }.stat-medium { color: #C98327; }.stat-high { color: #C93D46; }
 .stat-label {
   font-size: 22rpx;
-  color: rgba(255, 255, 255, 0.7);
+  color: #8996A5;
   font-weight: 500;
 }
 .stat-divider {
   width: 1rpx;
   height: 48rpx;
-  background: rgba(255, 255, 255, 0.15);
+  background: #E3E9EF;
 }
 
 .timeline-section {
@@ -304,104 +265,44 @@ function goUpload() {
   color: #20364D;
 }
 
-.timeline {
-  padding-left: 4rpx;
-}
-.timeline-item {
-  display: flex;
-  gap: 20rpx;
-  padding-bottom: 24rpx;
-}
-.timeline-item:last-child {
-  padding-bottom: 0;
-}
-
-.timeline-left {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 80rpx;
-  flex-shrink: 0;
-}
-.timeline-dot-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-}
-.timeline-dot {
-  width: 20rpx;
-  height: 20rpx;
-  border-radius: 50%;
-  border: 4rpx solid #FFFFFF;
-  z-index: 2;
-  flex-shrink: 0;
-}
-.dot-low {
-  background: #23956A;
-  box-shadow: 0 0 8rpx rgba(0, 180, 42, 0.3), 0 0 0 2rpx #23956A;
-}
-.dot-medium {
-  background: #FF9A2E;
-  box-shadow: 0 0 8rpx rgba(255, 154, 46, 0.3), 0 0 0 2rpx #FF9A2E;
-}
-.dot-high {
-  background: #C93D46;
-  box-shadow: 0 0 8rpx rgba(245, 63, 63, 0.3), 0 0 0 2rpx #C93D46;
-}
-.timeline-line {
-  width: 2rpx;
-  flex: 1;
-  background: #E5E6EB;
-  margin-top: 8rpx;
-  min-height: 80rpx;
-}
-.timeline-date {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2rpx;
-  margin-top: 8rpx;
-}
+.record-list { overflow: hidden; border: 1rpx solid #E0E7EE; border-radius: 20rpx; background: #FFFFFF; }
+.record-item { position: relative; display: grid; grid-template-columns: 82rpx minmax(0,1fr); gap: 18rpx; padding: 22rpx 20rpx; }
+.record-item::after { content: ''; position: absolute; right: 20rpx; bottom: 0; left: 20rpx; height: 1rpx; background: #E9EEF3; }.record-item:last-child::after { display: none; }
+.record-date { display: flex; flex-direction: column; align-items: flex-start; padding-top: 2rpx; }
 .date-year {
   font-size: 20rpx;
-  color: #C9CDD4;
+  color: #98A5B4;
   font-weight: 500;
 }
 .date-md {
-  font-size: 26rpx;
-  color: #4E5969;
-  font-weight: 700;
+  order: -1;
+  font-size: 27rpx;
+  color: #31485F;
+  font-weight: 750;
 }
 
 .record-card {
-  flex: 1;
-  background: #FFFFFF;
-  border-radius: 20rpx;
-  padding: 20rpx;
-  box-shadow: 0 4rpx 20rpx rgba(43, 111, 240, 0.06);
+  min-width: 0;
   transition: all 0.2s ease;
 }
 .record-card:active {
-  transform: scale(0.98);
-  box-shadow: 0 2rpx 12rpx rgba(43, 111, 240, 0.1);
+  opacity: .7;
 }
 
 .record-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16rpx;
-}
-.record-hospital-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
+  gap: 12rpx;
 }
 .record-hospital {
-  font-size: 26rpx;
-  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 25rpx;
+  font-weight: 680;
   color: #20364D;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .risk-indicator {
   display: flex;
@@ -436,28 +337,10 @@ function goUpload() {
 .indicator-high .indicator-text { color: #C93D46; }
 
 .record-body {
-  margin-bottom: 12rpx;
+  margin-top: 10rpx;
+  font-size: 21rpx;
 }
-.record-stat-row {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-}
-.record-stat {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-.record-stat-label {
-  font-size: 22rpx;
-  color: #86909C;
-  font-weight: 500;
-}
-.record-stat-value {
-  font-size: 23rpx;
-  color: #4E5969;
-  font-weight: 600;
-}
+.abnormal-has { color: #B74B53; }.abnormal-none { color: #23825F; }
 .archive-state {
   margin-top: 20rpx;
   padding: 60rpx 32rpx;
@@ -479,48 +362,20 @@ function goUpload() {
   font-size: 23rpx;
   line-height: 1.6;
 }
-.abnormal-badge {
-  min-width: 36rpx;
-  height: 36rpx;
-  border-radius: 18rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 10rpx;
-}
-.badge-has {
-  background: rgba(245, 63, 63, 0.1);
-}
-.badge-none {
-  background: rgba(0, 180, 42, 0.1);
-}
-.abnormal-badge-text {
-  font-size: 22rpx;
-  font-weight: 700;
-}
-.badge-has .abnormal-badge-text { color: #C93D46; }
-.badge-none .abnormal-badge-text { color: #23956A; }
-
 .record-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4rpx;
-  padding-top: 12rpx;
-  border-top: 1rpx solid #F2F3F5;
-}
-.record-hint {
-  margin-right: auto;
-  color: #B6BFCC;
-  font-size: 21rpx;
+  margin-top: 12rpx;
 }
 .record-action {
-  font-size: 24rpx;
+  font-size: 21rpx;
   color: #2E6DD1;
   font-weight: 500;
 }
 .record-arrow {
-  font-size: 24rpx;
+  font-size: 28rpx;
   color: #2E6DD1;
 }
 
@@ -532,7 +387,7 @@ function goUpload() {
   align-items: center;
   gap: 8rpx;
   padding: 16rpx 28rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   border-radius: 48rpx;
   box-shadow: 0 8rpx 32rpx rgba(43, 111, 240, 0.4);
   z-index: 100;

@@ -27,6 +27,9 @@ onLaunch(() => {
 </script>
 
 <style lang="scss">
+@use '@/styles/motion.scss';
+@use '@/styles/apple.scss';
+
 page {
   --network-canvas: #F3F7FA;
   --network-paper: #FFFFFF;
@@ -54,33 +57,126 @@ page {
 }
 
 /* #ifdef H5 */
-@media (min-width: 540px) {
+html,
+body,
+uni-app {
+  width: 100%;
+  min-height: 100%;
+  scrollbar-width: none;
+}
+
+uni-page-body,
+uni-page-wrapper {
+  width: 100%;
+  min-height: 0;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+uni-app::-webkit-scrollbar,
+uni-page-body::-webkit-scrollbar,
+uni-page-wrapper::-webkit-scrollbar,
+uni-scroll-view::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+body { margin: 0; background: #F3F7FA; }
+uni-app { display: block; min-height: 100vh; overflow: visible; background: #F3F7FA; }
+
+/* Desktop H5 is a phone preview, while mobile browsers remain full width.
+   The document keeps ownership of scrolling, so this does not recreate the
+   old nested-scroll shell. */
+@media (min-width: 768px) {
   html {
-    font-size: 20px !important;
-    background: #E7EDF4;
+    background: #DDE3E9;
+  }
+
+  body,
+  uni-app,
+  uni-page {
+    width: 430px;
+    max-width: 430px;
+    margin-right: auto;
+    margin-left: auto;
   }
 
   body {
-    background: #E7EDF4;
+    min-height: 100vh;
+    box-shadow: 0 0 0 1px rgba(32, 54, 77, .08), 0 18px 60px rgba(32, 54, 77, .14);
   }
 
   uni-app {
     position: relative;
-    display: block;
-    width: 480px;
-    max-width: 100%;
-    min-height: 100vh;
-    margin: 0 auto;
-    overflow-x: hidden;
-    background: #F3F6F9;
-    box-shadow: 0 0 0 1px rgba(36, 58, 82, 0.05);
-    transform: translateZ(0);
   }
 
-  uni-app.uni-app--showtabbar {
-    height: 100vh;
-    min-height: 0;
-    overflow-y: hidden;
+  uni-tabbar,
+  uni-tabbar .uni-tabbar {
+    right: calc(50vw - 215px) !important;
+    left: calc(50vw - 215px) !important;
+    width: 430px !important;
+  }
+
+  uni-page-head,
+  .uni-page-head {
+    right: calc(50vw - 215px) !important;
+    left: calc(50vw - 215px) !important;
+    width: 430px !important;
+  }
+
+  /* Transforming a page root makes fixed descendants page-relative. Keep the
+     desktop phone preview fixed, but retain a transform-free entrance. */
+  .motion-page-focus,
+  .motion-page-sheet,
+  .motion-page-list {
+    transform: none !important;
+    animation-name: pageDesktopReveal !important;
+  }
+
+  .motion-page-focus { animation-duration: 340ms !important; }
+  .motion-page-sheet { animation-duration: 400ms !important; }
+  .motion-page-list { animation-duration: 280ms !important; }
+
+  :is(
+    .nav-bar,
+    .matching-layer,
+    .top-overlay,
+    .map-container,
+    .map-fallback,
+    .bottom-drawer,
+    .success-overlay,
+    .popup-mask,
+    .location-picker-overlay
+  ) {
+    right: calc(50vw - 215px) !important;
+    left: calc(50vw - 215px) !important;
+    width: auto !important;
+  }
+
+  :is(uni-toast, uni-modal, uni-actionsheet, uni-popup) {
+    right: calc(50vw - 215px) !important;
+    left: calc(50vw - 215px) !important;
+    width: 430px !important;
+  }
+
+  .device-popup {
+    right: calc(50vw - 203px) !important;
+    left: calc(50vw - 203px) !important;
+  }
+
+  .locate-btn {
+    right: calc(50vw - 203px) !important;
+  }
+
+  .fab-btn {
+    right: calc(50vw - 199px) !important;
+  }
+
+  .add-btn {
+    right: calc(50vw - 178px) !important;
+    left: calc(50vw - 178px) !important;
   }
 }
 /* #endif */

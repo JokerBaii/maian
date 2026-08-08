@@ -1,10 +1,15 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-focus">
     <view class="page-scroll">
-      <view v-if="loading" class="state-card">
-        <view class="loading-ring"></view>
-        <text class="state-title">正在同步救援状态</text>
-        <text class="state-desc">请保持手机畅通</text>
+      <view v-if="loading" class="detail-skeleton motion-enter">
+        <view class="skeleton-heading">
+          <view><view class="skeleton-title motion-skeleton"></view><view class="skeleton-text motion-skeleton"></view></view>
+          <view class="skeleton-eta motion-skeleton"></view>
+        </view>
+        <view class="skeleton-lifeline motion-skeleton"></view>
+        <view class="skeleton-map motion-skeleton"></view>
+        <view class="skeleton-action motion-skeleton"></view>
+        <view class="skeleton-caption">正在同步救援状态，请保持手机畅通</view>
       </view>
 
       <view v-else-if="errorMessage" class="state-card">
@@ -16,17 +21,59 @@
       </view>
 
       <template v-else-if="rescueCall">
-        <view class="map-stage">
+        <view class="rescue-overview motion-enter">
+          <view class="status-heading">
+            <view class="status-copy">
+              <view class="status-line">
+                <view class="signal-dot"></view>
+                <text>{{ statusMeta.label }}</text>
+              </view>
+              <text class="status-desc">{{ statusMeta.description }}</text>
+            </view>
+            <view class="status-seal" :class="`urgency-${rescueCall.urgency.toLowerCase()}`">
+              <text>{{ urgencyLabel }}</text>
+            </view>
+          </view>
+
+          <view class="lifeline" :class="{ 'lifeline-complete': statusMeta.step === 3 }">
+            <view class="lifeline-track"></view>
+            <view class="lifeline-fill" :style="{ width: `${lifelinePercent}%` }">
+              <view class="lifeline-pulse"></view>
+            </view>
+            <view
+              v-for="(step, index) in progressSteps"
+              :key="step"
+              class="lifeline-step"
+              :class="{ active: index <= statusMeta.step }"
+              :style="{ left: `${index * (100 / (progressSteps.length - 1))}%` }"
+            >
+              <view class="lifeline-node"></view>
+              <text>{{ step }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view v-if="isAwaitingMatch" class="matching-board motion-enter motion-enter-delay-1">
+          <view class="matching-signal" aria-hidden="true">
+            <view></view><view></view><view></view><view></view><view></view>
+          </view>
+          <text class="matching-board-title">呼救已送达</text>
+          <text class="matching-board-desc">正在联系附近救援人员与 AED</text>
+          <view class="matching-board-live"><view></view><text>救援进展实时更新</text></view>
+        </view>
+
+        <view v-else-if="!hasReachedScene" class="route-card motion-enter motion-enter-delay-1">
+          <view class="route-map-wrap">
           <!-- #ifdef H5 -->
-          <view id="rescue-detail-map" class="rescue-map rescue-map-stage"></view>
-          <view v-if="mapUnavailable" class="map-unavailable map-unavailable-stage">
+          <view id="rescue-detail-map" class="rescue-map"></view>
+          <view v-if="mapUnavailable" class="map-unavailable">
             <app-icon name="map-filled" :size="30" color="#6F7F99" />
             <text>底图加载失败，可使用系统地图导航</text>
           </view>
           <!-- #endif -->
           <!-- #ifndef H5 -->
           <map
-            class="rescue-map rescue-map-stage"
+            class="rescue-map"
             :longitude="rescueCall.longitude"
             :latitude="rescueCall.latitude"
             :markers="nativeMarkers"
@@ -34,207 +81,125 @@
             show-location
           />
           <!-- #endif -->
-          <view class="map-topbar">
-            <view class="map-status-pill">
-              <view class="live-dot"></view>
-              <text>{{ statusMeta.label }}</text>
-            </view>
-            <view class="map-safety-pill" @tap="callEmergency">
-              <text>紧急 120</text>
-            </view>
+          <view v-if="rescueCall.matchedAed" class="tracking-chip">
+            <view class="signal-dot"></view>
+            <text>{{ trackingLabel }}</text>
           </view>
-          <view v-if="rescueCall.matchedAed" class="map-eta-panel">
-            <text class="map-eta-value">{{ formatEta(rescueCall.matchedAed.estimatedArrivalSeconds) }}</text>
-            <text class="map-eta-copy">预计 AED 到达</text>
-            <view class="map-eta-divider"></view>
-            <text class="map-distance-value">{{ formatDistance(rescueCall.matchedAed.distanceMeters) }}</text>
-            <text class="map-distance-copy">匹配距离</text>
-          </view>
-          <view class="map-location-button" @tap="openRescueLocation">
-            <app-icon name="navigate-filled" :size="17" color="#1F63D5" />
-          </view>
-        </view>
-
-        <view class="mission-sheet">
-          <view class="sheet-handle"></view>
-        <view class="status-panel" :class="`status-${rescueCall.status.toLowerCase()}`">
-          <view class="status-head">
-            <view>
-              <text class="status-title">{{ statusMeta.label }}</text>
+          <view v-if="rescueCall.matchedAed" class="route-telemetry" :class="{ 'route-telemetry-wide': !isResponder }">
+            <view class="telemetry-item">
+              <text class="telemetry-value">{{ liveEta }}</text>
+              <text class="telemetry-label">预计到达</text>
             </view>
-            <view class="live-chip">
-              <view class="live-dot"></view>
-              <text>实时同步</text>
+            <view class="telemetry-divider"></view>
+            <view class="telemetry-item">
+              <text class="telemetry-value telemetry-distance">{{ liveDistance }}</text>
+              <text class="telemetry-label">距求救现场</text>
             </view>
+            <view class="telemetry-progress"><view :style="{ width: `${routeVisualPercent}%` }"></view></view>
           </view>
-          <text class="status-desc">{{ statusMeta.description }}</text>
-          <view class="status-progress">
-            <view
-              v-for="(step, index) in progressSteps"
-              :key="step"
-              class="progress-step"
-              :class="{ active: index <= statusMeta.step }"
-            >
-              <view class="progress-node">
-                <app-icon
-                  v-if="index < statusMeta.step"
-                  name="checkmarkempty"
-                  :size="12"
-                  color="#FFFFFF"
-                />
+          </view>
+          <view class="route-summary">
+            <view class="route-place">
+              <view class="place-mark aed-mark">AED</view>
+              <view class="place-copy">
+                <text class="place-label">救援资源</text>
+                <text class="place-value">{{ rescueCall.matchedAed?.name || '正在匹配附近 AED' }}</text>
               </view>
-              <text>{{ step }}</text>
+            </view>
+            <view class="route-connector"><view class="route-flow"></view></view>
+            <view class="route-place">
+              <view class="place-mark scene-mark"></view>
+              <view class="place-copy">
+                <text class="place-label">求救现场</text>
+                <text class="place-value">{{ rescueCall.address }}</text>
+              </view>
             </view>
           </view>
         </view>
 
-        <view class="quick-actions">
-          <view class="quick-action" :class="{ 'quick-action-disabled': !hasCounterpartPhone }" @tap="callCounterpart">
-            <view class="quick-action-icon"><app-icon name="phone-filled" :size="19" color="#1F63D5" /></view>
-            <text>联系对方</text>
+        <view v-else class="arrival-card motion-enter motion-enter-delay-1">
+          <view class="arrival-mark">
+            <app-icon name="checkmarkempty" :size="25" color="#FFFFFF" />
           </view>
-          <view class="quick-action" @tap="openRescueLocation">
-            <view class="quick-action-icon"><app-icon name="navigate-filled" :size="19" color="#1F63D5" /></view>
+          <view class="arrival-copy">
+            <text class="arrival-title">已到达救援现场</text>
+            <text class="arrival-place">{{ rescueCall.address }}</text>
+          </view>
+          <view class="arrival-state">{{ rescueCall.status === 'COMPLETED' ? '已完成' : '现场中' }}</view>
+        </view>
+
+        <view v-if="isResponder && responderNextAction" class="current-action motion-enter motion-enter-delay-2">
+          <view class="current-action-copy">
+            <text class="current-action-label">当前救援节点</text>
+            <text class="current-action-title">{{ responderActionGuidance }}</text>
+          </view>
+          <view class="current-action-button" :class="{ busy: responderActionBusy }" @tap="performDetailAction">
+            {{ responderActionBusy ? '同步中…' : responderNextAction.label }}
+          </view>
+        </view>
+
+        <view v-if="rescueCall.status === 'PENDING_CONFIRMATION' && !isResponder" class="current-action motion-enter motion-enter-delay-2">
+          <view class="current-action-copy">
+            <text class="current-action-label">等待你的确认</text>
+            <text class="current-action-title">施救者已提交完成，请确认现场救援已结束</text>
+          </view>
+          <view class="current-action-button" @tap="confirmCompletion">确认完成救援</view>
+        </view>
+
+        <view class="quick-actions motion-enter motion-enter-delay-3" :class="{ 'quick-actions-two': (!isResponder || hasReachedScene) && hasCounterpartPhone, 'quick-actions-one': !hasCounterpartPhone }">
+          <view v-if="hasCounterpartPhone" class="quick-action" @tap="callCounterpart">
+            <app-icon name="phone-filled" :size="18" color="#2E6DD1" />
+            <text>{{ isResponder ? '联系求救者' : '联系施救者' }}</text>
+          </view>
+          <view v-if="isResponder && !hasReachedScene" class="quick-action" @tap="openRescueLocation">
+            <app-icon name="navigate-filled" :size="18" color="#2E6DD1" />
             <text>现场导航</text>
           </view>
-          <view class="quick-action quick-action-emergency" @tap="callEmergency">
-            <view class="quick-action-icon"><app-icon name="phone-filled" :size="19" color="#C22936" /></view>
+          <view class="quick-action emergency" @tap="callEmergency">
+            <app-icon name="phone-filled" :size="18" color="#C93D46" />
             <text>拨打 120</text>
           </view>
         </view>
 
-        <view v-if="isResponder && responderNextAction" class="responder-action-card responder-action-primary">
-          <view class="responder-action-copy">
-            <text class="responder-action-kicker">当前处置节点</text>
-            <text class="responder-action-title">{{ responderActionGuidance }}</text>
+        <view v-if="counterpart" class="panel coordination-panel">
+          <view class="panel-head">
+            <text class="panel-title">救援协作</text>
+            <view class="sync-chip"><view class="signal-dot"></view><text>协同中</text></view>
           </view>
-          <view
-            class="responder-action-button"
-            :class="{ 'responder-action-busy': responderActionBusy }"
-            @tap="performDetailAction"
-          >
-            <text>{{ responderActionBusy ? '同步中…' : responderNextAction.label }}</text>
-          </view>
-        </view>
-
-        <view
-          v-if="rescueCall.status === 'PENDING_CONFIRMATION' && !isResponder"
-          class="completion-card completion-card-primary"
-        >
-          <text class="completion-title">施救者已提交完成</text>
-          <text class="completion-desc">请确认现场救援已经结束，确认后双方同步完成</text>
-          <view class="completion-button" @tap="confirmCompletion">确认完成救援</view>
-        </view>
-
-        <view class="relationship-card">
-          <view class="relationship-head">
-            <view>
-              <text class="section-kicker">CARE TEAM</text>
-              <text class="section-title">现场救援协同</text>
+          <view class="participant-pair">
+            <view class="participant-person">
+              <app-icon-tile name="author" tone="blue" />
+              <view class="participant-copy">
+                <text class="participant-role">你</text>
+                <text class="participant-name">{{ isResponder ? '现场施救者' : '求救者' }}</text>
+              </view>
             </view>
-            <view class="connection-chip">
-              <view class="live-dot"></view>
-              <text>救援协同中</text>
-            </view>
-          </view>
-          <view class="relationship-body">
-            <view class="role-person role-person-self">
-              <view class="role-avatar">{{ isResponder ? '救' : '求' }}</view>
-              <text class="role-name">{{ isResponder ? '施救者（你）' : '求救者（你）' }}</text>
-              <text class="role-caption">{{ isResponder ? '执行现场急救处置' : '等待并配合现场救援' }}</text>
-            </view>
-            <view class="relationship-link">
-              <view class="relationship-line"></view>
-                <view class="relationship-badge">实时协同</view>
-            </view>
-            <view class="role-person">
-              <view class="role-avatar role-avatar-peer">{{ counterpartInitial }}</view>
-              <text class="role-name">{{ counterpart?.displayName || (isResponder ? '求救者' : '等待施救者响应') }}</text>
-              <text class="role-caption">{{ isResponder ? '本次救援需求发起人' : '志愿者响应后可联系并共享位置' }}</text>
-              <view v-if="hasCounterpartPhone" class="counterpart-phone" @tap="callCounterpart">
-                <app-icon name="phone-filled" :size="14" color="#1F63D5" />
-                <text>{{ counterpart?.phone }}</text>
+            <view class="pair-connector"><view></view><text>实时协作</text><view></view></view>
+            <view class="participant-person participant-person-end">
+              <app-icon-tile name="author" tone="green" />
+              <view class="participant-copy">
+                <text class="participant-role">{{ counterpart?.displayName || '待响应' }}</text>
+                <text class="participant-name">{{ isResponder ? '求救者' : '现场施救者' }}</text>
               </view>
             </view>
           </view>
         </view>
 
-        <view v-if="rescueCall.matchedAed" class="journey-card">
-          <view class="section-head">
-            <view>
-              <text class="section-kicker">RESCUE CHAIN</text>
-              <text class="section-title">生命救援链</text>
-            </view>
-            <text class="journey-role">{{ isResponder ? '施救端' : '求救端' }}</text>
+        <view v-if="rescueCall.matchedAed && hasReachedScene" class="panel aed-panel">
+          <view class="panel-head">
+            <text class="panel-title">救援 AED</text>
+            <text class="distance-readout">{{ aedDistanceLabel }}</text>
           </view>
-          <view class="journey-list">
-            <view
-              v-for="(step, index) in journeySteps"
-              :key="step.label"
-              class="journey-step"
-              :class="`journey-${step.state}`"
-            >
-              <view class="journey-track">
-                <view class="journey-node">
-                  <app-icon v-if="step.state === 'done'" name="checkmarkempty" :size="11" color="#FFFFFF" />
-                </view>
-                <view v-if="index < journeySteps.length - 1" class="journey-line"></view>
-              </view>
-              <view class="journey-copy">
-                <view class="journey-title-row">
-                  <text class="journey-title">{{ step.label }}</text>
-                  <text v-if="step.state === 'current'" class="journey-current-chip">当前</text>
-                </view>
-                <text class="journey-detail">{{ step.detail }}</text>
-              </view>
+          <view class="aed-resource">
+            <app-icon-tile :name="rescueCall.matchedAed.type === 'MOBILE' ? 'mobile-device' : 'fixed-device'" tone="green" />
+            <view class="aed-copy">
+              <text class="aed-name">{{ rescueCall.matchedAed.name }}</text>
+              <text class="aed-meta">{{ rescueCall.matchedAed.address }}</text>
             </view>
           </view>
         </view>
 
-        <view v-if="rescueCall.matchedAed" class="match-card">
-          <view class="section-head">
-            <view>
-              <text class="section-kicker">FASTEST AED</text>
-              <text class="section-title">已锁定最快到达资源</text>
-            </view>
-            <view class="eta-badge">
-              <text class="eta-value">{{ formatEta(rescueCall.matchedAed.estimatedArrivalSeconds) }}</text>
-              <text class="eta-label">匹配时预计</text>
-            </view>
-          </view>
-          <view class="match-resource">
-            <app-icon-tile
-              :name="rescueCall.matchedAed.type === 'MOBILE' ? 'mobile-device' : 'fixed-device'"
-              :tone="rescueCall.matchedAed.type === 'MOBILE' ? 'green' : 'blue'"
-            />
-            <view class="match-copy">
-              <text class="match-name">{{ rescueCall.matchedAed.name }}</text>
-              <text class="match-meta">
-                {{ rescueCall.matchedAed.type === 'MOBILE' ? '移动 AED 车辆' : '固定 AED 取送' }}
-                · {{ formatDistance(rescueCall.matchedAed.distanceMeters) }}
-              </text>
-              <text v-if="rescueCall.matchedAed.vehicleInfo" class="match-vehicle">
-                {{ rescueCall.matchedAed.vehicleInfo }}
-              </text>
-            </view>
-          </view>
-          <view class="match-actions">
-            <view
-              v-if="rescueCall.matchedAed.contactPhone"
-              class="match-action match-action-secondary"
-              @tap="callMatchedDevice"
-            >
-              <app-icon name="phone-filled" :size="16" color="#1F63D5" />
-              <text>联系资源方</text>
-            </view>
-            <view class="match-action match-action-primary" @tap="openMatchedDevice">
-              <app-icon name="navigate-filled" :size="16" color="#FFFFFF" />
-              <text>查看设备位置</text>
-            </view>
-          </view>
-        </view>
-
-        <view v-else class="waiting-card">
+        <view v-if="!rescueCall.matchedAed && !isAwaitingMatch" class="waiting-card">
           <view class="waiting-pulse"></view>
           <view>
             <text class="waiting-title">正在扩大范围匹配 AED</text>
@@ -242,36 +207,15 @@
           </view>
         </view>
 
-        <view class="map-card location-card">
-          <view class="location-row">
-            <view class="location-icon">
-              <app-icon name="location-filled" :size="18" color="#1F63D5" />
-            </view>
-            <view class="location-copy">
-              <text class="location-address">{{ rescueCall.address }}</text>
-              <text class="location-coordinates">
-                {{ rescueCall.latitude.toFixed(5) }}, {{ rescueCall.longitude.toFixed(5) }}
-              </text>
-            </view>
-          </view>
-        </view>
-
-        <view class="detail-card">
-          <view class="section-head">
-            <view>
-              <text class="section-kicker">CALL DETAILS</text>
-              <text class="section-title">呼救信息</text>
-            </view>
+        <view class="panel detail-card">
+          <view class="panel-head">
+            <text class="panel-title">现场信息</text>
             <view class="urgency-chip" :class="`urgency-${rescueCall.urgency.toLowerCase()}`">
               {{ urgencyLabel }}
             </view>
           </view>
 
           <view class="detail-list">
-            <view class="detail-row">
-              <text class="detail-label">呼救编号</text>
-              <text class="detail-value detail-id">{{ rescueCall.id }}</text>
-            </view>
             <view class="detail-row">
               <text class="detail-label">发起时间</text>
               <text class="detail-value">{{ formatTime(rescueCall.createdAt) }}</text>
@@ -302,17 +246,6 @@
                 @tap="previewSceneImage(index)"
               />
             </view>
-          </view>
-        </view>
-
-        <view class="safety-card">
-          <app-icon-tile name="phone-filled" tone="coral" />
-          <view class="safety-copy">
-            <text class="safety-title">危及生命请立即拨打 120</text>
-            <text class="safety-desc">平台协同不能替代专业急救，请遵循调度人员指导</text>
-          </view>
-          <view class="call-button" @tap="callEmergency">
-            <text>拨打</text>
           </view>
         </view>
 
@@ -366,7 +299,6 @@
         </view>
 
         <view class="bottom-space"></view>
-        </view>
       </template>
     </view>
   </view>
@@ -393,12 +325,12 @@ import {
   updateResponderLocation,
   type RescueCallResponse,
   type RescueFeedbackResponse,
-  type RescueParticipant,
-  type RescueStatus
+  type RescueParticipant
 } from '@/api/rescue'
 import { issueMediaDownload } from '@/api/files'
 import { connectRescueEvents } from '@/utils/rescueEvents'
-import { getCurrentGcj02Location } from '@/utils/location'
+import { getCurrentGcj02Location, isDemoMode, openMapNavigation } from '@/utils/location'
+import { rescueStatusPresentation, userFacingError } from '@/utils/presentation'
 
 const rescueId = ref('')
 const rescueCall = ref<RescueCallResponse | null>(null)
@@ -413,6 +345,11 @@ let disconnectEvents: (() => void) | null = null
 let renderedGeometryKey = ''
 let lastResponderLocationSyncAt = 0
 const responderActionBusy = ref(false)
+const routeProgress = ref(0.18)
+let routeAnimationFrame: number | null = null
+let routeAnimationStartedAt = 0
+let routeMovingMarker: any = null
+let routeCoordinates: [number, number][] = []
 
 const feedbackRating = ref(0)
 const feedbackComment = ref('')
@@ -445,7 +382,7 @@ async function submitFeedback() {
     })
     uni.showToast({ title: '感谢评价', icon: 'success' })
   } catch (error: any) {
-    uni.showToast({ title: error?.message || '评价提交失败，请重试', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '评价提交失败，请重试'), icon: 'none' })
   } finally {
     feedbackSubmitting.value = false
   }
@@ -465,89 +402,68 @@ function confirmCancel() {
         stopPolling()
         uni.showToast({ title: '已取消呼救', icon: 'success' })
       } catch (error: any) {
-        uni.showToast({ title: error?.message || '取消失败，请重试', icon: 'none' })
+        uni.showToast({ title: userFacingError(error, '取消失败，请重试'), icon: 'none' })
       }
     }
   })
 }
 
-const progressSteps = ['已呼救', '匹配中', '救援中', '已完成']
-const statusMap: Record<RescueStatus, { label: string; description: string; step: number }> = {
-  PENDING: { label: '呼救已发出', description: '救援请求已进入调度队列，请保持电话畅通', step: 0 },
-  MATCHING: { label: '正在匹配资源', description: '平台正在查找附近设备与救援力量', step: 1 },
-  EN_ROUTE_TO_AED: { label: '施救者正在取用 AED', description: '设备已锁定，施救者正在赶往取用点', step: 2 },
-  EN_ROUTE_TO_REQUESTER: { label: '施救者正在赶来', description: '请留在安全且显眼的位置并保持电话畅通', step: 2 },
-  ARRIVED: { label: '施救者已到达', description: '请按照现场指引配合救援', step: 2 },
-  RESCUING: { label: '救援进行中', description: '请遵循专业人员指导并保持现场通道畅通', step: 2 },
-  PENDING_CONFIRMATION: { label: '等待确认完成', description: '施救者已提交完成，请求救者确认', step: 2 },
-  COMPLETED: { label: '救援已完成', description: '本次救援流程已结束，感谢每一位参与者', step: 3 },
-  NO_RESOURCE: { label: '暂无可用资源', description: '当前范围内未找到可调度 AED，危急情况请立即拨打 120', step: 1 },
-  EXPIRED: { label: '匹配已超时', description: '本次调度已超时，危急情况请立即拨打 120', step: 1 },
-  USER_CANCELLED: { label: '呼救已取消', description: '本次呼救已经取消，如仍需帮助请重新发起', step: 0 },
-  SYSTEM_FAILED: { label: '调度异常', description: '系统未能完成调度，危急情况请立即拨打 120', step: 1 }
-}
+const progressSteps = ['求助', '响应', '处置', '完成']
+const statusMeta = computed(() => rescueStatusPresentation(rescueCall.value?.status))
 
-const statusMeta = computed(() => statusMap[rescueCall.value?.status || 'PENDING'])
+const isEnRoute = computed(() => ['EN_ROUTE_TO_AED', 'EN_ROUTE_TO_REQUESTER'].includes(rescueCall.value?.status || ''))
+const hasReachedScene = computed(() => ['ARRIVED', 'RESCUING', 'PENDING_CONFIRMATION', 'COMPLETED'].includes(rescueCall.value?.status || ''))
+const isAwaitingMatch = computed(() => ['PENDING', 'MATCHING'].includes(rescueCall.value?.status || '') && !rescueCall.value?.matchedAed)
+const lifelinePercent = computed(() => Math.max(0, Math.min(100, statusMeta.value.step * 33.333)))
+const routeVisualPercent = computed(() => {
+  const status = rescueCall.value?.status || ''
+  if (['ARRIVED', 'RESCUING', 'PENDING_CONFIRMATION', 'COMPLETED'].includes(status)) return 100
+  if (isEnRoute.value) return Math.round(routeProgress.value * 100)
+  return 8
+})
+const trackingLabel = computed(() => {
+  if (hasReachedScene.value) return '已到达现场'
+  if (rescueCall.value?.liveTracking) return '实时驰援轨迹'
+  if (isDemoMode && isEnRoute.value) return '演示驰援轨迹'
+  return '建议驰援轨迹'
+})
+const remainingDistanceMeters = computed(() => {
+  const call = rescueCall.value
+  const distance = call?.matchedAed?.distanceMeters
+  if (!call || distance == null) return null
+  if (hasReachedScene.value) return 0
+  if (call.liveTracking) {
+    return Math.round(haversineMeters(
+      call.liveTracking.responderLatitude,
+      call.liveTracking.responderLongitude,
+      call.latitude,
+      call.longitude
+    ))
+  }
+  return Math.max(0, Math.round(distance * (isEnRoute.value ? Math.max(0.06, 1 - routeProgress.value) : 1)))
+})
+const liveDistance = computed(() => hasReachedScene.value
+  ? '现场'
+  : remainingDistanceMeters.value == null ? '计算中' : formatDistance(remainingDistanceMeters.value))
+const aedDistanceLabel = computed(() => hasReachedScene.value ? '已到场' : liveDistance.value)
+const liveEta = computed(() => {
+  const call = rescueCall.value
+  const seconds = call?.matchedAed?.estimatedArrivalSeconds
+  if (seconds == null) return '计算中'
+  if (['ARRIVED', 'RESCUING', 'PENDING_CONFIRMATION', 'COMPLETED'].includes(call?.status || '')) return '已到达'
+  const initialDistance = Math.max(1, call?.matchedAed?.distanceMeters || 1)
+  const multiplier = call?.liveTracking
+    ? Math.min(1.5, Math.max(0.06, (remainingDistanceMeters.value || initialDistance) / initialDistance))
+    : isEnRoute.value ? Math.max(0.06, 1 - routeProgress.value) : 1
+  return formatLiveEta(Math.max(10, Math.round(seconds * multiplier)))
+})
 
 const counterpart = computed<RescueParticipant | undefined>(() => {
   if (!rescueCall.value) return undefined
   return isResponder.value ? rescueCall.value.requester : rescueCall.value.responder
 })
 
-const counterpartInitial = computed(() => {
-  const fallback = isResponder.value ? '求' : '救'
-  return (counterpart.value?.displayName || fallback).slice(0, 1)
-})
-
 const hasCounterpartPhone = computed(() => /^1\d{10}$/.test(counterpart.value?.phone || ''))
-
-type JourneyState = 'done' | 'current' | 'pending'
-interface JourneyStep { label: string; detail: string; state: JourneyState }
-
-const journeySteps = computed<JourneyStep[]>(() => {
-  const call = rescueCall.value
-  if (!call?.matchedAed) return []
-  const status = call.status
-  const progressedToScene = ['ARRIVED', 'RESCUING', 'PENDING_CONFIRMATION', 'COMPLETED'].includes(status)
-  const progressedToRescue = ['RESCUING', 'PENDING_CONFIRMATION', 'COMPLETED'].includes(status)
-  const result: JourneyStep[] = [{
-    label: call.matchedAed.type === 'MOBILE' ? '移动 AED 已锁定' : '固定 AED 已锁定',
-    detail: `${call.matchedAed.name} · ${formatDistance(call.matchedAed.distanceMeters)}`,
-    state: status === 'MATCHING' ? 'current' : 'done'
-  }]
-  if (call.matchedAed.type === 'FIXED') {
-    result.push({
-      label: '取用 AED',
-      detail: call.arrivedAtAedAt ? '已到达取用点，设备交接中' : '施救者导航至设备点',
-      state: status === 'EN_ROUTE_TO_AED' ? 'current' : progressedToScene || status === 'EN_ROUTE_TO_REQUESTER' ? 'done' : 'pending'
-    })
-  }
-  result.push({
-    label: '赶往求救现场',
-    detail: call.liveTracking ? '实时位置已同步' : '响应后持续同步施救位置',
-    state: status === 'EN_ROUTE_TO_REQUESTER' ? 'current' : progressedToScene ? 'done' : 'pending'
-  })
-  result.push({
-    label: '现场施救',
-    detail: status === 'ARRIVED' ? '已到达，等待开始施救' : '到场后按急救指引执行',
-    state: status === 'ARRIVED' || status === 'RESCUING' ? 'current' : progressedToRescue ? 'done' : 'pending'
-  })
-  result.push({
-    label: '双方确认完成',
-    detail: '施救者提交，求救者确认，超时由服务端收敛',
-    state: status === 'PENDING_CONFIRMATION' ? 'current' : status === 'COMPLETED' ? 'done' : 'pending'
-  })
-  if (call.matchedAed.type === 'FIXED') {
-    result.push({
-      label: '归还 AED',
-      detail: call.aedReturnedAt ? '设备已归还并重新可调度' : '救援完成后归还原设备点',
-      state: call.aedCustodyStatus === 'RETURNED' ? 'done'
-        : status === 'COMPLETED' && call.aedCustodyStatus === 'RETURNING' ? 'current'
-          : 'pending'
-    })
-  }
-  return result
-})
 
 type DetailTaskAction = 'aed-arrival' | 'aed-pickup' | 'requester-arrival' | 'rescue-start' | 'completion-submission' | 'aed-return'
 
@@ -608,17 +524,18 @@ const nativeMarkers = computed(() => {
   }]
   const matched = rescueCall.value.matchedAed
   if (matched) {
+    const matchedAtScene = ['ARRIVED', 'RESCUING', 'PENDING_CONFIRMATION', 'COMPLETED'].includes(rescueCall.value.status)
     markers.push({
       id: 2,
-      longitude: matched.longitude,
-      latitude: matched.latitude,
+      longitude: matchedAtScene ? rescueCall.value.longitude : matched.longitude,
+      latitude: matchedAtScene ? rescueCall.value.latitude : matched.latitude,
       iconPath: matched.type === 'MOBILE'
         ? '/static/map/marker-mobile.png'
         : '/static/map/marker-fixed.png',
       width: 26,
       height: 32,
       callout: {
-        content: `已匹配·${formatEta(matched.estimatedArrivalSeconds)}`,
+        content: matchedAtScene ? 'AED 已到场' : `已匹配·${formatEta(matched.estimatedArrivalSeconds)}`,
         color: '#1F63D5',
         fontSize: 13,
         borderRadius: 8,
@@ -628,7 +545,9 @@ const nativeMarkers = computed(() => {
       }
     })
   }
-  const live = rescueCall.value.liveTracking
+  const live = ['ARRIVED', 'RESCUING', 'PENDING_CONFIRMATION', 'COMPLETED'].includes(rescueCall.value.status)
+    ? undefined
+    : rescueCall.value.liveTracking
   if (live) {
     markers.push({
       id: 3,
@@ -682,7 +601,8 @@ async function loadDetail(showLoading = true) {
     loading.value = false
     await nextTick()
     // #ifdef H5
-    await initMap()
+    if (hasReachedScene.value || isAwaitingMatch.value) destroyMap()
+    else await initMap()
     // #endif
     if (['COMPLETED', 'NO_RESOURCE', 'EXPIRED', 'USER_CANCELLED', 'SYSTEM_FAILED'].includes(rescueCall.value.status)) {
       stopPolling()
@@ -690,7 +610,7 @@ async function loadDetail(showLoading = true) {
     }
   } catch (error: any) {
     if (showLoading) {
-      errorMessage.value = error?.message || '救援状态加载失败'
+      errorMessage.value = userFacingError(error, '救援状态加载失败')
     }
   } finally {
     if (showLoading) loading.value = false
@@ -745,10 +665,11 @@ async function initMap() {
 
     // 只有位置或匹配结果变化才重绘，否则每轮 fitBounds 会让画面抖动
     const matched = rescueCall.value.matchedAed
-    const live = rescueCall.value.liveTracking
+    const live = hasReachedScene.value ? undefined : rescueCall.value.liveTracking
     const geometryKey = [
       latitude,
       longitude,
+      rescueCall.value.status,
       matched?.deviceId ?? '',
       matched?.latitude ?? '',
       matched?.longitude ?? '',
@@ -760,7 +681,9 @@ async function initMap() {
     }
     renderedGeometryKey = geometryKey
 
+    stopRouteAnimation()
     mapDataLayer.clearLayers()
+    routeMovingMarker = null
     const marker = Leaflet.divIcon({
       className: 'rescue-location-marker',
       html: '<span><i></i></span>',
@@ -770,21 +693,34 @@ async function initMap() {
     Leaflet.marker([latitude, longitude], { icon: marker }).addTo(mapDataLayer)
     if (matched) {
       const deviceMarker = Leaflet.divIcon({
-        className: 'matched-aed-marker',
+        className: hasReachedScene.value ? 'matched-aed-marker matched-aed-arrived' : 'matched-aed-marker',
         html: '<span>AED</span>',
         iconSize: [32, 32],
         iconAnchor: [16, 16]
       })
-      Leaflet.marker([matched.latitude, matched.longitude], { icon: deviceMarker })
-        .addTo(mapDataLayer)
-      Leaflet.polyline(
-        [[latitude, longitude], [matched.latitude, matched.longitude]],
-        { color: '#2F73E8', weight: 3, opacity: 0.72, dashArray: '8 8' }
+      const routeStart: [number, number] = live
+        ? [live.responderLatitude, live.responderLongitude]
+        : [matched.latitude, matched.longitude]
+      const routeEnd: [number, number] = [latitude, longitude]
+      routeCoordinates = buildRescueRoute(routeStart, routeEnd)
+      Leaflet.polyline(routeCoordinates, {
+        color: '#AFC2D5', weight: 8, opacity: 0.78, lineCap: 'round'
+      }).addTo(mapDataLayer)
+      Leaflet.polyline(routeCoordinates, hasReachedScene.value
+        ? { className: 'rescue-route-complete', color: '#23956A', weight: 5, opacity: .9, lineCap: 'round' }
+        : {
+            className: 'rescue-route-flow', color: '#2676E5', weight: 5,
+            opacity: 1, dashArray: '7 14', lineCap: 'round'
+          }
       ).addTo(mapDataLayer)
+      const displayedProgress = hasReachedScene.value ? 1 : routeProgress.value
+      routeMovingMarker = Leaflet.marker(positionAlongRoute(routeCoordinates, displayedProgress), { icon: deviceMarker })
+        .addTo(mapDataLayer)
       mapInstance.fitBounds(
-        [[latitude, longitude], [matched.latitude, matched.longitude]],
-        { padding: [42, 42], maxZoom: 15 }
+        routeCoordinates,
+        { padding: [40, 40], maxZoom: 17 }
       )
+      if (isDemoMode && isEnRoute.value && !live) startRouteAnimation()
     }
     if (live) {
       const liveMarker = Leaflet.divIcon({
@@ -800,7 +736,63 @@ async function initMap() {
     mapUnavailable.value = true
   }
 }
+
+function destroyMap() {
+  stopRouteAnimation()
+  renderedGeometryKey = ''
+  mapDataLayer = null
+  routeMovingMarker = null
+  if (mapInstance) {
+    mapInstance.remove()
+    mapInstance = null
+  }
+}
 // #endif
+
+function buildRescueRoute(start: [number, number], end: [number, number]): [number, number][] {
+  const latitudeDelta = end[0] - start[0]
+  const longitudeDelta = end[1] - start[1]
+  const bendLatitude = -longitudeDelta * 0.12
+  const bendLongitude = latitudeDelta * 0.12
+  return Array.from({ length: 18 }, (_, index) => {
+    const progress = index / 17
+    const curve = Math.sin(progress * Math.PI)
+    return [
+      start[0] + latitudeDelta * progress + bendLatitude * curve,
+      start[1] + longitudeDelta * progress + bendLongitude * curve
+    ]
+  })
+}
+
+function positionAlongRoute(points: [number, number][], progress: number): [number, number] {
+  if (!points.length) return [0, 0]
+  const position = Math.max(0, Math.min(1, progress)) * (points.length - 1)
+  const index = Math.min(points.length - 2, Math.floor(position))
+  const fraction = position - index
+  const current = points[index]
+  const next = points[index + 1] || current
+  return [
+    current[0] + (next[0] - current[0]) * fraction,
+    current[1] + (next[1] - current[1]) * fraction
+  ]
+}
+
+function startRouteAnimation() {
+  stopRouteAnimation()
+  routeAnimationStartedAt = performance.now() - routeProgress.value * 26000
+  const animate = (now: number) => {
+    const raw = ((now - routeAnimationStartedAt) % 30000) / 26000
+    routeProgress.value = raw > 1 ? 0.94 : 0.12 + raw * 0.82
+    routeMovingMarker?.setLatLng(positionAlongRoute(routeCoordinates, routeProgress.value))
+    routeAnimationFrame = requestAnimationFrame(animate)
+  }
+  routeAnimationFrame = requestAnimationFrame(animate)
+}
+
+function stopRouteAnimation() {
+  if (routeAnimationFrame != null) cancelAnimationFrame(routeAnimationFrame)
+  routeAnimationFrame = null
+}
 
 function formatTime(value: string) {
   const date = new Date(value)
@@ -811,23 +803,17 @@ function formatTime(value: string) {
 
 function openRescueLocation() {
   if (!rescueCall.value) return
-  uni.openLocation({
+  openMapNavigation({
     latitude: rescueCall.value.latitude,
     longitude: rescueCall.value.longitude,
-    name: '呼救位置',
+    name: '救援现场',
     address: rescueCall.value.address,
-    scale: 16,
-    fail: () => uni.showToast({ title: '无法打开系统地图', icon: 'none' })
+    mode: 'car'
   })
 }
 
 function callEmergency() {
   uni.makePhoneCall({ phoneNumber: '120' })
-}
-
-function callMatchedDevice() {
-  const phoneNumber = rescueCall.value?.matchedAed?.contactPhone
-  if (phoneNumber) uni.makePhoneCall({ phoneNumber })
 }
 
 function callCounterpart() {
@@ -860,7 +846,7 @@ async function executeDetailAction(action: DetailTaskAction) {
     await loadDetail(false)
     uni.showToast({ title: '救援状态已同步', icon: 'success' })
   } catch (error: any) {
-    uni.showToast({ title: error?.message || '救援状态更新失败', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '救援进展更新失败'), icon: 'none' })
   } finally {
     responderActionBusy.value = false
   }
@@ -889,26 +875,31 @@ async function confirmCompletion() {
     stopPolling()
     await loadFeedback()
   } catch (error: any) {
-    uni.showToast({ title: error?.message || '确认失败，请重试', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '确认失败，请重试'), icon: 'none' })
   }
-}
-
-function openMatchedDevice() {
-  const device = rescueCall.value?.matchedAed
-  if (!device) return
-  uni.openLocation({
-    latitude: device.latitude,
-    longitude: device.longitude,
-    name: device.name,
-    address: device.address,
-    scale: 16,
-    fail: () => uni.showToast({ title: '无法打开系统地图', icon: 'none' })
-  })
 }
 
 function formatEta(seconds: number) {
   if (seconds < 60) return `${seconds}秒`
   return `${Math.ceil(seconds / 60)}分钟`
+}
+
+function formatLiveEta(seconds: number) {
+  if (seconds < 60) return `${seconds}秒`
+  if (seconds < 180) return `${Math.floor(seconds / 60)}分${seconds % 60}秒`
+  return `${Math.ceil(seconds / 60)}分钟`
+}
+
+function haversineMeters(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number) {
+  const radians = (degrees: number) => degrees * Math.PI / 180
+  const latitudeDelta = radians(toLatitude - fromLatitude)
+  const longitudeDelta = radians(toLongitude - fromLongitude)
+  const fromLat = radians(fromLatitude)
+  const toLat = radians(toLatitude)
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(fromLat) * Math.cos(toLat) * Math.sin(longitudeDelta / 2) ** 2
+  const clamped = Math.min(1, Math.max(0, haversine))
+  return 6_371_000 * 2 * Math.asin(Math.sqrt(clamped))
 }
 
 function formatDistance(meters: number) {
@@ -931,11 +922,11 @@ function previewSceneImage(index: number) {
 
 onUnmounted(() => {
   stopPolling()
+  stopRouteAnimation()
   disconnectEvents?.()
-  if (mapInstance) {
-    mapInstance.remove()
-    mapInstance = null
-  }
+  // #ifdef H5
+  destroyMap()
+  // #endif
 })
 </script>
 
@@ -967,6 +958,7 @@ onUnmounted(() => {
   border: 0;
 }
 .matched-aed-marker span {
+  position: relative;
   display: flex;
   width: 32px;
   height: 32px;
@@ -980,894 +972,207 @@ onUnmounted(() => {
   font-size: 9px;
   font-weight: 800;
 }
+.matched-aed-marker span::after {
+  content: '';
+  position: absolute;
+  inset: -11px;
+  z-index: -1;
+  border: 2px solid rgba(35,149,106,.48);
+  border-radius: 50%;
+  animation: aedBeacon 1.8s ease-out infinite;
+}
+.matched-aed-arrived span::after { display: none; }
+.rescue-route-flow {
+  animation: rescueRouteFlow 1.25s linear infinite;
+}
+@keyframes rescueRouteFlow {
+  to { stroke-dashoffset: -32; }
+}
+@keyframes aedBeacon {
+  from { opacity: .9; transform: scale(.55); }
+  to { opacity: 0; transform: scale(1.25); }
+}
 /* #endif */
 </style>
 
 <style lang="scss" scoped>
-.page {
-  min-height: 100vh;
-  background: #F2F6FB;
-  color: #17243A;
-}
-
-.page-scroll {
-  min-height: 100vh;
-}
-
-.map-stage {
-  position: relative;
-  height: 620rpx;
-  overflow: hidden;
-  background: #DCE5EE;
-}
-
-.rescue-map-stage,
-.map-unavailable-stage {
-  width: 100%;
-  height: 620rpx;
-  margin: 0;
-  border-radius: 0;
-}
-
-.map-stage .rescue-map-stage,
-.map-stage .map-unavailable-stage {
-  width: 100%;
-  height: 620rpx;
-  margin: 0;
-  border-radius: 0;
-}
-
-.map-topbar {
-  position: absolute;
-  z-index: 500;
-  top: calc(22rpx + env(safe-area-inset-top));
-  left: 24rpx;
-  right: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  pointer-events: none;
-}
-
-.map-status-pill,
-.map-safety-pill {
-  display: flex;
-  min-height: 62rpx;
-  box-sizing: border-box;
-  align-items: center;
-  gap: 10rpx;
-  padding: 0 20rpx;
-  border: 1rpx solid rgba(255, 255, 255, .78);
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, .94);
-  box-shadow: 0 8rpx 24rpx rgba(26, 48, 81, .15);
-  color: #263852;
-  font-size: 23rpx;
-  font-weight: 800;
-  pointer-events: auto;
-  backdrop-filter: blur(14px);
-}
-
-.map-safety-pill { color: #B52832; }
-
-.map-eta-panel {
-  position: absolute;
-  z-index: 500;
-  left: 24rpx;
-  bottom: 54rpx;
-  display: grid;
-  grid-template-columns: auto auto 1rpx auto auto;
-  align-items: baseline;
-  gap: 8rpx;
-  padding: 20rpx 24rpx;
-  border: 1rpx solid rgba(255, 255, 255, .78);
-  border-radius: 20rpx;
-  background: rgba(255, 255, 255, .95);
-  box-shadow: 0 12rpx 34rpx rgba(26, 48, 81, .17);
-  backdrop-filter: blur(14px);
-}
-
-.map-eta-value { color: #152A49; font-size: 36rpx; font-weight: 900; letter-spacing: -1rpx; }
-.map-eta-copy,
-.map-distance-copy { color: #7D8A9D; font-size: 19rpx; }
-.map-eta-divider { width: 1rpx; height: 42rpx; margin: 0 9rpx; align-self: center; background: #DCE3EB; }
-.map-distance-value { color: #147452; font-size: 27rpx; font-weight: 850; }
-
-.map-location-button {
-  position: absolute;
-  z-index: 500;
-  right: 24rpx;
-  bottom: 54rpx;
-  display: flex;
-  width: 70rpx;
-  height: 70rpx;
-  align-items: center;
-  justify-content: center;
-  border: 1rpx solid rgba(255, 255, 255, .8);
-  border-radius: 20rpx;
-  background: rgba(255, 255, 255, .96);
-  box-shadow: 0 10rpx 28rpx rgba(26, 48, 81, .16);
-}
-
-.mission-sheet {
-  position: relative;
-  z-index: 600;
-  min-height: 55vh;
-  margin-top: -28rpx;
-  padding: 0 0 calc(18rpx + env(safe-area-inset-bottom));
-  border-radius: 30rpx 30rpx 0 0;
-  background: #F2F6FB;
-  box-shadow: 0 -12rpx 32rpx rgba(30, 51, 81, .11);
-}
-
-.sheet-handle {
-  width: 74rpx;
-  height: 8rpx;
-  margin: 0 auto 6rpx;
-  padding-top: 18rpx;
-  border-bottom: 8rpx solid #C8D1DC;
-  border-radius: 999rpx;
-}
-
-.quick-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14rpx;
-  margin: 18rpx 24rpx 0;
-}
-
-.quick-action {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 10rpx;
-  padding: 16rpx 13rpx;
-  border: 1rpx solid #DEE6EF;
-  border-radius: 18rpx;
-  background: #FFFFFF;
-  color: #44566F;
-  font-size: 21rpx;
-  font-weight: 750;
-}
-
-.quick-action-icon {
-  display: flex;
-  width: 52rpx;
-  height: 52rpx;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: 15rpx;
-  background: #EDF4FF;
-}
-
-.quick-action-emergency .quick-action-icon { background: #FFF0F1; }
-.quick-action-disabled { opacity: .42; }
-.location-card { padding: 4rpx 28rpx 24rpx; }
-
-.state-card {
-  min-height: 72vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40rpx;
-}
-
-.state-icon {
-  box-shadow: 0 12rpx 34rpx rgba(35, 65, 112, 0.1);
-}
-
-.loading-ring {
-  width: 54rpx;
-  height: 54rpx;
-  border: 6rpx solid #DCE7F8;
-  border-top-color: #2F73E8;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.state-title {
-  margin-top: 28rpx;
-  font-size: 32rpx;
-  font-weight: 700;
-}
-
-.state-desc {
-  margin-top: 10rpx;
-  color: #75839A;
-  font-size: 25rpx;
-}
-
-.state-action {
-  margin-top: 30rpx;
-  padding: 18rpx 34rpx;
-  border-radius: 18rpx;
-  background: #2F73E8;
-  color: #FFFFFF;
-  font-size: 26rpx;
-  font-weight: 700;
-}
-
-.status-panel,
-.map-card,
-.detail-card,
-.safety-card {
-  margin: 24rpx 24rpx 0;
-  border-radius: 26rpx;
-}
-
-.status-panel {
-  margin-top: 0;
-  padding: 28rpx 30rpx 30rpx;
-  overflow: hidden;
-  border-radius: 24rpx;
-  background: #FFFFFF;
-  border: 1rpx solid #E1E8F0;
-  color: #1C2B45;
-}
-
-.status-completed {
-  border-color: rgba(34, 168, 122, 0.4);
-}
-
-.status-cancelled {
-  border-color: #E1E8F0;
-}
-
-.status-head,
-.section-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.status-kicker,
-.section-kicker {
-  display: block;
-  font-size: 20rpx;
-  font-weight: 700;
-  letter-spacing: 3rpx;
-}
-
-.status-kicker {
-  color: rgba(255, 255, 255, 0.68);
-}
-
-.status-title {
-  display: block;
-  font-size: 40rpx;
-  font-weight: 800;
-  letter-spacing: -1rpx;
-  color: #1C2B45;
-}
-
-.status-desc {
-  display: block;
-  margin-top: 14rpx;
-  color: #68758A;
-  font-size: 25rpx;
-  line-height: 1.65;
-}
-
-.live-chip {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 9rpx 14rpx;
-  border: 1rpx solid #D6E4F5;
-  border-radius: 999rpx;
-  background: #F2F7FD;
-  color: #2E6DD1;
-  font-size: 21rpx;
-}
-
-.live-dot {
-  width: 10rpx;
-  height: 10rpx;
-  border-radius: 50%;
-  background: #23956A;
-}
-
-.status-progress {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 34rpx;
-}
-
-.progress-step {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10rpx;
-  color: #A8B4C4;
-  font-size: 20rpx;
-}
-
-.progress-step::before {
-  content: '';
-  position: absolute;
-  top: 11rpx;
-  right: 50%;
-  width: 100%;
-  height: 2rpx;
-  background: #E1E8F0;
-}
-
-.progress-step:first-child::before {
-  display: none;
-}
-
-.progress-step.active {
-  color: #2E6DD1;
-}
-
-.progress-step.active::before {
-  background: #2E6DD1;
-}
-
-.progress-node {
-  position: relative;
-  z-index: 1;
-  width: 24rpx;
-  height: 24rpx;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 4rpx solid #E1E8F0;
-  border-radius: 50%;
-  background: #FFFFFF;
-}
-
-.progress-step.active .progress-node {
-  border-color: #2E6DD1;
-  background: #2E6DD1;
-}
-
-.progress-step.active:not(:last-child) .progress-node {
-  background: #2E6DD1;
-}
-
-.map-card,
-.detail-card,
-.match-card {
-  padding: 28rpx;
-  background: #FFFFFF;
-  box-shadow: 0 10rpx 28rpx rgba(38, 63, 103, 0.07);
-}
-
-.match-resource {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  margin-top: 24rpx;
-  padding: 20rpx;
-  border-radius: 18rpx;
-  background: #F3F7FC;
-}
-
-.match-copy { min-width: 0; flex: 1; }
-.match-name,
-.match-meta,
-.match-vehicle { display: block; }
-.match-name { font-size: 27rpx; font-weight: 800; }
-.match-meta { margin-top: 6rpx; color: #53647E; font-size: 22rpx; }
-.match-vehicle { margin-top: 6rpx; color: #7A889D; font-size: 21rpx; }
-
-.eta-badge { text-align: right; }
-.eta-value { display: block; color: #16855D; font-size: 32rpx; font-weight: 900; }
-.eta-label { display: block; margin-top: 2rpx; color: #7A889D; font-size: 19rpx; }
-
-.match-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 14rpx;
-  margin-top: 20rpx;
-}
-
-.match-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  min-height: 64rpx;
-  padding: 0 20rpx;
-  border-radius: 15rpx;
-  font-size: 22rpx;
-  font-weight: 700;
-}
-.match-action-secondary { background: #EDF4FF; color: #1F63D5; }
-.match-action-primary { background: #1F63D5; color: #FFFFFF; }
-
-.waiting-card {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  margin: 24rpx 24rpx 0;
-  padding: 24rpx 28rpx;
-  border: 1rpx solid #DDE7F5;
-  border-radius: 22rpx;
-  background: #FFFFFF;
-}
-.waiting-pulse {
-  width: 18rpx;
-  height: 18rpx;
-  flex: none;
-  border-radius: 50%;
-  background: #2F73E8;
-  box-shadow: 0 0 0 10rpx rgba(47, 115, 232, 0.12);
-}
-.waiting-title,
-.waiting-desc { display: block; }
-.waiting-title { font-size: 25rpx; font-weight: 800; }
-.waiting-desc { margin-top: 6rpx; color: #75839A; font-size: 21rpx; line-height: 1.45; }
-
-.section-kicker {
-  color: #7A8AA3;
-}
-
-.section-title {
-  display: block;
-  margin-top: 5rpx;
-  font-size: 32rpx;
-  font-weight: 800;
-}
-
-.section-link {
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-  padding: 12rpx 16rpx;
-  border-radius: 14rpx;
-  background: #EDF4FF;
-  color: #1F63D5;
-  font-size: 23rpx;
-  font-weight: 700;
-}
-
-.rescue-map,
-.map-unavailable {
-  height: 360rpx;
-  margin-top: 24rpx;
-  overflow: hidden;
-  border-radius: 20rpx;
-}
-
-.map-unavailable {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16rpx;
-  background: #EDF2F8;
-  color: #6F7F99;
-  font-size: 23rpx;
-}
-
-.location-row {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  margin-top: 22rpx;
-}
-
-.location-icon {
-  flex: none;
-  width: 58rpx;
-  height: 58rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 17rpx;
-  background: #EDF4FF;
-}
-
-.location-copy {
-  min-width: 0;
-  flex: 1;
-}
-
-.location-address,
-.location-coordinates {
-  display: block;
-}
-
-.location-address {
-  font-size: 26rpx;
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.location-coordinates {
-  margin-top: 5rpx;
-  color: #93A0B4;
-  font-size: 21rpx;
-}
-
-.urgency-chip {
-  padding: 9rpx 16rpx;
-  border-radius: 999rpx;
-  font-size: 22rpx;
-  font-weight: 700;
-}
-
-.urgency-critical {
-  background: #FFF0F1;
-  color: #C22936;
-}
-
-.urgency-high {
-  background: #FFF4E8;
-  color: #C76713;
-}
-
-.urgency-medium {
-  background: #EDF4FF;
-  color: #1F63D5;
-}
-
-.detail-list {
-  margin-top: 20rpx;
-}
-
-.detail-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24rpx;
-  padding: 22rpx 0;
-  border-bottom: 1rpx solid #E9EEF5;
-}
-
-.detail-row:last-child {
-  border-bottom: 0;
-}
-
-.detail-row-block {
-  display: block;
-}
-
-.detail-label {
-  flex: none;
-  color: #7B899E;
-  font-size: 24rpx;
-}
-
-.detail-value {
-  min-width: 0;
-  text-align: right;
-  font-size: 24rpx;
-  font-weight: 600;
-}
-
-.detail-id {
-  max-width: 430rpx;
-  overflow-wrap: anywhere;
-  color: #53627A;
-  font-size: 21rpx;
-}
-
-.symptom-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  margin-top: 15rpx;
-}
-
-.symptom-chip {
-  padding: 9rpx 14rpx;
-  border-radius: 12rpx;
-  background: #F0F5FC;
-  color: #3C4F6B;
-  font-size: 22rpx;
-}
-
-.description {
-  display: block;
-  margin-top: 13rpx;
-  font-size: 25rpx;
-  line-height: 1.7;
-}
-
-.scene-section {
-  padding-top: 22rpx;
-  border-top: 1rpx solid #E9EEF5;
-}
-
-.scene-gallery {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12rpx;
-  margin-top: 15rpx;
-}
-
-.scene-image {
-  width: 100%;
-  height: 176rpx;
-  border-radius: 16rpx;
-  background: #EDF2F8;
-}
-
-.safety-card {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  padding: 24rpx;
-  background: #FFF2F2;
-  border: 1rpx solid #FAD6D8;
-}
-
-.cancel-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 24rpx 24rpx 0;
-  padding: 22rpx 26rpx;
-  border: 1rpx solid #E1E8F0;
-  border-radius: 22rpx;
-  background: #FFFFFF;
-}
-
-.completion-card {
-  margin: 24rpx 24rpx 0;
-  padding: 28rpx;
-  border: 1rpx solid #D5E3F8;
-  border-radius: 22rpx;
-  background: #FFFFFF;
-}
-
-.completion-card-primary { margin-top: 18rpx; }
-
-.completion-title {
-  display: block;
-  color: #1C2B45;
-  font-size: 29rpx;
-  font-weight: 700;
-}
-
-.completion-desc {
-  display: block;
-  margin-top: 10rpx;
-  color: #68758A;
-  font-size: 23rpx;
-  line-height: 1.6;
-}
-
-.completion-button {
-  margin-top: 22rpx;
-  padding: 18rpx 0;
-  border-radius: 14rpx;
-  background: #1F63D5;
-  color: #FFFFFF;
-  text-align: center;
-  font-size: 26rpx;
-  font-weight: 700;
-}
-
-.cancel-desc {
-  color: #68758A;
-  font-size: 23rpx;
-}
-
-.cancel-button {
-  padding: 10rpx 22rpx;
-  border: 1rpx solid #C93D46;
-  border-radius: 999rpx;
-  color: #C93D46;
-  font-size: 23rpx;
-  font-weight: 650;
-}
-
-.feedback-card {
-  margin: 24rpx 24rpx 0;
-  padding: 30rpx;
-  border: 1rpx solid #E1E8F0;
-  border-radius: 22rpx;
-  background: #FFFFFF;
-}
-
-.feedback-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.feedback-title {
-  display: block;
-  color: #1C2B45;
-  font-size: 30rpx;
-  font-weight: 700;
-}
-
-.feedback-done {
-  color: #23956A;
-  font-size: 23rpx;
-  font-weight: 650;
-}
-
-.feedback-stars {
-  display: flex;
-  gap: 10rpx;
-  margin-top: 20rpx;
-}
-
-.feedback-star {
-  color: #D9E1EA;
-  font-size: 52rpx;
-  line-height: 1;
-}
-
-.feedback-star.star-filled {
-  color: #F5A623;
-}
-
-.feedback-comment {
-  display: block;
-  margin-top: 18rpx;
-  color: #4E5969;
-  font-size: 24rpx;
-  line-height: 1.6;
-}
-
-.feedback-input {
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: 20rpx;
-  padding: 18rpx;
-  border: 1rpx solid #E1E8F0;
-  border-radius: 14rpx;
-  background: #F7F9FC;
-  color: #1C2B45;
-  font-size: 24rpx;
-  min-height: 100rpx;
-}
-
-.feedback-submit {
-  margin-top: 20rpx;
-  padding: 20rpx 0;
-  border: 1rpx solid #2E6DD1;
-  border-radius: 14rpx;
-  text-align: center;
-  color: #2E6DD1;
-  font-size: 27rpx;
-  font-weight: 700;
-}
-
-.feedback-submit-busy {
-  opacity: 0.6;
-}
-
-.safety-copy {
-  min-width: 0;
-  flex: 1;
-}
-
-.safety-title,
-.safety-desc {
-  display: block;
-}
-
-.safety-title {
-  color: #A31F2A;
-  font-size: 24rpx;
-  font-weight: 800;
-}
-
-.safety-desc {
-  margin-top: 5rpx;
-  color: #94666B;
-  font-size: 20rpx;
-  line-height: 1.5;
-}
-
-.call-button {
-  flex: none;
-  padding: 13rpx 20rpx;
-  border-radius: 14rpx;
-  background: #C22936;
-  color: #FFFFFF;
-  font-size: 23rpx;
-  font-weight: 800;
-}
-
-.relationship-card,
-.journey-card,
-.responder-action-card {
-  margin: 24rpx 24rpx 0;
-  padding: 28rpx;
-  border: 1rpx solid #E1E8F0;
-  border-radius: 24rpx;
-  background: #FFFFFF;
-}
-
-.relationship-head,
-.relationship-body,
-.journey-title-row,
-.responder-action-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.connection-chip {
-  display: flex;
-  align-items: center;
-  gap: 7rpx;
-  padding: 8rpx 12rpx;
-  border-radius: 999rpx;
-  background: #EEF8F4;
-  color: #147452;
-  font-size: 19rpx;
-  font-weight: 700;
-}
-
-.relationship-body {
-  align-items: flex-start;
-  margin-top: 28rpx;
-}
-
-.role-person {
-  width: 220rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.role-avatar {
-  display: flex;
-  width: 72rpx;
-  height: 72rpx;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #DDEBFA;
-  color: #245FAF;
-  font-size: 28rpx;
-  font-weight: 850;
-}
-
-.role-avatar-peer { background: #E3F2EC; color: #147452; }
-.role-name { margin-top: 12rpx; color: #263852; font-size: 23rpx; font-weight: 800; }
-.role-caption { margin-top: 5rpx; color: #8592A4; font-size: 18rpx; line-height: 1.45; }
-.relationship-link { position: relative; display: flex; flex: 1; min-width: 80rpx; align-items: center; justify-content: center; padding-top: 34rpx; }
-.relationship-line { position: absolute; left: 4rpx; right: 4rpx; height: 2rpx; background: #D7E1EC; }
-.relationship-badge { z-index: 1; padding: 5rpx 8rpx; border: 1rpx solid #D7E1EC; border-radius: 8rpx; background: #FFFFFF; color: #718096; font-size: 16rpx; }
-.counterpart-phone { display: flex; align-items: center; gap: 6rpx; margin-top: 9rpx; color: #1F63D5; font-size: 18rpx; font-weight: 700; }
-
-.journey-role { padding: 6rpx 12rpx; border-radius: 9rpx; background: #F0F4F8; color: #64748A; font-size: 19rpx; font-weight: 700; }
-.journey-list { margin-top: 28rpx; }
-.journey-step { display: flex; min-height: 96rpx; }
-.journey-track { display: flex; width: 48rpx; flex-direction: column; align-items: center; }
-.journey-node { z-index: 1; display: flex; width: 26rpx; height: 26rpx; box-sizing: border-box; align-items: center; justify-content: center; border: 5rpx solid #DCE3EB; border-radius: 50%; background: #FFFFFF; }
-.journey-line { width: 2rpx; flex: 1; background: #DCE3EB; }
-.journey-copy { min-width: 0; flex: 1; padding: 0 0 24rpx 8rpx; }
-.journey-title-row { justify-content: flex-start; gap: 9rpx; }
-.journey-title { color: #78869A; font-size: 24rpx; font-weight: 750; }
-.journey-detail { display: block; margin-top: 6rpx; color: #97A3B2; font-size: 20rpx; line-height: 1.45; }
-.journey-done .journey-node { border-color: #16855D; background: #16855D; }
-.journey-done .journey-line { background: #A9D9C7; }
-.journey-done .journey-title { color: #41576D; }
-.journey-current .journey-node { border-color: #1F63D5; box-shadow: 0 0 0 8rpx rgba(31, 99, 213, .1); }
-.journey-current .journey-title { color: #1F3F70; }
-.journey-current-chip { padding: 3rpx 7rpx; border-radius: 6rpx; background: #EAF2FF; color: #1F63D5; font-size: 17rpx; font-weight: 800; }
-
-.responder-action-card { gap: 20rpx; }
-.responder-action-primary { position: sticky; z-index: 700; bottom: calc(14rpx + env(safe-area-inset-bottom)); margin-top: 18rpx; box-shadow: 0 14rpx 36rpx rgba(32, 64, 108, .16); }
-.responder-action-copy { min-width: 0; flex: 1; }
-.responder-action-kicker { display: block; color: #7E8A9B; font-size: 18rpx; font-weight: 700; }
-.responder-action-title { display: block; margin-top: 6rpx; color: #263852; font-size: 22rpx; line-height: 1.45; }
-.responder-action-button { display: flex; min-width: 240rpx; min-height: 72rpx; align-items: center; justify-content: center; padding: 0 18rpx; border-radius: 13rpx; background: #1F63D5; color: #FFFFFF; text-align: center; font-size: 22rpx; font-weight: 800; }
-.responder-action-busy { opacity: .55; }
-
-.bottom-space {
-  height: calc(36rpx + env(safe-area-inset-bottom));
+.page { min-height: 100vh; background: #F3F7FA; color: #20364D; }
+.page-scroll { min-height: 100vh; padding: 0 24rpx; box-sizing: border-box; }
+
+.rescue-overview { position: relative; margin: 0 -24rpx; padding: 34rpx 28rpx 52rpx; overflow: hidden; border-bottom: 1rpx solid rgba(60,60,67,.12); border-radius: 0; background: #F8F8FA; }
+.rescue-overview::before { display: none; }
+.status-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24rpx; }
+.status-copy { min-width: 0; flex: 1; }
+.status-line { position: relative; z-index: 1; display: flex; align-items: center; gap: 13rpx; color: #183755; font-size: 41rpx; font-weight: 820; letter-spacing: -1rpx; }
+.signal-dot { width: 13rpx; height: 13rpx; flex: none; border-radius: 50%; background: #23956A; box-shadow: 0 0 0 0 rgba(35,149,106,.25); animation: signalPulse 2s ease-out infinite; }
+.status-desc { position: relative; z-index: 1; display: block; margin-top: 10rpx; color: #637B93; font-size: 23rpx; line-height: 1.5; }
+.status-seal { position: relative; z-index: 1; flex: none; padding: 10rpx 16rpx; border-radius: 13rpx; font-size: 20rpx; font-weight: 800; }
+.lifeline { position: relative; z-index: 1; height: 76rpx; margin: 33rpx 18rpx 0; }
+.lifeline-track, .lifeline-fill { position: absolute; top: 10rpx; left: 0; height: 3rpx; border-radius: 999rpx; }
+.lifeline-track { width: 100%; background: #DCE5ED; }
+.lifeline-fill { background: #2E6DD1; transition: width .6s cubic-bezier(.22,.8,.24,1); }
+.lifeline-pulse { position: absolute; top: -7rpx; right: -8rpx; width: 17rpx; height: 17rpx; border-radius: 50%; background: #2E6DD1; box-shadow: 0 0 0 8rpx rgba(46,109,209,.11); }
+.lifeline-complete .lifeline-fill, .lifeline-complete .lifeline-pulse { background: #23956A; }
+.lifeline-step { position: absolute; top: 0; display: flex; width: 92rpx; flex-direction: column; align-items: center; gap: 12rpx; color: #9AA7B5; font-size: 18rpx; transform: translateX(-50%); }
+.lifeline-step:first-of-type { align-items: flex-start; transform: none; }
+.lifeline-step:last-of-type { align-items: flex-end; transform: translateX(-100%); }
+.lifeline-node { width: 20rpx; height: 20rpx; box-sizing: border-box; border: 4rpx solid #DCE5ED; border-radius: 50%; background: #F3F7FA; transition: all .35s ease; }
+.lifeline-step.active { color: #49627D; }
+.lifeline-step.active .lifeline-node { border-color: #2E6DD1; background: #2E6DD1; }
+
+.route-card, .arrival-card, .matching-board, .panel, .current-action, .waiting-card, .cancel-card, .feedback-card { margin: 0 0 18rpx; border: 1rpx solid #E1E9F0; border-radius: 24rpx; background: #FFFFFF; box-shadow: 0 8rpx 22rpx rgba(42,67,92,.045); }
+.route-card { position: relative; z-index: 3; margin-top: -24rpx; overflow: hidden; border-color: rgba(255,255,255,.9); box-shadow: 0 18rpx 44rpx rgba(35,65,98,.14); }
+.arrival-card { position: relative; z-index: 3; display: flex; min-height: 154rpx; align-items: center; gap: 20rpx; margin-top: -24rpx; padding: 28rpx; overflow: hidden; border: 0; background: #E8F5EE; box-shadow: none; }
+.arrival-card::after { display: none; }
+.arrival-card > * { position: relative; z-index: 1; }
+.matching-board { position: relative; z-index: 3; display: flex; min-height: 330rpx; flex-direction: column; align-items: center; justify-content: center; margin-top: -24rpx; overflow: hidden; border: 0; background: #EDF4FC; }
+.matching-signal { display: flex; height: 68rpx; align-items: center; gap: 10rpx; padding: 0 24rpx; border-radius: 18rpx; background: rgba(255,255,255,.72); }
+.matching-signal view { width: 7rpx; height: 18rpx; border-radius: 6rpx; background: #2E6DD1; animation: signalLevel 1.15s cubic-bezier(.4,0,.2,1) infinite; }
+.matching-signal view:nth-child(2) { height: 34rpx; animation-delay: .12s; }
+.matching-signal view:nth-child(3) { height: 50rpx; background: #C72C38; animation-delay: .24s; }
+.matching-signal view:nth-child(4) { height: 30rpx; animation-delay: .36s; }
+.matching-signal view:nth-child(5) { animation-delay: .48s; }
+.matching-board-title { margin-top: 25rpx; color: #1F3B57; font-size: 34rpx; font-weight: 800; letter-spacing: -.5rpx; }.matching-board-desc { margin-top: 8rpx; color: #64778B; font-size: 21rpx; }
+.matching-board-live { display: flex; align-items: center; gap: 8rpx; margin-top: 24rpx; color: #47705E; font-size: 18rpx; font-weight: 650; }
+.matching-board-live view { width: 9rpx; height: 9rpx; border-radius: 50%; background: #248A5A; box-shadow: 0 0 0 0 rgba(36,138,90,.22); animation: signalPulse 2s ease-out infinite; }
+@keyframes signalLevel { 0%,100% { opacity: .42; transform: scaleY(.52); } 45% { opacity: 1; transform: scaleY(1); } }
+.arrival-mark { display: flex; width: 76rpx; height: 76rpx; flex: none; align-items: center; justify-content: center; border-radius: 50%; background: #248A5A; box-shadow: 0 0 0 12rpx rgba(36,138,90,.09); animation: arrivalConfirm 420ms cubic-bezier(.2,.75,.2,1) both; }
+.arrival-copy { min-width: 0; flex: 1; }
+.arrival-title, .arrival-place { display: block; }
+.arrival-title { color: #173F31; font-size: 31rpx; font-weight: 800; }
+.arrival-place { margin-top: 6rpx; overflow: hidden; color: #587268; font-size: 21rpx; text-overflow: ellipsis; white-space: nowrap; }
+.arrival-state { flex: none; padding: 7rpx 11rpx; border-radius: 10rpx; background: #E9F5F0; color: #197C59; font-size: 18rpx; font-weight: 750; }
+@keyframes arrivalConfirm { from { opacity: 0; transform: scale(.82); } to { opacity: 1; transform: none; } }
+.route-map-wrap { position: relative; height: 390rpx; overflow: hidden; background: #E6EDF3; }
+.route-card .rescue-map, .route-card .map-unavailable { width: 100%; height: 390rpx; margin: 0; border-radius: 0; }
+.route-card .map-unavailable { position: absolute; inset: 0; z-index: 4; }
+.tracking-chip { position: absolute; z-index: 500; top: 18rpx; left: 18rpx; display: flex; align-items: center; gap: 9rpx; padding: 10rpx 15rpx; border: 1rpx solid rgba(255,255,255,.8); border-radius: 999rpx; background: rgba(255,255,255,.93); color: #49627D; font-size: 19rpx; font-weight: 700; backdrop-filter: blur(10px); }
+.route-telemetry { position: absolute; z-index: 500; left: 18rpx; right: 88rpx; bottom: 18rpx; display: grid; grid-template-columns: 1fr 1rpx 1fr; align-items: center; gap: 16rpx; padding: 15rpx 18rpx 18rpx; overflow: hidden; border: 1rpx solid rgba(255,255,255,.8); border-radius: 18rpx; background: rgba(255,255,255,.94); box-shadow: 0 9rpx 25rpx rgba(30,56,84,.16); backdrop-filter: blur(12px); }
+.route-telemetry-wide { right: 18rpx; }
+.telemetry-value, .telemetry-label { display: block; }
+.telemetry-value { color: #1C3B5C; font-size: 27rpx; font-weight: 850; }
+.telemetry-distance { color: #167B58; }
+.telemetry-label { margin-top: 2rpx; color: #7F8D9D; font-size: 16rpx; }
+.telemetry-divider { height: 42rpx; background: #DCE4EB; }
+.telemetry-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 5rpx; background: #DDE7EF; }
+.telemetry-progress view { height: 100%; border-radius: 999rpx; background: linear-gradient(90deg,#23956A,#2E6DD1); transition: width .35s linear; }
+.route-summary { display: grid; grid-template-columns: minmax(0,1fr) 54rpx minmax(0,1fr); align-items: center; gap: 8rpx; padding: 20rpx 22rpx; }
+.route-place { display: flex; min-width: 0; align-items: center; gap: 11rpx; }
+.place-mark { display: flex; width: 36rpx; height: 36rpx; flex: none; box-sizing: border-box; align-items: center; justify-content: center; border-radius: 11rpx; }
+.aed-mark { background: #E5F5EE; color: #197C59; font-size: 13rpx; font-weight: 900; }
+.scene-mark { border: 8rpx solid #C93D46; border-radius: 50%; background: #FFFFFF; }
+.place-copy { min-width: 0; flex: 1; }
+.place-label, .place-value { display: block; }
+.place-label { color: #8795A6; font-size: 17rpx; }
+.place-value { margin-top: 3rpx; overflow: hidden; color: #31475E; font-size: 20rpx; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.route-connector { position: relative; height: 2rpx; overflow: hidden; background: #D7E1EA; }
+.route-flow { position: absolute; width: 22rpx; height: 2rpx; background: #2E6DD1; animation: routeFlow 1.7s linear infinite; }
+
+.current-action { display: flex; align-items: center; gap: 18rpx; padding: 22rpx; border-color: #C8DCF5; background: #FFFFFF; box-shadow: none; }
+.current-action-copy { min-width: 0; flex: 1; }
+.current-action-label, .current-action-title { display: block; }
+.current-action-label { color: #728296; font-size: 18rpx; }
+.current-action-title { margin-top: 5rpx; color: #2B4159; font-size: 22rpx; font-weight: 700; line-height: 1.4; }
+.current-action-button { display: flex; min-width: 238rpx; min-height: 68rpx; box-sizing: border-box; align-items: center; justify-content: center; padding: 0 18rpx; border-radius: 16rpx; background: #2E6DD1; color: #FFFFFF; text-align: center; font-size: 21rpx; font-weight: 760; box-shadow: 0 8rpx 18rpx rgba(46,109,209,.18); transition: transform .15s ease, opacity .15s ease; }
+.current-action-button:active { transform: scale(.98); }
+.current-action-button.busy { opacity: .55; }
+
+.quick-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12rpx; margin: 0 0 18rpx; }
+.quick-actions-two { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.quick-actions-one { grid-template-columns: 1fr; }
+.quick-action { display: flex; min-width: 0; min-height: 70rpx; box-sizing: border-box; align-items: center; justify-content: center; gap: 9rpx; padding: 0 10rpx; border: 1rpx solid #DEE7EF; border-radius: 18rpx; background: #FFFFFF; color: #4E6279; font-size: 20rpx; font-weight: 700; transition: transform .16s ease, background .16s ease; }
+.quick-action:active { transform: scale(.975); background: #F5F8FB; }
+.quick-action.emergency { border-color: #F0D4D7; color: #B8323C; }
+.quick-action.disabled { opacity: .38; }
+
+.panel { padding: 24rpx; }
+.coordination-panel { margin-bottom: 0; border-bottom: 0; border-radius: 24rpx 24rpx 0 0; box-shadow: none; }
+.coordination-panel + .aed-panel { border-radius: 0 0 24rpx 24rpx; box-shadow: 0 10rpx 26rpx rgba(42,67,92,.055); }
+.panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }
+.panel-title { display: block; }
+.panel-title { color: #263D55; font-size: 28rpx; font-weight: 780; }
+.sync-chip { display: flex; align-items: center; gap: 8rpx; padding: 8rpx 12rpx; border-radius: 999rpx; background: #EEF8F4; color: #197C59; font-size: 18rpx; font-weight: 700; }
+.participant-pair { display: flex; align-items: center; gap: 12rpx; margin-top: 21rpx; }
+.participant-person { display: flex; min-width: 0; flex: 1; align-items: center; }
+.participant-person-end { flex-direction: row-reverse; text-align: right; }
+.participant-copy { min-width: 0; flex: 1; margin-left: 14rpx; }
+.participant-person-end .participant-copy { margin-right: 14rpx; margin-left: 0; }
+.participant-role, .participant-name { display: block; }
+.participant-role { color: #334B63; font-size: 23rpx; font-weight: 760; }
+.participant-name { margin-top: 4rpx; color: #7D8C9D; font-size: 19rpx; font-weight: 400; }
+.pair-connector { display: flex; width: 106rpx; flex: none; align-items: center; color: #8190A0; font-size: 15rpx; white-space: nowrap; }
+.pair-connector view { height: 1rpx; flex: 1; background: #D8E3EC; }
+.pair-connector text { margin: 0 6rpx; }
+
+.distance-readout { flex: none; color: #23956A; font-size: 25rpx; font-weight: 800; }
+.aed-resource { display: flex; align-items: center; gap: 14rpx; margin-top: 22rpx; }
+.aed-copy { min-width: 0; flex: 1; }
+.aed-name, .aed-meta { display: block; }
+.aed-name { color: #31475E; font-size: 24rpx; font-weight: 760; }
+.aed-meta { margin-top: 4rpx; overflow: hidden; color: #7D8C9D; font-size: 19rpx; text-overflow: ellipsis; white-space: nowrap; }
+
+.waiting-card { display: flex; align-items: center; gap: 18rpx; padding: 22rpx 24rpx; }
+.waiting-pulse { width: 16rpx; height: 16rpx; border-radius: 50%; background: #2E6DD1; box-shadow: 0 0 0 9rpx rgba(46,109,209,.1); animation: signalPulse 2.4s ease-out infinite; }
+.waiting-title, .waiting-desc { display: block; }
+.waiting-title { color: #31475E; font-size: 23rpx; font-weight: 760; }
+.waiting-desc { margin-top: 5rpx; color: #8190A0; font-size: 19rpx; }
+
+.detail-card { padding: 24rpx; box-shadow: 0 8rpx 22rpx rgba(42,67,92,.045); }
+.detail-list { margin-top: 14rpx; }
+.detail-row { display: grid; grid-template-columns: 132rpx minmax(0,1fr); align-items: start; gap: 18rpx; padding: 19rpx 0; border-bottom: 1rpx solid #EDF1F4; }
+.detail-row:last-child { border-bottom: 0; }
+.detail-row-block { display: block; }
+.detail-label, .detail-value { display: block; font-size: 21rpx; }
+.detail-label { color: #7C8B9C; }
+.detail-value { min-width: 0; color: #31475E; text-align: right; font-weight: 650; line-height: 1.55; }
+.urgency-chip { padding: 7rpx 12rpx; border-radius: 10rpx; font-size: 19rpx; }
+.urgency-critical { background: #F9EAEC; color: #B52B36; }
+.urgency-high { background: #FFF3E3; color: #A86B1F; }
+.urgency-medium { background: #EAF2FC; color: #245FAF; }
+.symptom-list { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 12rpx; }
+.symptom-chip { padding: 8rpx 12rpx; border-radius: 9rpx; background: #EEF4FA; color: #425A72; font-size: 20rpx; }
+.description { display: block; margin-top: 10rpx; color: #354B62; font-size: 22rpx; line-height: 1.7; }
+.scene-section { margin-top: 10rpx; padding-top: 20rpx; border-top: 1rpx solid #EDF1F4; }
+.scene-gallery { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10rpx; margin-top: 12rpx; }
+.scene-image { width: 100%; height: 160rpx; border-radius: 12rpx; background: #EDF2F6; }
+
+.cancel-card { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; padding: 20rpx 22rpx; }
+.cancel-desc { color: #718195; font-size: 20rpx; }
+.cancel-button { flex: none; padding: 8rpx 14rpx; border: 1rpx solid #E0BFC2; border-radius: 999rpx; color: #B8323C; font-size: 19rpx; }
+.feedback-card { padding: 24rpx; }
+.feedback-head { display: flex; align-items: center; justify-content: space-between; }
+.feedback-title { color: #2B4159; font-size: 26rpx; font-weight: 760; }
+.feedback-stars { display: flex; gap: 8rpx; margin-top: 16rpx; }
+.feedback-head .feedback-stars { margin-top: 0; }
+.feedback-star { color: #D8E0E8; font-size: 42rpx; line-height: 1; }
+.feedback-star.star-filled { color: #E4A126; }
+.feedback-done { color: #23956A; font-size: 20rpx; font-weight: 700; }
+.feedback-comment { display: block; margin-top: 14rpx; color: #52667A; font-size: 21rpx; line-height: 1.6; }
+.feedback-input { box-sizing: border-box; width: 100%; min-height: 112rpx; margin-top: 16rpx; padding: 15rpx; border: 1rpx solid #DCE5ED; border-radius: 12rpx; background: #F7F9FB; color: #334A61; font-size: 21rpx; }
+.feedback-submit { margin-top: 16rpx; padding: 15rpx; border-radius: 13rpx; background: #2E6DD1; color: #FFFFFF; text-align: center; font-size: 22rpx; font-weight: 730; }
+.feedback-submit-busy { opacity: .55; }
+.bottom-space { height: calc(28rpx + env(safe-area-inset-bottom)); }
+
+.state-card { min-height: 72vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40rpx; text-align: center; }
+.state-title { margin-top: 22rpx; color: #2A4159; font-size: 28rpx; font-weight: 750; }
+.state-action { margin-top: 22rpx; padding: 14rpx 24rpx; border-radius: 13rpx; background: #2E6DD1; color: #FFFFFF; font-size: 21rpx; font-weight: 700; }
+
+.detail-skeleton { padding-top: 24rpx; }
+.skeleton-heading { display: flex; align-items: flex-start; justify-content: space-between; padding: 10rpx 4rpx 22rpx; }
+.skeleton-title { width: 220rpx; height: 34rpx; border-radius: 999rpx; }
+.skeleton-text { width: 360rpx; height: 18rpx; margin-top: 15rpx; border-radius: 999rpx; }
+.skeleton-eta { width: 92rpx; height: 54rpx; border-radius: 14rpx; }
+.skeleton-lifeline { height: 4rpx; margin: 18rpx 20rpx 34rpx; border-radius: 999rpx; }
+.skeleton-map { height: 320rpx; border-radius: 24rpx; }
+.skeleton-action { height: 104rpx; margin-top: 18rpx; border-radius: 20rpx; }
+.skeleton-caption { padding: 18rpx 0; color: #8593A3; text-align: center; font-size: 19rpx; }
+
+@keyframes signalPulse { 0% { box-shadow: 0 0 0 0 rgba(35,149,106,.24); } 65%,100% { box-shadow: 0 0 0 10rpx rgba(35,149,106,0); } }
+@keyframes routeFlow { from { transform: translateX(-22rpx); } to { transform: translateX(54rpx); } }
+@keyframes overviewBreath { 0%,100% { opacity: .65; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.05); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-dot, .waiting-pulse, .route-flow { animation: none; }
+  .lifeline-fill, .lifeline-node, .quick-action, .current-action-button { transition: none; }
 }
 </style>

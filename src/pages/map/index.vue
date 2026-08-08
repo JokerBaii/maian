@@ -1,5 +1,5 @@
 <template>
-  <view class="map-page">
+  <view class="map-page apple-page">
     <view class="top-overlay" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="search-bar">
         <view class="search-icon-wrap">
@@ -234,7 +234,7 @@ import { onShow } from '@dcloudio/uni-app'
 import 'leaflet/dist/leaflet.css'
 // #endif
 import AppIcon from '@/components/AppIcon.vue'
-import { getCurrentGcj02Location, FIXED_LOCATION, isDemoMode } from '@/utils/location'
+import { getCurrentGcj02Location, FIXED_LOCATION, isDemoMode, openMapNavigation } from '@/utils/location'
 import { loadAMap } from '@/common/amap'
 import { addBaseTileLayer } from '@/common/mapTiles'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
@@ -668,17 +668,14 @@ function handleCallDevice() {
   uni.makePhoneCall({ phoneNumber })
 }
 
-function handleNavigate(device: any) {
+function handleNavigate(device: EmergencyDeviceResponse) {
   closePopup()
-  uni.openLocation({
+  openMapNavigation({
     longitude: Number(device.longitude),
     latitude: Number(device.latitude),
     name: device.name,
     address: device.address,
-    scale: 16,
-    fail: () => {
-      uni.showToast({ title: '无法打开系统地图', icon: 'none' })
-    }
+    mode: device.type === 'MOBILE' ? 'car' : 'walk'
   })
 }
 
@@ -754,7 +751,11 @@ function toggleDrawer() {
 onMounted(() => {
   nextTick(async () => {
     preloadMarkerAssets()
-    await locateMe(false)
+    try {
+      await locateMe(false)
+    } catch {
+      // 定位失败时仍加载公开设备；用户可稍后点击定位按钮重试。
+    }
     const devicesPromise = loadDevices()
     // #ifdef H5
     const mapPromise = initMap()
@@ -1277,7 +1278,7 @@ onUnmounted(() => {
   background: #F2F3F5;
 }
 .popup-btn-nav {
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   box-shadow: 0 6rpx 24rpx rgba(43, 111, 240, 0.3);
 }
 .popup-btn-icon {

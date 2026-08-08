@@ -1,11 +1,11 @@
 <template>
-  <view class="page">
+  <view class="page apple-page">
     <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="nav-bar-content">
         <text class="nav-title">我的</text>
         <view class="nav-right">
           <view class="nav-icon-btn" @tap="goSettings">
-            <app-icon class="nav-icon-text" name="settings-filled" :size="21" color="#FFFFFF" />
+            <app-icon class="nav-icon-text" name="settings-filled" :size="21" color="#2C2C2E" />
           </view>
         </view>
       </view>
@@ -237,7 +237,7 @@ onShow(loadStats)
 .page {
   height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px));
   overflow: hidden;
-  background: #F3F7FA;
+  background: #F2F2F7;
 }
 
 .nav-bar {
@@ -246,7 +246,9 @@ onShow(loadStats)
   left: 0;
   right: 0;
   z-index: 999;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  border-bottom: 1rpx solid rgba(60, 60, 67, .12);
+  background: rgba(249, 249, 251, .94);
+  backdrop-filter: blur(24rpx);
 }
 .nav-bar-content {
   display: flex;
@@ -256,9 +258,9 @@ onShow(loadStats)
   padding: 0 32rpx;
 }
 .nav-title {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: #FFFFFF;
+  font-size: 34rpx;
+  font-weight: 650;
+  color: #1C1C1E;
 }
 .nav-right {
   display: flex;
@@ -267,8 +269,8 @@ onShow(loadStats)
 .nav-icon-btn {
   width: 64rpx;
   height: 64rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
+  border-radius: 18rpx;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -285,47 +287,43 @@ onShow(loadStats)
 
 .profile-section {
   position: relative;
-  padding: 24rpx 32rpx 0;
+  padding: 24rpx 24rpx 0;
   overflow: hidden;
 }
 .profile-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 360rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 50%, #7DA8F7 100%);
-  border-radius: 0 0 48rpx 48rpx;
+  display: none;
 }
 .profile-card {
   position: relative;
   z-index: 2;
   display: flex;
   align-items: center;
-  padding: 36rpx 32rpx;
+  padding: 30rpx 26rpx;
+  border: 1rpx solid rgba(60, 60, 67, .12);
+  border-radius: 24rpx;
+  background: #FFFFFF;
 }
 .profile-avatar-wrap {
   margin-right: 28rpx;
 }
 .avatar-ring {
-  width: 128rpx;
-  height: 128rpx;
+  width: 104rpx;
+  height: 104rpx;
   border-radius: 50%;
-  padding: 6rpx;
-  background: rgba(255, 255, 255, 0.3);
-  border: 2rpx solid rgba(255, 255, 255, 0.5);
+  padding: 0;
+  background: #E8F1FD;
 }
 .avatar-placeholder {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FFFFFF 0%, #E8F0FE 100%);
+  background: #E8F1FD;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .avatar-text {
-  font-size: 52rpx;
+  font-size: 44rpx;
   font-weight: 800;
   color: #2E6DD1;
 }
@@ -343,22 +341,22 @@ onShow(loadStats)
 .nickname {
   font-size: 36rpx;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #1C1C1E;
 }
 .role-badge {
-  background: rgba(255, 255, 255, 0.25);
+  background: #EEF4FC;
   border-radius: 8rpx;
   padding: 4rpx 14rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.4);
+  border: 0;
 }
 .role-badge-text {
   font-size: 20rpx;
-  color: #FFFFFF;
+  color: #2E6DD1;
   font-weight: 500;
 }
 .phone {
   font-size: 26rpx;
-  color: rgba(255, 255, 255, 0.85);
+  color: #8E8E93;
 }
 .verify-row {
   margin-top: 4rpx;
@@ -367,10 +365,10 @@ onShow(loadStats)
   display: inline-flex;
   align-items: center;
   gap: 6rpx;
-  background: rgba(0, 180, 42, 0.3);
+  background: #E8F6EF;
   border-radius: 8rpx;
   padding: 4rpx 14rpx;
-  border: 1rpx solid rgba(0, 180, 42, 0.4);
+  border: 0;
 }
 
 .verify-badge-unverified {
@@ -395,11 +393,12 @@ onShow(loadStats)
 .stats-row {
   display: flex;
   align-items: center;
-  margin: 24rpx 32rpx 0;
+  margin: 16rpx 24rpx 0;
   background: #FFFFFF;
-  border-radius: 24rpx;
-  padding: 32rpx 0;
-  box-shadow: 0 4rpx 24rpx rgba(43, 111, 240, 0.08);
+  border: 1rpx solid rgba(60, 60, 67, .12);
+  border-radius: 22rpx;
+  padding: 26rpx 0;
+  box-shadow: none;
 }
 .stat-item {
   flex: 1;
@@ -426,8 +425,8 @@ onShow(loadStats)
 }
 
 .menu-section {
-  margin-top: 32rpx;
-  padding: 0 32rpx;
+  margin-top: 28rpx;
+  padding: 0 24rpx;
 }
 .menu-section-title {
   font-size: 26rpx;
@@ -438,8 +437,8 @@ onShow(loadStats)
 }
 .menu-list {
   background: #FFFFFF;
-  border: 1rpx solid var(--network-line);
-  border-radius: var(--network-radius-section);
+  border: 1rpx solid rgba(60, 60, 67, .12);
+  border-radius: 22rpx;
   overflow: hidden;
 }
 .menu-item {

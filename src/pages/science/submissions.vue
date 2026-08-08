@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-list">
     <view v-if="loading" class="state-card">正在加载我的投稿…</view>
     <view v-else-if="!submissions.length" class="state-card">
       <text class="state-title">还没有投稿</text>
@@ -51,6 +51,7 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { resolveApiUrl } from '@/api/http'
+import { submissionStatusLabel, userFacingError } from '@/utils/presentation'
 import {
   listScienceSubmissions,
   deleteScienceSubmission,
@@ -79,7 +80,7 @@ async function loadSubmissions() {
     const page = await listScienceSubmissions()
     submissions.value = page.content
   } catch (error: any) {
-    uni.showToast({ title: error?.message || '投稿加载失败', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '投稿加载失败'), icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -96,9 +97,7 @@ function categoryLabel(category: string) {
   } as Record<string, string>)[category] || category
 }
 
-function statusLabel(status: string) {
-  return ({ PENDING: '待审核', APPROVED: '已通过', REJECTED: '已驳回' } as Record<string, string>)[status] || status
-}
+const statusLabel = submissionStatusLabel
 
 function formatTime(value: string) {
   const date = new Date(value)
@@ -119,7 +118,7 @@ function confirmDelete(item: ScienceSubmissionResponse) {
         submissions.value = submissions.value.filter(row => row.id !== item.id)
         uni.showToast({ title: '已删除', icon: 'success' })
       } catch (error: any) {
-        uni.showToast({ title: error?.message || '删除失败，请重试', icon: 'none' })
+        uni.showToast({ title: userFacingError(error, '删除失败，请重试'), icon: 'none' })
       }
     }
   })

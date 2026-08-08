@@ -1,5 +1,5 @@
 <template>
-  <view class="home-page">
+  <view class="home-page apple-page">
     <scroll-view class="home-scroll" scroll-y :show-scrollbar="false">
       <view class="hero" :style="{ paddingTop: statusBarHeight + 'px' }">
       <image

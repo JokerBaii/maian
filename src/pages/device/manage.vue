@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-list">
     <view class="scroll-content">
       <view class="page-actions">
         <view class="device-summary">
@@ -19,7 +19,6 @@
         >
           <text class="tab-text">固定设备</text>
           <text class="tab-count">{{ fixedDevices.length }}</text>
-          <view v-if="activeTab === 'fixed'" class="tab-indicator"></view>
         </view>
         <view
           class="tab-item"
@@ -28,7 +27,6 @@
         >
           <text class="tab-text">移动设备</text>
           <text class="tab-count">{{ mobileDevices.length }}</text>
-          <view v-if="activeTab === 'mobile'" class="tab-indicator"></view>
         </view>
       </view>
 
@@ -39,8 +37,8 @@
             :key="device.id"
             class="device-card"
             :class="'device-card-' + statusTone(device)"
+            @tap="viewDetail(device)"
           >
-            <view class="device-status-rail"></view>
             <view class="card-header">
               <view class="card-header-info">
                 <text class="card-name">{{ device.name }}</text>
@@ -87,37 +85,13 @@
                   <text>{{ device.serviceRange ? `${device.serviceRange}km 服务范围` : '范围未设置' }}</text>
                 </view>
               </view>
-              <view v-if="deviceImages(device).length" class="card-image-strip">
-                <image
-                  v-for="(imageUrl, index) in deviceImages(device)"
-                  :key="imageUrl"
-                  class="card-image"
-                  :src="resolveApiUrl(imageUrl)"
-                  mode="aspectFill"
-                  @tap="previewDeviceImage(device, index)"
-                />
-              </view>
             </view>
 
             <view class="card-footer">
               <text class="footer-service">{{ device.serviceTime || '服务时段未设置' }}</text>
-              <view class="card-actions">
-                <view
-                  v-if="device.type === 'MOBILE'"
-                  class="card-btn card-btn-detail"
-                  @tap="reportMobileLocation(device)"
-                >
-                  <text class="card-btn-text">上报位置</text>
-                </view>
-                <view class="card-btn card-btn-detail" @tap="viewDetail(device)">
-                  <text class="card-btn-text">详情</text>
-                </view>
-                <view class="card-btn card-btn-edit" @tap="editDevice(device)">
-                  <text class="card-btn-text card-btn-text-edit">编辑</text>
-                </view>
-                <view class="card-btn card-btn-delete" @tap="confirmDelete(device)">
-                  <text class="card-btn-text card-btn-text-delete">删除</text>
-                </view>
+              <view class="manage-action" @tap.stop="openDeviceActions(device)">
+                <text>管理</text>
+                <app-icon name="right" :size="14" color="#2E6DD1" />
               </view>
             </view>
           </view>
@@ -149,7 +123,7 @@ import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { getCurrentGcj02Location } from '@/utils/location'
-import { resolveApiUrl } from '@/api/http'
+import { deviceStatusLabel as presentDeviceStatus, userFacingError } from '@/utils/presentation'
 import {
   listMyEmergencyDevices,
   deleteEmergencyDevice,
@@ -181,29 +155,12 @@ function toView(device: EmergencyDeviceResponse): DeviceView {
   }
 }
 
-function deviceImages(device: DeviceView) {
-  return [...device.imageUrls, ...device.vehicleImageUrls]
-}
-
 function canToggleDevice(device: DeviceView) {
   return ['AVAILABLE', 'DISABLED'].includes(device.status)
 }
 
 function deviceStatusLabel(device: DeviceView) {
-  if (device.type === 'MOBILE' && device.status === 'AVAILABLE') {
-    return ({ ONLINE: '在线', STALE: '位置已过期', OFFLINE: '离线' } as Record<string, string>)[
-      device.mobilePresenceStatus || 'OFFLINE'
-    ]
-  }
-  const labels: Record<string, string> = {
-    PENDING_REVIEW: '待平台审核',
-    AVAILABLE: device.type === 'FIXED' ? '可用' : '在线',
-    RESERVED: '救援占用中',
-    DISABLED: device.type === 'FIXED' ? '维护中' : '离线',
-    EXPIRED: '已过期',
-    REJECTED: '审核未通过'
-  }
-  return labels[device.status] || device.status
+  return presentDeviceStatus(device)
 }
 
 function statusTone(device: DeviceView) {
@@ -212,11 +169,6 @@ function statusTone(device: DeviceView) {
   if (device.status === 'PENDING_REVIEW') return 'pending'
   if (device.status === 'REJECTED' || device.status === 'EXPIRED') return 'rejected'
   return 'offline'
-}
-
-function previewDeviceImage(device: DeviceView, index: number) {
-  const urls = deviceImages(device).map(resolveApiUrl)
-  uni.previewImage({ current: urls[index], urls })
 }
 
 async function loadDevices() {
@@ -300,7 +252,7 @@ async function reportMobileLocation(device: DeviceView) {
     if (target) Object.assign(target, toView(updated))
     uni.showToast({ title: '位置已上报', icon: 'success' })
   } catch (error: any) {
-    uni.showToast({ title: error?.message || '位置上报失败', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '位置更新失败，请稍后重试'), icon: 'none' })
   } finally {
     syncingLocation = false
   }
@@ -318,6 +270,22 @@ function viewDetail(device: DeviceView) {
 function editDevice(device: DeviceView) {
   uni.navigateTo({
     url: '/pages/device/add?id=' + device.id
+  })
+}
+
+function openDeviceActions(device: DeviceView) {
+  const itemList = device.type === 'MOBILE'
+    ? ['查看设备信息', '更新当前位置', '编辑设备', '删除设备']
+    : ['查看设备信息', '编辑设备', '删除设备']
+  uni.showActionSheet({
+    itemList,
+    success: ({ tapIndex }) => {
+      if (tapIndex === 0) return viewDetail(device)
+      if (device.type === 'MOBILE' && tapIndex === 1) return reportMobileLocation(device)
+      const editIndex = device.type === 'MOBILE' ? 2 : 1
+      if (tapIndex === editIndex) return editDevice(device)
+      confirmDelete(device)
+    }
   })
 }
 
@@ -352,7 +320,7 @@ onShow(loadDevices)
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F4F7FA;
+  background: #F2F2F7;
 }
 
 .review-status {
@@ -363,9 +331,6 @@ onShow(loadDevices)
   font-size: 22rpx;
   font-weight: 600;
 }
-.badge-pending { color: #B66A10; background: #FFF4E5; }
-.badge-rejected { color: #C93D46; background: #FFF0F0; }
-
 .scroll-content {
   min-height: 100vh;
   box-sizing: border-box;
@@ -448,42 +413,28 @@ onShow(loadDevices)
   background: #E6EFFD;
   color: #2E6DD1;
 }
-.tab-indicator {
-  position: absolute;
-  bottom: 4rpx;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 30rpx;
-  height: 4rpx;
-  border-radius: 3rpx;
-  background: #2E6DD1;
-}
-
 .device-list {
   margin: 18rpx 24rpx 0;
+  overflow: hidden;
+  border: 1rpx solid rgba(60, 60, 67, .14);
+  border-radius: 20rpx;
+  background: #FFFFFF;
+  box-shadow: none;
 }
 
 .device-card {
   position: relative;
-  margin-bottom: 16rpx;
+  margin: 0;
   overflow: hidden;
-  padding: 22rpx 22rpx 18rpx 30rpx;
-  border: 1rpx solid #DDE6EE;
-  border-radius: 18rpx;
+  padding: 23rpx 22rpx 19rpx;
+  border: 0;
+  border-radius: 0;
   background: #FFFFFF;
 }
-.device-status-rail {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 7rpx;
-  background: #AAB6C5;
-}
-.device-card-online .device-status-rail { background: #24986B; }
-.device-card-pending .device-status-rail { background: #D58B2D; }
-.device-card-rejected .device-status-rail { background: #C94D55; }
-.device-card-offline .device-status-rail { background: #9AA6B5; }
+.device-card::after { content: ''; position: absolute; right: 22rpx; bottom: 0; left: 22rpx; height: 1rpx; background: #E8EDF2; }
+.device-card:last-child { border-bottom: 0; }
+.device-card:last-child::after { display: none; }
+.device-card:active { background: #F8FAFC; }
 
 .card-header-info {
   flex: 1;
@@ -557,9 +508,8 @@ onShow(loadDevices)
 }
 
 .card-body {
-  padding: 14rpx 0 0;
-  margin-top: 14rpx;
-  border-top: 1rpx solid #F2F3F5;
+  padding: 11rpx 0 0;
+  margin-top: 4rpx;
 }
 .card-info-item {
   display: flex;
@@ -586,40 +536,25 @@ onShow(loadDevices)
 .card-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8rpx;
+  gap: 5rpx 18rpx;
 }
 .card-fact {
   display: flex;
   align-items: center;
   gap: 7rpx;
   max-width: 100%;
-  padding: 8rpx 11rpx;
-  border-radius: 9rpx;
-  background: #F4F7FA;
+  padding: 2rpx 0;
+  border-radius: 0;
+  background: transparent;
   color: #607187;
   font-size: 21rpx;
 }
-.card-image-strip {
-  display: flex;
-  gap: 12rpx;
-  margin-top: 18rpx;
-  overflow: hidden;
-}
-.card-image {
-  width: 128rpx;
-  height: 96rpx;
-  flex: none;
-  border-radius: 14rpx;
-  background: #EDF2F8;
-}
-
 .card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 14rpx;
-  padding-top: 14rpx;
-  border-top: 1rpx solid #F2F3F5;
+  margin-top: 9rpx;
+  padding-top: 5rpx;
 }
 .footer-service {
   min-width: 0;
@@ -629,90 +564,53 @@ onShow(loadDevices)
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.badge-dot {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-}
-.badge-online .badge-dot {
-  background: #23956A;
-  box-shadow: 0 0 8rpx rgba(0, 180, 42, 0.4);
-}
-.badge-offline .badge-dot {
-  background: #C9CDD4;
-}
-.badge-text {
-  font-size: 22rpx;
-  font-weight: 500;
-}
-.badge-online .badge-text {
-  color: #23956A;
-}
-.badge-offline .badge-text {
-  color: #C9CDD4;
-}
-.card-actions {
+.manage-action {
   display: flex;
   flex: none;
-  gap: 8rpx;
-  margin-left: 12rpx;
-}
-.card-btn {
-  padding: 8rpx 12rpx;
-  border-radius: 9rpx;
-  background: #F3F6F9;
-  transition: opacity 150ms ease;
-}
-.card-btn:active {
-  opacity: 0.55;
-}
-.card-btn-text {
-  font-size: 21rpx;
-  color: #4E5969;
-  font-weight: 500;
-}
-.card-btn-text-edit {
+  align-items: center;
+  gap: 3rpx;
+  min-height: 48rpx;
+  margin-left: 18rpx;
+  padding: 0 4rpx 0 14rpx;
   color: #2E6DD1;
-  font-weight: 600;
+  font-size: 22rpx;
+  font-weight: 650;
 }
-.card-btn-edit { background: #EEF4FD; }
-.card-btn-delete { background: #FFF1F1; }
-.card-btn-text-delete {
-  color: #C44242;
-  font-weight: 600;
+.manage-action:active {
+  opacity: 0.5;
 }
 
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 120rpx 0;
+  padding: 82rpx 24rpx;
 }
 .empty-icon {
-  margin-bottom: 32rpx;
+  margin-bottom: 20rpx;
 }
 .empty-title {
-  font-size: 32rpx;
+  font-size: 28rpx;
   font-weight: 600;
   color: #20364D;
   margin-bottom: 12rpx;
 }
 .empty-desc {
-  font-size: 26rpx;
+  font-size: 22rpx;
   color: #86909C;
-  margin-bottom: 40rpx;
+  margin-bottom: 26rpx;
 }
 .empty-btn {
-  padding: 20rpx 64rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
-  border-radius: 40rpx;
-  box-shadow: 0 6rpx 24rpx rgba(43, 111, 240, 0.3);
+  padding: 14rpx 34rpx;
+  background: #2E6DD1;
+  border-radius: 14rpx;
+  box-shadow: none;
 }
 .empty-btn:active {
   transform: scale(0.97);
 }
 .empty-btn-text {
-  font-size: 28rpx;
+  font-size: 23rpx;
   color: #FFFFFF;
   font-weight: 600;
 }

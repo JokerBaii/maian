@@ -1,13 +1,13 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-list">
     <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="nav-bar-content">
         <view class="nav-back" @tap="goBack">
-          <app-icon class="back-icon" name="back" :size="22" color="#FFFFFF" />
+          <app-icon class="back-icon" name="back" :size="22" color="#20364D" />
         </view>
         <text class="nav-title">急救与健康科普</text>
         <view class="nav-right" @tap="goContribute">
-          <app-icon class="nav-action" name="compose" :size="21" color="#FFFFFF" />
+          <app-icon class="nav-action" name="compose" :size="21" color="#2E6DD1" />
         </view>
       </view>
     </view>
@@ -234,7 +234,9 @@ function goContribute() {
 }
 
 .nav-bar {
-  background: linear-gradient(135deg, #2E6DD1, #4A9BFF);
+  background: rgba(248, 250, 252, .94);
+  border-bottom: 1rpx solid rgba(32, 54, 77, .08);
+  backdrop-filter: blur(24rpx);
 }
 
 .nav-bar-content {
@@ -261,7 +263,7 @@ function goContribute() {
 .nav-title {
   font-size: 34rpx;
   font-weight: 600;
-  color: #fff;
+  color: #20364D;
 }
 
 .nav-right {
@@ -345,6 +347,7 @@ function goContribute() {
 }
 
 .category-item {
+  flex: none;
   padding: 10rpx 28rpx;
   border-radius: 28rpx;
   background: #F2F3F5;
@@ -357,6 +360,7 @@ function goContribute() {
 .category-text {
   font-size: 24rpx;
   color: #4E5969;
+  white-space: nowrap;
 }
 
 .category-active .category-text {
@@ -367,11 +371,18 @@ function goContribute() {
   width: 100%;
   box-sizing: border-box;
   padding: 20rpx 24rpx;
+  animation: modeContentChange 320ms cubic-bezier(.2, .72, .2, 1) both;
 }
 
 .video-section,
 .quiz-board {
   margin: 20rpx 24rpx 0;
+  animation: modeContentChange 320ms cubic-bezier(.2, .72, .2, 1) both;
+}
+
+@keyframes modeContentChange {
+  from { opacity: 0; transform: translateY(10rpx) scale(.996); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .section-copy {
   display: flex;

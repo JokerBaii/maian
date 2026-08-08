@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-focus">
     <view class="page-scroll">
       <view v-if="loading" class="state-card">
         <view class="loading-ring"></view>
@@ -16,12 +16,12 @@
         <view class="risk-card" :class="`risk-${report.riskLevel.toLowerCase()}`">
           <view class="risk-top">
             <view>
-              <text class="risk-kicker">HEALTH ANALYSIS</text>
+              <text class="risk-kicker">健康评估</text>
               <text class="risk-title">{{ riskLabel }}</text>
             </view>
             <view class="source-chip">
               <view class="source-dot"></view>
-              <text>{{ report.analysisSource === 'SPRING_AI' ? 'Spring AI' : '规则分析' }}</text>
+              <text>{{ report.analysisSource === 'SPRING_AI' ? '智能分析' : '基础分析' }}</text>
             </view>
           </view>
           <text class="risk-summary">{{ report.summary }}</text>
@@ -46,7 +46,7 @@
         <view class="report-card">
           <view class="section-head">
             <view>
-              <text class="section-kicker">REPORT INFO</text>
+              <text class="section-kicker">体检记录</text>
               <text class="section-title">报告信息</text>
             </view>
             <text class="report-date">{{ report.checkupDate }}</text>
@@ -67,7 +67,7 @@
         <view class="report-card">
           <view class="section-head">
             <view>
-              <text class="section-kicker">INDICATORS</text>
+              <text class="section-kicker">数据概览</text>
               <text class="section-title">体检指标</text>
             </view>
             <text class="section-meta">{{ report.indicators.length }} 项</text>
@@ -104,7 +104,7 @@
         <view class="report-card">
           <view class="section-head">
             <view>
-              <text class="section-kicker">RECOMMENDATIONS</text>
+              <text class="section-kicker">行动建议</text>
               <text class="section-title">健康建议</text>
             </view>
           </view>
@@ -142,6 +142,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { resolveApiUrl } from '@/api/http'
 import { issueMediaDownload } from '@/api/files'
+import { userFacingError } from '@/utils/presentation'
 import {
   getHealthReport,
   listHealthReports,
@@ -173,7 +174,7 @@ onLoad(async (query) => {
       sourceImageUrl.value = (await issueMediaDownload(report.value.sourceMediaId)).url
     }
   } catch (error: any) {
-    errorMessage.value = error?.message || '报告加载失败'
+    errorMessage.value = userFacingError(error, '报告加载失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -271,25 +272,21 @@ function goUpload() {
 .risk-card {
   padding: 32rpx 30rpx 28rpx;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 91% 8%, rgba(255, 255, 255, 0.18), transparent 34%),
-    linear-gradient(135deg, #186F57 0%, #27A477 100%);
-  color: #FFFFFF;
-  box-shadow: 0 16rpx 42rpx rgba(28, 128, 93, 0.22);
+  border: 1rpx solid rgba(60, 60, 67, .14);
+  border-left: 8rpx solid #248A5A;
+  background: #FFFFFF;
+  color: #1C1C1E;
+  box-shadow: none;
 }
 
 .risk-medium {
-  background:
-    radial-gradient(circle at 91% 8%, rgba(255, 255, 255, 0.18), transparent 34%),
-    linear-gradient(135deg, #B85F17 0%, #E28D34 100%);
-  box-shadow: 0 16rpx 42rpx rgba(195, 105, 28, 0.22);
+  border-left-color: #C97818;
+  box-shadow: none;
 }
 
 .risk-high {
-  background:
-    radial-gradient(circle at 91% 8%, rgba(255, 255, 255, 0.18), transparent 34%),
-    linear-gradient(135deg, #A92836 0%, #D84B56 100%);
-  box-shadow: 0 16rpx 42rpx rgba(184, 48, 61, 0.22);
+  border-left-color: #C72C38;
+  box-shadow: none;
 }
 
 .risk-top,
@@ -316,7 +313,7 @@ function goUpload() {
 }
 
 .risk-kicker {
-  color: rgba(255, 255, 255, 0.64);
+  color: #8E8E93;
 }
 
 .risk-title {
@@ -331,9 +328,10 @@ function goUpload() {
   align-items: center;
   gap: 8rpx;
   padding: 9rpx 14rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  border: 0;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.12);
+  background: #F2F2F7;
+  color: #636366;
   font-size: 20rpx;
 }
 
@@ -341,13 +339,13 @@ function goUpload() {
   width: 10rpx;
   height: 10rpx;
   border-radius: 50%;
-  background: #D4FFE9;
+  background: #248A5A;
 }
 
 .risk-summary {
   display: block;
   margin-top: 22rpx;
-  color: rgba(255, 255, 255, 0.86);
+  color: #48484A;
   font-size: 25rpx;
   line-height: 1.65;
 }
@@ -358,7 +356,7 @@ function goUpload() {
   margin-top: 27rpx;
   padding: 19rpx 0;
   border-radius: 18rpx;
-  background: rgba(255, 255, 255, 0.11);
+  background: #F2F2F7;
 }
 
 .risk-stat {
@@ -378,14 +376,14 @@ function goUpload() {
 
 .stat-label {
   margin-top: 5rpx;
-  color: rgba(255, 255, 255, 0.7);
+  color: #8E8E93;
   font-size: 19rpx;
 }
 
 .stat-line {
   width: 1rpx;
   height: 42rpx;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(60, 60, 67, .16);
 }
 
 .report-card {
@@ -568,7 +566,7 @@ function goUpload() {
 
 .primary-button {
   flex: 1;
-  background: linear-gradient(135deg, #245FC6 0%, #377BE9 100%);
+  background: #007AFF;
   color: #FFFFFF;
   box-shadow: 0 10rpx 25rpx rgba(37, 101, 207, 0.22);
 }

@@ -2,8 +2,7 @@ import { request } from './http'
 import { issueMediaDownload } from './files'
 import {
   toServiceWindows,
-  type DeviceServiceWindow,
-  type WeekDay
+  type DeviceServiceWindow
 } from '@/utils/deviceSchedule'
 
 export type { DeviceServiceWindow, WeekDay } from '@/utils/deviceSchedule'

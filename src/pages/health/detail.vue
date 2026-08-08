@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-focus">
     <view class="scroll-content">
       <view class="tab-switcher">
         <view

@@ -182,14 +182,16 @@
     }
   ],
   "globalStyle": {
-    "navigationBarTextStyle": "white",
+    "navigationBarTextStyle": "black",
     "navigationBarTitleText": "脉安驰援",
-    "navigationBarBackgroundColor": "#2E6DD1",
-    "backgroundColor": "#F3F7FA",
+    "navigationBarBackgroundColor": "#F9F9FB",
+    "backgroundColor": "#F2F2F7",
     "app-plus": {
+      "animationType": "fade-in",
+      "animationDuration": 260,
       "titleNView": {
-        "titleColor": "#ffffff",
-        "backgroundColor": "#2E6DD1"
+        "titleColor": "#20364D",
+        "backgroundColor": "#F9F9FB"
       }
     }
   },

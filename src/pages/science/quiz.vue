@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-focus">
     <view v-if="!showResult" class="quiz-content">
       <view class="progress-section">
         <view class="progress-info">
@@ -276,7 +276,7 @@ function goBack() {
 .progress-bar-fill {
   height: 100%;
   border-radius: 6rpx;
-  background: linear-gradient(90deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   transition: width 0.4s ease;
   box-shadow: 0 2rpx 8rpx rgba(43, 111, 240, 0.3);
 }
@@ -467,7 +467,7 @@ function goBack() {
   gap: 12rpx;
   height: 96rpx;
   border-radius: 48rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   box-shadow: 0 8rpx 32rpx rgba(43, 111, 240, 0.3);
   transition: all 0.2s ease;
 }
@@ -695,7 +695,7 @@ function goBack() {
   transform: scale(0.97);
 }
 .result-btn-retry {
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   box-shadow: 0 8rpx 32rpx rgba(43, 111, 240, 0.3);
 }
 .result-btn-back {

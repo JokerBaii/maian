@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-list">
     <view v-if="loading" class="state-card">正在加载待审核投稿…</view>
     <view v-else-if="!submissions.length" class="state-card">
       <text class="state-title">暂无待审核投稿</text>
@@ -32,6 +32,7 @@ import {
   reviewScienceSubmission,
   type ScienceSubmissionResponse
 } from '@/api/science'
+import { userFacingError } from '@/utils/presentation'
 
 const loading = ref(false)
 const submissions = ref<ScienceSubmissionResponse[]>([])
@@ -42,7 +43,7 @@ async function loadSubmissions() {
     const page = await listPendingScienceSubmissions()
     submissions.value = page.content
   } catch (error: any) {
-    uni.showToast({ title: error?.message || '投稿加载失败', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '投稿加载失败'), icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -79,7 +80,7 @@ function review(item: ScienceSubmissionResponse, approved: boolean) {
         submissions.value = submissions.value.filter(candidate => candidate.id !== item.id)
         uni.showToast({ title: approved ? '审核已通过' : '投稿已驳回', icon: 'success' })
       } catch (error: any) {
-        uni.showToast({ title: error?.message || '审核失败', icon: 'none' })
+        uni.showToast({ title: userFacingError(error, '审核失败，请稍后重试'), icon: 'none' })
       } finally {
         reviewingId.value = ''
       }

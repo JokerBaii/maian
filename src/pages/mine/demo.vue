@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-sheet">
     <view class="demo-note">
       <text class="demo-title">选择本轮演示身份</text>
       <text class="demo-desc">身份切换只用于在一台设备上展示多角色业务闭环，不代表正式登录。</text>

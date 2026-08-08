@@ -5,9 +5,13 @@
     "dev:h5": "uni",
     "build:ios": "uni build -p app-ios",
     "build:h5": "uni build",
+    "build:h5:demo": "VITE_DEMO_MODE=true uni build",
     "build:mp-weixin": "uni build -p mp-weixin",
     "type-check": "vue-tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "qa:ui": "node scripts/ui-audit.mjs",
+    "qa:flows": "node scripts/navigation-audit.mjs",
+    "qa:rescue-detail": "node scripts/rescue-detail-content-audit.mjs"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",

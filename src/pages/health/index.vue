@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page">
     <view class="health-mast" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="mast-content">
         <view class="mast-signal" aria-hidden="true">

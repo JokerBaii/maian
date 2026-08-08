@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-sheet">
     <view class="scroll-content">
       <view class="tips-card">
         <view class="tips-header">
@@ -129,6 +129,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { createScienceSubmission } from '@/api/science'
 import { uploadImage } from '@/api/files'
+import { userFacingError } from '@/utils/presentation'
 
 const categories = [
   { key: 'device', label: '设备使用' },
@@ -203,7 +204,7 @@ async function handleSubmit() {
     }
   } catch (error: any) {
     uni.hideLoading()
-    uni.showToast({ title: error?.message || '投稿失败，请重试', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '投稿失败，请重试'), icon: 'none' })
   }
 }
 
@@ -222,7 +223,7 @@ async function handleSubmit() {
 
 .tips-card {
   margin: 24rpx 24rpx 0;
-  background: linear-gradient(135deg, #E8F0FE 0%, #D4E4FC 100%);
+  background: #EDF4FC;
   border-radius: 24rpx;
   padding: 28rpx 24rpx;
   box-shadow: 0 4rpx 24rpx rgba(43, 111, 240, 0.08);
@@ -473,7 +474,7 @@ async function handleSubmit() {
 .submit-btn {
   height: 96rpx;
   border-radius: 48rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -484,7 +485,7 @@ async function handleSubmit() {
   transform: scale(0.97);
 }
 .submit-btn-disabled {
-  background: linear-gradient(135deg, #C9CDD4 0%, #D5D8DE 100%);
+  background: #C7C7CC;
   box-shadow: none;
 }
 .submit-btn-disabled:active {

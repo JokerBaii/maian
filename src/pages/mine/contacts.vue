@@ -1,10 +1,11 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-sheet">
     <view class="contact-list">
       <view
         v-for="(contact, idx) in contacts"
         :key="contact.id"
         class="contact-card"
+        @tap="openContactActions(idx)"
       >
         <view class="contact-avatar">
           <text class="contact-avatar-text">{{ contact.name.charAt(0) }}</text>
@@ -18,14 +19,7 @@
           </view>
           <text class="contact-phone">{{ contact.phone }}</text>
         </view>
-        <view class="contact-actions">
-          <view class="action-btn action-edit" @tap="editContact(idx)">
-            <text class="action-btn-text">编辑</text>
-          </view>
-          <view class="action-btn action-delete" @tap="deleteContact(idx)">
-            <text class="action-btn-text action-delete-text">删除</text>
-          </view>
-        </view>
+        <app-icon name="right" :size="16" color="#A1ACB8" />
       </view>
 
       <view v-if="contacts.length === 0" class="empty-state">
@@ -106,6 +100,7 @@ import {
   updateEmergencyContact,
   type EmergencyContactResponse
 } from '@/api/user'
+import { userFacingError } from '@/utils/presentation'
 
 const contacts = ref<EmergencyContactResponse[]>([])
 
@@ -138,6 +133,18 @@ function editContact(idx: number) {
   popupForm.phone = c.phone
   popupForm.relation = c.relation
   popupVisible.value = true
+}
+
+function openContactActions(idx: number) {
+  const contact = contacts.value[idx]
+  uni.showActionSheet({
+    itemList: ['拨打电话', '编辑联系人', '删除联系人'],
+    success: ({ tapIndex }) => {
+      if (tapIndex === 0) return uni.makePhoneCall({ phoneNumber: contact.phone })
+      if (tapIndex === 1) return editContact(idx)
+      deleteContact(idx)
+    }
+  })
 }
 
 function deleteContact(idx: number) {
@@ -189,7 +196,7 @@ async function handleSave() {
     }
     hidePopup()
   } catch (error: any) {
-    uni.showToast({ title: error?.message || '保存失败，请重试', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '保存失败，请重试'), icon: 'none' })
   }
 }
 
@@ -206,39 +213,51 @@ onShow(loadContacts)
 
 <style lang="scss" scoped>
 .page {
+  position: relative;
   min-height: 100vh;
-  background: #F3F7FA;
+  overflow: hidden;
+  background: #F2F2F7;
   padding: 24rpx 32rpx;
   box-sizing: border-box;
   padding-bottom: 160rpx;
 }
+.page::before { display: none; }
 
 .contact-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1rpx solid #E2E8EF;
+  border-radius: 22rpx;
+  background: #FFFFFF;
+  box-shadow: none;
 }
 .contact-card {
   display: flex;
   align-items: center;
+  min-height: 118rpx;
+  margin-left: 22rpx;
+  padding: 0 22rpx 0 0;
+  border-bottom: 1rpx solid #EDF1F5;
   background: #FFFFFF;
-  border-radius: 20rpx;
-  padding: 28rpx 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(43, 111, 240, 0.06);
 }
+.contact-card:last-child { border-bottom: 0; }
+.contact-card:active { background: #F7F9FB; }
 .contact-avatar {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 18rpx;
+  background: #3478D4;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 20rpx;
+  margin-right: 16rpx;
   flex-shrink: 0;
 }
+.contact-card:nth-child(3n + 2) .contact-avatar { background: #248A5A; }
+.contact-card:nth-child(3n) .contact-avatar { background: #64748B; }
 .contact-avatar-text {
-  font-size: 36rpx;
+  font-size: 26rpx;
   font-weight: 700;
   color: #FFFFFF;
 }
@@ -246,57 +265,31 @@ onShow(loadContacts)
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 3rpx;
 }
 .contact-name-row {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  gap: 9rpx;
 }
 .contact-name {
-  font-size: 30rpx;
-  font-weight: 600;
+  font-size: 27rpx;
+  font-weight: 680;
   color: #20364D;
 }
 .relation-tag {
   background: rgba(43, 111, 240, 0.08);
-  border-radius: 8rpx;
-  padding: 2rpx 14rpx;
+  border-radius: 7rpx;
+  padding: 2rpx 10rpx;
 }
 .relation-tag-text {
-  font-size: 20rpx;
+  font-size: 17rpx;
   color: #2E6DD1;
   font-weight: 500;
 }
 .contact-phone {
-  font-size: 26rpx;
+  font-size: 22rpx;
   color: #86909C;
-}
-.contact-actions {
-  display: flex;
-  gap: 12rpx;
-  flex-shrink: 0;
-  margin-left: 16rpx;
-}
-.action-btn {
-  padding: 10rpx 20rpx;
-  border-radius: 12rpx;
-}
-.action-edit {
-  background: rgba(43, 111, 240, 0.08);
-}
-.action-btn-text {
-  font-size: 24rpx;
-  color: #2E6DD1;
-  font-weight: 500;
-}
-.action-delete {
-  background: rgba(245, 63, 63, 0.06);
-}
-.action-delete-text {
-  font-size: 24rpx;
-  color: #C93D46;
-  font-weight: 500;
 }
 
 .empty-state {
@@ -322,29 +315,30 @@ onShow(loadContacts)
 .add-btn {
   position: fixed;
   bottom: 60rpx;
-  left: 32rpx;
-  right: 32rpx;
+  left: 74rpx;
+  right: 74rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
-  border-radius: 48rpx;
-  padding: 28rpx 0;
-  box-shadow: 0 8rpx 32rpx rgba(43, 111, 240, 0.3);
+  background: #007AFF;
+  min-height: 84rpx;
+  border-radius: 22rpx;
+  padding: 0;
+  box-shadow: none;
   z-index: 10;
 }
 .add-btn:active {
   opacity: 0.85;
 }
 .add-btn-icon {
-  font-size: 40rpx;
+  font-size: 32rpx;
   color: #FFFFFF;
   font-weight: 300;
   line-height: 1;
 }
 .add-btn-text {
-  font-size: 30rpx;
+  font-size: 26rpx;
   color: #FFFFFF;
   font-weight: 600;
 }
@@ -451,11 +445,11 @@ onShow(loadContacts)
 
 .popup-submit {
   margin-top: 40rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   border-radius: 48rpx;
   padding: 28rpx 0;
   text-align: center;
-  box-shadow: 0 8rpx 32rpx rgba(43, 111, 240, 0.3);
+  box-shadow: none;
 }
 .popup-submit:active {
   opacity: 0.85;

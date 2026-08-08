@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-sheet">
     <view v-if="user.isVerified" class="verified-section">
       <view class="verified-card">
         <view class="verified-bg"></view>
@@ -72,6 +72,7 @@ import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { getCurrentProfile, verifyIdentity } from '@/api/user'
+import { userFacingError } from '@/utils/presentation'
 
 const user = reactive({
   isVerified: false,
@@ -103,7 +104,7 @@ async function handleSubmit() {
     uni.showToast({ title: '身份信息已校验', icon: 'success' })
   } catch (error: any) {
     uni.hideLoading()
-    uni.showToast({ title: error?.message || '校验失败，请检查信息', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '校验失败，请检查信息'), icon: 'none' })
   }
 }
 
@@ -145,7 +146,7 @@ onShow(loadProfile)
   left: 0;
   right: 0;
   height: 200rpx;
-  background: linear-gradient(135deg, #23956A 0%, #4DC580 50%, #7BE0A2 100%);
+  background: #248A5A;
 }
 .verified-content {
   position: relative;
@@ -290,7 +291,7 @@ onShow(loadProfile)
 
 .submit-btn {
   margin-top: 48rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   border-radius: 48rpx;
   padding: 28rpx 0;
   text-align: center;

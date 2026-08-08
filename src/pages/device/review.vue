@@ -1,23 +1,27 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-list">
     <view v-if="loading" class="state">正在加载待审核设备…</view>
     <view v-else-if="!devices.length" class="state-card">
       <text class="state-title">暂无待审核设备</text>
       <text class="state-desc">请先切换为普通用户并提交一台设备</text>
     </view>
     <view v-else class="device-list">
-      <view v-for="device in devices" :key="device.id" class="device-card">
+      <view
+        v-for="device in devices"
+        :key="device.id"
+        class="device-card"
+        :class="{ 'device-card-busy': reviewingId === device.id }"
+        @tap="openReviewActions(device)"
+      >
         <view class="card-head">
           <text class="device-name">{{ device.name }}</text>
           <text class="pending">待审核</text>
         </view>
         <text class="device-meta">{{ device.type === 'FIXED' ? '固定设备' : '移动设备' }} · {{ device.category }}</text>
         <text class="device-address">{{ device.address }}</text>
-        <text v-if="device.vehicleInfo" class="device-detail">车辆信息：{{ device.vehicleInfo }}</text>
-        <text v-if="device.expireDate" class="device-detail">有效期：{{ device.expireDate }}</text>
-        <view class="actions" :class="{ 'actions-busy': reviewingId === device.id }">
-          <view class="reject-btn" @tap="review(device, false)">驳回</view>
-          <view class="approve-btn" @tap="review(device, true)">审核通过</view>
+        <view class="device-foot">
+          <text>{{ device.vehicleInfo || (device.expireDate ? `有效至 ${device.expireDate}` : '查看资料并审核') }}</text>
+          <view class="review-action"><text>审核</text><text class="review-arrow">›</text></view>
         </view>
       </view>
     </view>
@@ -28,6 +32,7 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { listPendingEmergencyDevices, reviewEmergencyDevice, type EmergencyDeviceResponse } from '@/api/devices'
+import { userFacingError } from '@/utils/presentation'
 
 const devices = ref<EmergencyDeviceResponse[]>([])
 const loading = ref(true)
@@ -37,13 +42,21 @@ async function load() {
   try {
     devices.value = (await listPendingEmergencyDevices()).content
   } catch (error: any) {
-    uni.showToast({ title: error?.message || '待审核设备加载失败', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '待审核设备加载失败'), icon: 'none' })
   } finally {
     loading.value = false
   }
 }
 
 const reviewingId = ref('')
+
+function openReviewActions(device: EmergencyDeviceResponse) {
+  if (reviewingId.value) return
+  uni.showActionSheet({
+    itemList: ['审核通过', '驳回并退回修改'],
+    success: ({ tapIndex }) => review(device, tapIndex === 0)
+  })
+}
 
 function review(device: EmergencyDeviceResponse, approved: boolean) {
   if (reviewingId.value) return
@@ -62,7 +75,7 @@ function review(device: EmergencyDeviceResponse, approved: boolean) {
         devices.value = devices.value.filter(item => item.id !== device.id)
         uni.showToast({ title: approved ? '已通过' : '已驳回', icon: 'success' })
       } catch (error: any) {
-        uni.showToast({ title: error?.message || '审核失败', icon: 'none' })
+        uni.showToast({ title: userFacingError(error, '审核失败，请稍后重试'), icon: 'none' })
       } finally {
         reviewingId.value = ''
       }
@@ -81,16 +94,19 @@ onShow(load)
 .state, .state-card { padding: 56rpx 30rpx; text-align: center; border-radius: 18rpx; background: #FFFFFF; color: #68758A; }
 .state-title { display: block; color: #172033; font-size: 30rpx; font-weight: 700; }
 .state-desc { display: block; margin-top: 12rpx; font-size: 24rpx; }
-.device-list { margin-top: 0; }
-.device-card { margin-bottom: 18rpx; padding: 28rpx; border-radius: 22rpx; background: #FFFFFF; border: 1rpx solid #E1E8F0; }
+.device-list { overflow: hidden; border: 1rpx solid #E1E8F0; border-radius: 18rpx; background: #FFFFFF; }
+.device-card { position: relative; margin-left: 24rpx; padding: 22rpx 24rpx 20rpx 0; background: #FFFFFF; }
+.device-card::after { content: ''; position: absolute; right: 24rpx; bottom: 0; left: 0; height: 1rpx; background: #E9EEF3; }
+.device-card:last-child { border-bottom: 0; }
+.device-card:last-child::after { display: none; }
+.device-card:active { background: #F8FAFC; }
+.device-card-busy { opacity: .55; }
 .card-head { display: flex; align-items: center; justify-content: space-between; }
-.device-name { font-size: 30rpx; font-weight: 700; }
-.pending { padding: 6rpx 14rpx; border-radius: 10rpx; background: #FFF4E5; color: #B66A10; font-size: 22rpx; }
-.device-meta, .device-address, .device-detail { display: block; margin-top: 12rpx; font-size: 25rpx; color: #56627A; }
+.device-name { font-size: 27rpx; font-weight: 720; }
+.pending { padding: 5rpx 10rpx; border-radius: 8rpx; background: #FFF4E5; color: #B66A10; font-size: 19rpx; }
+.device-meta, .device-address { display: block; margin-top: 9rpx; font-size: 22rpx; color: #66768A; }
 .device-address { color: #26364D; }
-.actions { display: flex; gap: 16rpx; margin-top: 26rpx; }
-.actions-busy { opacity: 0.55; }
-.reject-btn, .approve-btn { flex: 1; padding: 20rpx 0; border-radius: 14rpx; text-align: center; font-size: 26rpx; font-weight: 600; }
-.reject-btn { color: #C93D46; background: #FFF0F0; }
-.approve-btn { color: #FFFFFF; background: #1F63D5; }
+.device-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 12rpx; color: #8795A6; font-size: 20rpx; }
+.review-action { display: flex; align-items: center; color: #2E6DD1; font-weight: 700; }
+.review-arrow { margin-left: 5rpx; font-size: 29rpx; line-height: 1; }
 </style>

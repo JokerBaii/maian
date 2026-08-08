@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-focus">
     <view class="page-scroll">
     <view class="cover-area">
       <view class="cover-image-area">

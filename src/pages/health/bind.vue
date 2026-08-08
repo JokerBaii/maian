@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-sheet">
     <view class="scroll-content">
       <view v-if="boundDevice" class="card bound-card">
         <view class="card-header">
@@ -35,6 +35,52 @@
         </view>
       </view>
 
+      <view v-if="boundDevice" class="card telemetry-card">
+        <view class="telemetry-heading">
+          <view>
+            <text class="telemetry-kicker">今日监测</text>
+            <text class="telemetry-title">生命信号持续同步</text>
+          </view>
+          <view class="telemetry-live">
+            <view class="telemetry-live-dot"></view>
+            <text>{{ boundDevice.connected ? '同步中' : '已暂停' }}</text>
+          </view>
+        </view>
+
+        <view class="pulse-reading">
+          <view class="pulse-wave" aria-hidden="true">
+            <view class="pulse-line"></view>
+          </view>
+          <view class="pulse-value-wrap">
+            <text class="pulse-value">{{ heartRateData.current || '--' }}</text>
+            <text class="pulse-unit">BPM</text>
+          </view>
+          <text class="pulse-scene">{{ currentSceneLabel }}</text>
+        </view>
+
+        <view class="telemetry-metrics">
+          <view class="telemetry-metric">
+            <text class="telemetry-value">{{ todaySampleCount }}</text>
+            <text class="telemetry-label">今日采样</text>
+          </view>
+          <view class="telemetry-divider"></view>
+          <view class="telemetry-metric">
+            <text class="telemetry-value">{{ todayRange }}</text>
+            <text class="telemetry-label">心率区间</text>
+          </view>
+          <view class="telemetry-divider"></view>
+          <view class="telemetry-metric">
+            <text class="telemetry-value">{{ heartRateData.avg || '--' }}</text>
+            <text class="telemetry-label">今日平均</text>
+          </view>
+        </view>
+
+        <view class="sync-row">
+          <text>最近同步</text>
+          <text class="sync-value">{{ lastSyncLabel }}</text>
+        </view>
+      </view>
+
       <view v-if="!boundDevice" class="empty-bound">
         <app-icon-tile
           class="empty-icon"
@@ -49,11 +95,6 @@
 
       <view class="scan-section">
         <view class="scan-btn" :class="{ 'scanning': isScanning }" @tap="toggleScan">
-          <view v-if="isScanning" class="scan-animation">
-            <view class="scan-ring scan-ring-1"></view>
-            <view class="scan-ring scan-ring-2"></view>
-            <view class="scan-ring scan-ring-3"></view>
-          </view>
           <view class="scan-icon-wrap">
             <app-icon
               v-if="!isScanning"
@@ -127,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
@@ -140,13 +181,14 @@ import {
 import { bleHeartRateService } from '@/services/bleHeartRateService'
 import { parseHeartRateMeasurement } from '@/utils/heartRateMeasurement'
 
-const { updateWearable } = useHealthMonitoring()
+const { monitoring: heartRateData, loadMonitoring, updateWearable } = useHealthMonitoring()
 
 const boundDevice = ref<{
   name: string
   type: string
   connected: boolean
   battery: number | null
+  lastSeenAt: string | null
 } | null>(null)
 const connectedDeviceId = ref('')
 let scanTimer: ReturnType<typeof setTimeout> | null = null
@@ -155,6 +197,31 @@ let lastReadingUploadAt = 0
 const isScanning = ref(false)
 const showBindSuccess = ref(false)
 const boundDeviceName = ref('')
+
+const todaySampleCount = computed(() => heartRateData.value.todayData.length)
+const todayRange = computed(() => {
+  if (!heartRateData.value.todayData.length) return '--'
+  return `${heartRateData.value.min}–${heartRateData.value.max}`
+})
+const currentSceneLabel = computed(() => {
+  const labels: Record<string, string> = {
+    resting: '静息',
+    exercise: '运动',
+    sleeping: '睡眠'
+  }
+  return labels[heartRateData.value.scene] || '实时'
+})
+const lastSyncLabel = computed(() => {
+  const value = boundDevice.value?.lastSeenAt
+  if (!value) return '等待首次同步'
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) return '已同步'
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000))
+  if (elapsedMinutes < 1) return '刚刚'
+  if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`
+  const date = new Date(timestamp)
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+})
 
 interface DiscoveredDevice {
   id: string
@@ -169,19 +236,24 @@ interface DiscoveredDevice {
 const discoveredDevices = reactive<DiscoveredDevice[]>([])
 
 onMounted(async () => {
-  try {
-    const device = await getWearableDevice()
+  const [deviceResult] = await Promise.allSettled([
+    getWearableDevice(),
+    loadMonitoring(true)
+  ])
+  if (deviceResult.status === 'fulfilled') {
+    const device = deviceResult.value
     if (device.type !== 'none') {
       connectedDeviceId.value = device.deviceIdentifier || ''
       boundDevice.value = {
         name: device.name,
         type: device.type,
         connected: device.connected,
-        battery: device.battery
+        battery: device.battery,
+        lastSeenAt: device.lastSeenAt || null
       }
       updateWearable(device)
     }
-  } catch {
+  } else {
     uni.showToast({ title: '绑定设备信息加载失败', icon: 'none' })
   }
 })
@@ -197,37 +269,12 @@ function toggleScan() {
   // #endif
   // #ifndef APP-PLUS
   uni.showModal({
-    title: '演示环境无法扫描蓝牙',
-    content: '浏览器无法访问低功耗蓝牙设备。可绑定一台演示设备，展示连接与心率同步流程。',
-    confirmText: '绑定演示设备',
-    cancelText: '取消',
-    success: (result) => {
-      if (result.confirm) demoBind()
-    }
+    title: '请使用 iOS 客户端连接',
+    content: '网页端无法直接访问低功耗蓝牙。请在 iPhone 上打开脉安驰援并靠近手环完成连接。',
+    confirmText: '我知道了',
+    showCancel: false
   })
   // #endif
-}
-
-/** H5 演示兜底：直接绑定后端种子穿戴设备，跳过蓝牙扫描环节。 */
-async function demoBind() {
-  const demoDevice = { name: '演示心率手环', type: 'bluetooth', connected: true }
-  try {
-    const saved = await saveWearableDevice({
-      deviceIdentifier: 'demo-h5-band',
-      name: demoDevice.name,
-      type: demoDevice.type,
-      connected: true,
-      battery: 86
-    })
-    updateWearable(saved)
-    boundDeviceName.value = saved.name
-    showBindSuccess.value = true
-    setTimeout(() => {
-      showBindSuccess.value = false
-    }, 1800)
-  } catch {
-    uni.showToast({ title: '演示设备绑定失败，请重试', icon: 'none' })
-  }
 }
 
 // #ifdef APP-PLUS
@@ -269,7 +316,7 @@ function handleBluetoothDevicesFound(result: any) {
       id: rawDevice.deviceId,
       name,
       icon: name.charAt(0).toUpperCase(),
-      avatarBg: 'linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%)',
+      avatarBg: '#007AFF',
       signal,
       binding: false,
       bound: false
@@ -391,7 +438,8 @@ function handleBind(device: DiscoveredDevice) {
         name: device.name,
         type: 'bluetooth',
         connected: true,
-        battery: null
+        battery: null,
+        lastSeenAt: new Date().toISOString()
       }
       updateWearable({
         name: device.name,
@@ -454,7 +502,7 @@ function handleDisconnect() {
           try {
             await deleteWearableDevice()
           } catch {
-            uni.showToast({ title: '设备已断开，服务端解绑失败', icon: 'none' })
+            uni.showToast({ title: '设备已断开，请稍后确认解绑状态', icon: 'none' })
           }
         }
         // #ifdef APP-PLUS
@@ -518,6 +566,181 @@ onUnmounted(() => {
   font-size: 30rpx;
   font-weight: 700;
   color: #20364D;
+}
+
+.telemetry-card {
+  border: 1rpx solid rgba(60, 60, 67, .14);
+}
+
+.telemetry-heading,
+.pulse-reading,
+.telemetry-metrics,
+.sync-row {
+  display: flex;
+  align-items: center;
+}
+
+.telemetry-heading,
+.sync-row {
+  justify-content: space-between;
+}
+
+.telemetry-kicker,
+.telemetry-title {
+  display: block;
+}
+
+.telemetry-kicker {
+  color: #8E8E93;
+  font-size: 19rpx;
+  font-weight: 750;
+  letter-spacing: 2rpx;
+}
+
+.telemetry-title {
+  margin-top: 4rpx;
+  color: #20364D;
+  font-size: 29rpx;
+  font-weight: 780;
+}
+
+.telemetry-live {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  color: #23865F;
+  font-size: 21rpx;
+  font-weight: 700;
+}
+
+.telemetry-live-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: #28A474;
+  box-shadow: 0 0 0 7rpx rgba(40, 164, 116, .1);
+  animation: telemetryPulse 2.2s ease-in-out infinite;
+}
+
+.pulse-reading {
+  min-height: 108rpx;
+  margin-top: 24rpx;
+  padding: 0 20rpx;
+  border-radius: 18rpx;
+  background: #F6F8FB;
+}
+
+.pulse-wave {
+  position: relative;
+  width: 92rpx;
+  height: 44rpx;
+  overflow: hidden;
+}
+
+.pulse-line {
+  position: absolute;
+  top: 20rpx;
+  left: 0;
+  width: 92rpx;
+  height: 2rpx;
+  background: #D9E2EA;
+}
+
+.pulse-line::after {
+  content: '';
+  position: absolute;
+  top: -18rpx;
+  left: 16rpx;
+  width: 52rpx;
+  height: 36rpx;
+  border-right: 4rpx solid #C93D46;
+  border-bottom: 4rpx solid #C93D46;
+  transform: skewX(-28deg) rotate(-42deg);
+  animation: telemetryBeat 1.65s cubic-bezier(.2, .72, .2, 1) infinite;
+}
+
+.pulse-value-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 7rpx;
+  margin-left: 18rpx;
+}
+
+.pulse-value {
+  color: #1C1C1E;
+  font-size: 48rpx;
+  font-weight: 820;
+  line-height: 1;
+}
+
+.pulse-unit,
+.pulse-scene {
+  color: #8E8E93;
+  font-size: 19rpx;
+}
+
+.pulse-scene {
+  margin-left: auto;
+  padding: 7rpx 12rpx;
+  border-radius: 10rpx;
+  background: #FFFFFF;
+}
+
+.telemetry-metrics {
+  margin-top: 22rpx;
+}
+
+.telemetry-metric {
+  min-width: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.telemetry-value,
+.telemetry-label {
+  display: block;
+}
+
+.telemetry-value {
+  color: #20364D;
+  font-size: 27rpx;
+  font-weight: 780;
+}
+
+.telemetry-label {
+  margin-top: 4rpx;
+  color: #8E8E93;
+  font-size: 19rpx;
+}
+
+.telemetry-divider {
+  width: 1rpx;
+  height: 42rpx;
+  background: rgba(60, 60, 67, .14);
+}
+
+.sync-row {
+  margin-top: 22rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid rgba(60, 60, 67, .12);
+  color: #8E8E93;
+  font-size: 20rpx;
+}
+
+.sync-value {
+  color: #636366;
+  font-weight: 650;
+}
+
+@keyframes telemetryPulse {
+  0%, 100% { opacity: .65; transform: scale(.92); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes telemetryBeat {
+  0%, 42%, 100% { opacity: .38; transform: skewX(-28deg) rotate(-42deg) scale(.92); }
+  48% { opacity: 1; transform: skewX(-28deg) rotate(-42deg) scale(1.08); }
+  58% { opacity: .58; transform: skewX(-28deg) rotate(-42deg) scale(.98); }
 }
 
 .connected-badge {
@@ -631,70 +854,29 @@ onUnmounted(() => {
 .scan-section {
   display: flex;
   justify-content: center;
-  padding: 40rpx 0;
+  padding: 26rpx 32rpx 38rpx;
 }
 .scan-btn {
   position: relative;
-  width: 240rpx;
-  height: 240rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  width: 100%;
+  min-height: 88rpx;
+  border-radius: 18rpx;
+  background: #007AFF;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 12rpx;
-  box-shadow: 0 8rpx 40rpx rgba(43, 111, 240, 0.35);
-  transition: all 0.3s ease;
+  gap: 10rpx;
+  box-shadow: none;
+  transition: opacity 150ms ease, transform 150ms ease;
   z-index: 2;
 }
 .scan-btn.scanning {
-  box-shadow: 0 8rpx 48rpx rgba(43, 111, 240, 0.5);
-}
-.scan-animation {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-.scan-ring {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  border: 3rpx solid rgba(43, 111, 240, 0.25);
-  animation: scanPulse 2s ease-out infinite;
-}
-.scan-ring-1 {
-  width: 280rpx;
-  height: 280rpx;
-  animation-delay: 0s;
-}
-.scan-ring-2 {
-  width: 340rpx;
-  height: 340rpx;
-  animation-delay: 0.4s;
-}
-.scan-ring-3 {
-  width: 400rpx;
-  height: 400rpx;
-  animation-delay: 0.8s;
-}
-@keyframes scanPulse {
-  0% {
-    transform: translate(-50%, -50%) scale(0.85);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1.2);
-    opacity: 0;
-  }
+  opacity: .72;
 }
 .scan-icon-wrap {
-  width: 64rpx;
-  height: 64rpx;
+  width: 44rpx;
+  height: 44rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -780,7 +962,7 @@ onUnmounted(() => {
 .bind-btn {
   padding: 10rpx 28rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   box-shadow: 0 4rpx 12rpx rgba(43, 111, 240, 0.2);
   transition: all 0.3s ease;
 }
@@ -846,7 +1028,7 @@ onUnmounted(() => {
   width: 120rpx;
   height: 120rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #23956A 0%, #4DC580 100%);
+  background: #248A5A;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,0 +1,113 @@
+/* Apple-platform baseline for every screen except the established home page. */
+.apple-page {
+  --ios-canvas: #F2F2F7;
+  --ios-group: #FFFFFF;
+  --ios-label: #1C1C1E;
+  --ios-secondary-label: #636366;
+  --ios-tertiary-label: #8E8E93;
+  --ios-separator: rgba(60, 60, 67, .16);
+  --ios-fill: rgba(118, 118, 128, .12);
+  --ios-blue: #007AFF;
+  --ios-green: #248A5A;
+  --ios-red: #C72C38;
+  --ios-orange: #C97818;
+  --ios-group-radius: 20rpx;
+  --ios-control-radius: 14rpx;
+  color: var(--ios-label);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  font-feature-settings: 'kern';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.apple-page:not(.emergency-page):not(.map-page) {
+  background-color: var(--ios-canvas) !important;
+}
+
+/* Navigation is the translucent functional layer; content stays opaque. */
+.apple-page:not(.emergency-page) > .nav-bar {
+  border-bottom: 1rpx solid var(--ios-separator);
+  background: rgba(249, 249, 251, .92) !important;
+  box-shadow: none !important;
+  backdrop-filter: saturate(160%) blur(24rpx);
+  -webkit-backdrop-filter: saturate(160%) blur(24rpx);
+}
+
+.apple-page :is(
+  .card,
+  .report-card,
+  .summary-card,
+  .device-card,
+  .content-card,
+  .record-card,
+  .submission-card,
+  .review-card,
+  .menu-list,
+  .contact-list,
+  .form-card,
+  .section-card
+) {
+  box-shadow: none !important;
+}
+
+.apple-page :is(input, textarea) {
+  color: var(--ios-label);
+  caret-color: var(--ios-blue);
+}
+
+.apple-page :is(input, textarea):focus {
+  outline: none;
+}
+
+.apple-page :is(
+  .primary-button,
+  .secondary-button,
+  .submit-button,
+  .state-button,
+  .popup-submit,
+  .empty-btn
+) {
+  min-height: 88rpx;
+  box-sizing: border-box;
+}
+
+/* Touch feedback should be immediate and quiet. */
+.apple-page :is(
+  .menu-item,
+  .record-card,
+  .device-card,
+  .contact-card,
+  .content-card,
+  .submission-card,
+  .review-card
+) {
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+
+.apple-page :is(
+  .menu-item,
+  .record-card,
+  .device-card,
+  .contact-card,
+  .content-card,
+  .submission-card,
+  .review-card
+):active {
+  background-color: #EDEDF2;
+}
+
+/* #ifdef H5 */
+.apple-page * {
+  -webkit-tap-highlight-color: transparent;
+}
+/* #endif */
+
+@media (prefers-reduced-motion: reduce) {
+  .apple-page *,
+  .apple-page *::before,
+  .apple-page *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

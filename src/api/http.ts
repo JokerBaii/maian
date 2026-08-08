@@ -83,8 +83,9 @@ async function authenticatedRequest<T>(
           return
         }
         const body = response.data as unknown as ApiResponse<T>
-        if (response.statusCode >= 200 && response.statusCode < 300 && body.success && body.data !== undefined) {
-          resolve(body.data)
+        if (response.statusCode >= 200 && response.statusCode < 300 && body.success) {
+          // 成功的命令型接口允许只返回 success/timestamp，不强制携带 data。
+          resolve(body.data as T)
           return
         }
 

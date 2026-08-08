@@ -1,5 +1,5 @@
 <template>
-  <view v-if="lesson" class="page">
+  <view v-if="lesson" class="page apple-page motion-page-focus">
     <video
       v-if="!videoFailed"
       class="video-player"

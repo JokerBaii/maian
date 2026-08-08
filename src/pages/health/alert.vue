@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-focus">
     <view class="scroll-content">
       <view class="summary-card">
         <view class="summary-bg"></view>
@@ -157,7 +157,7 @@ onMounted(async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #2E6DD1 0%, #1A4FD0 50%, #0D3AAF 100%);
+  background: #007AFF;
   opacity: 0.04;
 }
 .summary-content {

@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page apple-page motion-page-sheet">
     <view class="scroll-content">
       <view class="form-section">
         <view class="form-label">
@@ -403,6 +403,7 @@ import { loadAMap } from '@/common/amap'
 // #endif
 import { uploadImage } from '@/api/files'
 import { resolveApiUrl } from '@/api/http'
+import { userFacingError } from '@/utils/presentation'
 import {
   createEmergencyDevice,
   getEmergencyDevice,
@@ -560,9 +561,9 @@ async function initPickerMap() {
       uni.showToast({ title: '已使用当前位置', icon: 'none' })
       cancelLocationPicker()
     }
-    getCurrentGcj02Location().then((location) => {
-      useLocation(location.longitude, location.latitude)
-    })
+    getCurrentGcj02Location()
+      .then((location) => useLocation(location.longitude, location.latitude))
+      .catch(() => uni.showToast({ title: '定位失败，请在地图上选择设备位置', icon: 'none' }))
     return
   }
   const AMap = (window as any).AMap
@@ -830,7 +831,7 @@ async function handleSubmit() {
     }, 800)
   } catch (error: any) {
     isSubmitting.value = false
-    uni.showToast({ title: error?.message || '提交失败，请重试', icon: 'none' })
+    uni.showToast({ title: userFacingError(error, '提交失败，请重试'), icon: 'none' })
   }
 }
 
@@ -1004,7 +1005,7 @@ async function handleSubmit() {
 }
 .location-btn {
   padding: 12rpx 28rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   border-radius: 24rpx;
   margin-left: 16rpx;
 }
@@ -1172,7 +1173,7 @@ async function handleSubmit() {
   width: 100%;
   height: 96rpx;
   border-radius: 48rpx;
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1228,7 +1229,7 @@ async function handleSubmit() {
   flex-direction: column;
 }
 .lp-header {
-  background: linear-gradient(135deg, #2E6DD1 0%, #2E6DD1 100%);
+  background: #007AFF;
   padding-bottom: 16rpx;
   z-index: 10;
 }
