@@ -109,7 +109,7 @@ public class ReportRecognitionService {
             form.add("image", Base64.getEncoder().encodeToString(image));
             form.add("detect_direction", "true");
             String body = restClient.post()
-                .uri("https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic?access_token={token}", accessToken())
+                .uri("https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token={token}", accessToken())
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(form)
                 .retrieve()

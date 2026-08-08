@@ -38,6 +38,8 @@ export BAIDU_OCR_API_KEY='...'
 export BAIDU_OCR_SECRET_KEY='...'
 ```
 
+当前调用百度“通用文字识别（标准版）” `general_basic`。百度的免费测试资源按月发放且可能调整，应以[OCR 控制台与官方免费资源说明](https://ai.baidu.com/ai-doc/OCR/fk3h7xu7h)为准，不把“有免费额度”当作无限永久免费。前端在首次识别前会明示说明数据发往百度并获取用户同意。
+
 未启用 OCR 时接口明确返回 `OCR_UNAVAILABLE`，前端继续支持人工录入。只有 `healthDataShare=true` 时才允许向 OCR 或 DeepSeek 发送健康数据。DeepSeek 通过 Spring AI 的 OpenAI 兼容接口接入，默认关闭：
 
 ```bash
@@ -48,11 +50,13 @@ export OPENAI_MODEL=deepseek-chat
 
 ## 救援工作流
 
-呼救先落库，附件异步上传。服务端调度器独立执行重匹配与超时，不依赖客户端页面。志愿者只收到附近可接任务，接单前 DTO 不含精确坐标、地址和图片；原子接单后开放参与者数据。
+呼救先落库，附件异步上传。服务端调度器独立执行重匹配与超时，不依赖客户端页面。志愿者只收到附近可响应任务，确认响应前 DTO 不含精确坐标、地址和图片；原子响应成功后开放参与者数据。
 
 固定 AED：`MATCHING → EN_ROUTE_TO_AED → EN_ROUTE_TO_REQUESTER → ARRIVED → RESCUING → PENDING_CONFIRMATION → COMPLETED → AED_RETURNED`。
 
 移动 AED 跳过取用/归还环节。完成由施救者提交、求救者确认，10 分钟未操作则服务端自动确认。匹配时 ETA/坐标保存在快照字段，持续位置上报单独返回 `liveTracking`。
+
+ETA 不限于校园：校园、社区、场馆、园区和城市道路都使用同一调度语义，但速度、路径系数和取用 overhead 必须按当地样本标定。公式、数据字段、验证指标和环境变量见 [docs/ETA_CALIBRATION.md](../docs/ETA_CALIBRATION.md)。
 
 前台通过 `/api/v1/rescue-events/stream` 接收 SSE，客户端保留轮询兜底。系统级 APNs/厂商 Push 仍需部署方提供证书和设备 Token 后启用外部推送供应商。
 

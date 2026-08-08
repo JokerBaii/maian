@@ -65,6 +65,11 @@
             <text class="recognize-hint">自动读取机构、日期与关键指标</text>
           </view>
 
+          <view v-if="imagePath" class="ocr-provider-note">
+            <app-icon name="info" :size="13" color="#6F7F94" />
+            <text>识别时会在你确认后，将报告图片发送至百度智能云 OCR；识别结果仍需人工核对。</text>
+          </view>
+
           <view v-if="recognizeNotice" class="recognize-notice">
             <app-icon name="info" :size="14" color="#1F63D5" />
             <text class="recognize-notice-text">{{ recognizeNotice }}</text>
@@ -172,6 +177,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { uploadImage } from '@/api/files'
 import { createHealthReport, recognizeHealthReport } from '@/api/reports'
+import { getUserSettings, updateUserSettings } from '@/api/user'
 
 interface IndicatorForm {
   key: number
@@ -242,6 +248,10 @@ async function recognizeReport() {
   recognizing.value = true
   uni.showLoading({ title: '识别中…' })
   try {
+    if (!await ensureOcrConsent()) {
+      uni.hideLoading()
+      return
+    }
     if (!uploadedMediaId.value) {
       const uploaded = await uploadImage(imagePath.value, 'HEALTH_REPORT')
       uploadedMediaId.value = uploaded.mediaId
@@ -267,6 +277,34 @@ async function recognizeReport() {
   } finally {
     recognizing.value = false
   }
+}
+
+async function ensureOcrConsent() {
+  const settings = await getUserSettings()
+  if (settings.healthDataShare) return true
+  uni.hideLoading()
+  const confirmed = await new Promise<boolean>(resolve => {
+    uni.showModal({
+      title: '授权 OCR 识别',
+      content: '报告图片将发送至百度智能云用于文字识别。是否同意本次及后续健康数据识别？',
+      confirmText: '同意并继续',
+      cancelText: '手动录入',
+      success: result => resolve(Boolean(result.confirm)),
+      fail: () => resolve(false)
+    })
+  })
+  if (!confirmed) return false
+  await updateUserSettings({
+    rescuePush: settings.rescuePush,
+    healthAlert: settings.healthAlert,
+    scienceUpdate: settings.scienceUpdate,
+    locationShare: settings.locationShare,
+    healthDataShare: true,
+    maxHeartRate: settings.maxHeartRate,
+    minHeartRate: settings.minHeartRate
+  })
+  uni.showLoading({ title: '识别中…' })
+  return true
 }
 
 function addIndicator() {
@@ -475,6 +513,21 @@ async function submitReport() {
   color: #8D9AAF;
   font-size: 21rpx;
 }
+
+.ocr-provider-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8rpx;
+  margin-top: 14rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 12rpx;
+  background: #F4F6F8;
+  color: #6F7F94;
+  font-size: 19rpx;
+  line-height: 1.55;
+}
+
+.ocr-provider-note text { flex: 1; }
 
 .recognize-notice {
   display: flex;

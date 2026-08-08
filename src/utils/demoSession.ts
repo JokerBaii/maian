@@ -14,7 +14,7 @@ export const demoUsers = [
   },
   {
     id: '30000000-0000-0000-0000-000000000002', role: 'VOLUNTEER', name: '志愿者体验账号', title: '救援志愿者',
-    description: '接取附近任务、更新救援进度'
+    description: '响应附近任务、更新救援进度'
   },
   {
     id: '30000000-0000-0000-0000-000000000003', role: 'ADMIN', name: '审核体验账号', title: '平台审核员',

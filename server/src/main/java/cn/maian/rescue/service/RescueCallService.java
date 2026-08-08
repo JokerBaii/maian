@@ -12,6 +12,7 @@ import cn.maian.rescue.domain.RescueStatus;
 import cn.maian.rescue.domain.ResponderPresence;
 import cn.maian.rescue.dto.CreateRescueCallRequest;
 import cn.maian.rescue.dto.RequesterRescueResponse;
+import cn.maian.rescue.dto.RescueParticipantResponse;
 import cn.maian.rescue.dto.ResponderTaskResponse;
 import cn.maian.rescue.repository.ActiveRescueLockRepository;
 import cn.maian.rescue.repository.RescueCallRepository;
@@ -94,7 +95,7 @@ public class RescueCallService {
                 request.clientRequestId(), requesterId
             );
             if (idempotent.isPresent()) {
-                return RequesterRescueResponse.from(idempotent.orElseThrow());
+                return requesterResponse(idempotent.orElseThrow());
             }
         }
 
@@ -102,7 +103,7 @@ public class RescueCallService {
             requesterId, ACTIVE_STATUSES, PageRequest.of(0, 1)
         );
         if (!activeCalls.isEmpty()) {
-            return RequesterRescueResponse.from(activeCalls.getFirst());
+            return requesterResponse(activeCalls.getFirst());
         }
 
         Instant now = clock.instant();
@@ -117,18 +118,18 @@ public class RescueCallService {
         appendEvent(rescueCall, 1, RescueEventType.CREATED, requesterId, "求救请求已创建", now);
         appendEvent(rescueCall, 2, RescueEventType.MATCHING_STARTED, null, "系统开始匹配 AED 和施救者", now);
         matchAndAssign(rescueCall);
-        return RequesterRescueResponse.from(rescueCall);
+        return requesterResponse(rescueCall);
     }
 
     @Transactional(readOnly = true)
     public RequesterRescueResponse findById(UUID id) {
-        return RequesterRescueResponse.from(findOwned(id));
+        return requesterResponse(findOwned(id));
     }
 
     @Transactional(readOnly = true)
     public Page<RequesterRescueResponse> findAll(Pageable pageable) {
         return rescueCallRepository.findAllOwnedDetailed(currentUserService.currentUserId(), pageable)
-            .map(RequesterRescueResponse::from);
+            .map(this::requesterResponse);
     }
 
     @Transactional
@@ -149,7 +150,7 @@ public class RescueCallService {
         List<ResponderTaskResponse> tasks = new ArrayList<>();
         rescueCallRepository.findAssignedToResponder(
             responderId, ACTIVE_STATUSES, PageRequest.of(0, OFFER_CANDIDATE_LIMIT)
-        ).stream().map(ResponderTaskResponse::assigned).forEach(tasks::add);
+        ).stream().map(this::assignedResponse).forEach(tasks::add);
 
         responderPresenceRepository.findById(responderId)
             .filter(presence -> presence.isEligibleAt(
@@ -169,13 +170,13 @@ public class RescueCallService {
         RescueCall call = rescueCallRepository.findDetailedById(id)
             .orElseThrow(() -> new ResourceNotFoundException("未找到救援任务：" + id));
         if (responderId.equals(call.getResponderUserId())) {
-            return ResponderTaskResponse.assigned(call);
+            return assignedResponse(call);
         }
         ResponderPresence presence = responderPresenceRepository.findById(responderId)
             .filter(value -> value.isEligibleAt(
                 clock.instant().minusSeconds(dispatchProperties.volunteerPresenceMaxAgeSeconds())
             ))
-            .orElseThrow(() -> new ForbiddenOperationException("请先上报实时位置并设为可接单"));
+            .orElseThrow(() -> new ForbiddenOperationException("请先上报实时位置并设为可响应"));
         ensureOfferVisible(call, responderId, presence);
         return ResponderTaskResponse.offer(call, distanceMeters(presence, call));
     }
@@ -188,8 +189,8 @@ public class RescueCallService {
         ensureEligibleOffer(call, responderId);
         Instant now = clock.instant();
         call.acceptBy(responderId, now);
-        appendCurrentEvent(call, RescueEventType.ACCEPTED, responderId, "施救者已接单", now);
-        return ResponderTaskResponse.assigned(call);
+        appendCurrentEvent(call, RescueEventType.ACCEPTED, responderId, "施救者已确认响应", now);
+        return assignedResponse(call);
     }
 
     @Transactional
@@ -229,7 +230,7 @@ public class RescueCallService {
         call.confirmCompletion(now);
         activeRescueLockRepository.deleteByRescueCallId(call.getId());
         appendCurrentEvent(call, RescueEventType.COMPLETION_CONFIRMED, requesterId, "求救者已确认救援完成", now);
-        return RequesterRescueResponse.from(call);
+        return requesterResponse(call);
     }
 
     @Transactional
@@ -243,7 +244,7 @@ public class RescueCallService {
         UUID responderId = currentUserService.currentUserId();
         RescueCall call = findForUpdate(id);
         call.updateResponderLocation(responderId, latitude, longitude, clock.instant());
-        return ResponderTaskResponse.assigned(call);
+        return assignedResponse(call);
     }
 
     @Transactional
@@ -255,7 +256,7 @@ public class RescueCallService {
         call.cancelByRequester(requesterId, now);
         activeRescueLockRepository.deleteByRescueCallId(call.getId());
         appendCurrentEvent(call, RescueEventType.USER_CANCELLED, requesterId, "求救者已取消任务", now);
-        return RequesterRescueResponse.from(call);
+        return requesterResponse(call);
     }
 
     private ResponderTaskResponse responderAction(
@@ -271,7 +272,7 @@ public class RescueCallService {
         Instant now = clock.instant();
         action.apply(call, now);
         appendCurrentEvent(call, eventType, responderId, summary, now);
-        return ResponderTaskResponse.assigned(call);
+        return assignedResponse(call);
     }
 
     private void addNearbyOffers(
@@ -302,7 +303,7 @@ public class RescueCallService {
 
     private void ensureEligibleOffer(RescueCall call, UUID responderId) {
         if (call.getStatus() != RescueStatus.MATCHING || call.getResponderUserId() != null) {
-            throw new cn.maian.common.exception.InvalidStateTransitionException("该任务已被接单或不可接取");
+            throw new cn.maian.common.exception.InvalidStateTransitionException("该任务已被其他志愿者响应或不可响应");
         }
         if (call.getMatchDeadlineAt() == null || !call.getMatchDeadlineAt().isAfter(clock.instant())) {
             throw new cn.maian.common.exception.InvalidStateTransitionException("该任务已超时");
@@ -311,7 +312,7 @@ public class RescueCallService {
             .filter(value -> value.isEligibleAt(
                 clock.instant().minusSeconds(dispatchProperties.volunteerPresenceMaxAgeSeconds())
             ))
-            .orElseThrow(() -> new ForbiddenOperationException("请先上报实时位置并设为可接单"));
+            .orElseThrow(() -> new ForbiddenOperationException("请先上报实时位置并设为可响应"));
         ensureOfferVisible(call, responderId, presence);
     }
 
@@ -321,16 +322,16 @@ public class RescueCallService {
         ResponderPresence presence
     ) {
         if (call.getStatus() != RescueStatus.MATCHING || call.getResponderUserId() != null) {
-            throw new cn.maian.common.exception.InvalidStateTransitionException("该任务已被接单或不可接取");
+            throw new cn.maian.common.exception.InvalidStateTransitionException("该任务已被其他志愿者响应或不可响应");
         }
         if (call.getMatchDeadlineAt() == null || !call.getMatchDeadlineAt().isAfter(clock.instant())) {
             throw new cn.maian.common.exception.InvalidStateTransitionException("该任务已超时");
         }
         if (!isDeviceEligibleForResponder(call, responderId)) {
-            throw new ForbiddenOperationException("该移动 AED 仅可由设备携带者接单");
+            throw new ForbiddenOperationException("该移动 AED 仅可由设备携带者响应");
         }
         if (distanceMeters(presence, call) > dispatchProperties.volunteerOfferRadiusKm() * 1_000) {
-            throw new ForbiddenOperationException("该救援任务不在当前可接单范围内");
+            throw new ForbiddenOperationException("该救援任务不在当前可响应范围内");
         }
     }
 
@@ -349,6 +350,22 @@ public class RescueCallService {
     private RescueCall findOwned(UUID id) {
         return rescueCallRepository.findOwnedDetailedById(id, currentUserService.currentUserId())
             .orElseThrow(() -> new ResourceNotFoundException("未找到救援请求：" + id));
+    }
+
+    private RequesterRescueResponse requesterResponse(RescueCall call) {
+        RescueParticipantResponse responder = call.getResponderUserId() == null
+            ? null
+            : userProfileRepository.findById(call.getResponderUserId())
+                .map(RescueParticipantResponse::from)
+                .orElse(null);
+        return RequesterRescueResponse.from(call, responder);
+    }
+
+    private ResponderTaskResponse assignedResponse(RescueCall call) {
+        RescueParticipantResponse requester = userProfileRepository.findById(call.getRequestedByUserId())
+            .map(RescueParticipantResponse::from)
+            .orElse(null);
+        return ResponderTaskResponse.assigned(call, requester);
     }
 
     private RescueCall findForUpdate(UUID id) {

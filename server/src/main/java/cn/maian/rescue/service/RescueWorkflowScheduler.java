@@ -96,7 +96,7 @@ public class RescueWorkflowScheduler {
         return switch (type) {
             case AED_ASSIGNED -> "系统已重新匹配 AED";
             case NO_RESOURCE -> "匹配时限内未找到可用资源";
-            case EXPIRED -> "救援任务等待接单超时";
+            case EXPIRED -> "救援任务等待响应超时";
             case COMPLETION_AUTO_CONFIRMED -> "求救者未在时限内操作，系统自动确认完成";
             default -> type.name();
         };

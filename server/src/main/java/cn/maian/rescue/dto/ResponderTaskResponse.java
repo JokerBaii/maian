@@ -16,6 +16,7 @@ public record ResponderTaskResponse(
     UrgencyLevel urgency,
     RescueStatus status,
     boolean detailAvailable,
+    RescueParticipantResponse requester,
     Integer distanceToRequesterMeters,
     Double latitude,
     Double longitude,
@@ -36,7 +37,7 @@ public record ResponderTaskResponse(
 ) {
     public static ResponderTaskResponse offer(RescueCall call, int distanceMeters) {
         return new ResponderTaskResponse(
-            call.getId(), call.getUrgency(), call.getStatus(), false, distanceMeters,
+            call.getId(), call.getUrgency(), call.getStatus(), false, null, distanceMeters,
             null, null, null, null, Set.of(), List.of(), null,
             call.getMatchedDevice() == null ? null : call.getMatchedDevice().getType(),
             call.getAedCustodyStatus(), null, null, null, null,
@@ -45,8 +46,15 @@ public record ResponderTaskResponse(
     }
 
     public static ResponderTaskResponse assigned(RescueCall call) {
+        return assigned(call, null);
+    }
+
+    public static ResponderTaskResponse assigned(
+        RescueCall call,
+        RescueParticipantResponse requester
+    ) {
         return new ResponderTaskResponse(
-            call.getId(), call.getUrgency(), call.getStatus(), true, null,
+            call.getId(), call.getUrgency(), call.getStatus(), true, requester, null,
             call.getLatitude(), call.getLongitude(), call.getAddress(), call.getDescription(),
             call.getSymptoms(), call.getAttachmentMediaIds(), MatchedAedResponse.from(call, true),
             call.getMatchedDevice() == null ? null : call.getMatchedDevice().getType(),

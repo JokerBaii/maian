@@ -23,6 +23,7 @@ public record RequesterRescueResponse(
     MatchedAedResponse matchedAed,
     AedCustodyStatus aedCustodyStatus,
     UUID responderUserId,
+    RescueParticipantResponse responder,
     LiveTrackingResponse liveTracking,
     Instant matchDeadlineAt,
     Instant acceptedAt,
@@ -38,13 +39,20 @@ public record RequesterRescueResponse(
     Instant updatedAt
 ) {
     public static RequesterRescueResponse from(RescueCall rescueCall) {
+        return from(rescueCall, null);
+    }
+
+    public static RequesterRescueResponse from(
+        RescueCall rescueCall,
+        RescueParticipantResponse responder
+    ) {
         return new RequesterRescueResponse(
             rescueCall.getId(), rescueCall.getUrgency(), rescueCall.getStatus(),
             rescueCall.getLatitude(), rescueCall.getLongitude(), rescueCall.getAddress(),
             rescueCall.getDescription(), rescueCall.getSymptoms(), rescueCall.getAttachmentMediaIds(),
             MatchedAedResponse.from(rescueCall, rescueCall.getResponderUserId() != null),
             rescueCall.getAedCustodyStatus(),
-            rescueCall.getResponderUserId(), LiveTrackingResponse.from(rescueCall),
+            rescueCall.getResponderUserId(), responder, LiveTrackingResponse.from(rescueCall),
             rescueCall.getMatchDeadlineAt(), rescueCall.getAcceptedAt(), rescueCall.getArrivedAtAedAt(),
             rescueCall.getArrivedAt(),
             rescueCall.getRescueStartedAt(), rescueCall.getCompletionSubmittedAt(),

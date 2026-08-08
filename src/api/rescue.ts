@@ -16,6 +16,13 @@ export interface CreateRescueCallRequest {
   clientRequestId?: string
 }
 
+export interface RescueParticipant {
+  userId: string
+  displayName: string
+  phone: string
+  verified: boolean
+}
+
 export interface RescueCallResponse {
   id: string
   urgency: RescueUrgency
@@ -44,6 +51,8 @@ export interface RescueCallResponse {
     custodyStatus?: string
   }
   responderUserId?: string
+  responder?: RescueParticipant
+  requester?: RescueParticipant
   aedCustodyStatus?: 'RESERVED' | 'PICKUP_PENDING' | 'IN_CUSTODY' | 'AT_SCENE' | 'RETURNING' | 'RETURNED'
   liveTracking?: {
     responderLatitude: number
@@ -70,6 +79,7 @@ export interface ResponderTaskResponse {
   urgency: RescueUrgency
   status: RescueStatus
   detailAvailable: boolean
+  requester?: RescueParticipant
   distanceToRequesterMeters?: number
   latitude?: number
   longitude?: number
@@ -159,6 +169,16 @@ export function updateResponderPresence(payload: {
     method: 'PUT',
     data: payload
   })
+}
+
+export function updateResponderLocation(id: string, payload: {
+  latitude: number
+  longitude: number
+}) {
+  return request<ResponderTaskResponse>(
+    `/api/v1/rescue-calls/${encodeURIComponent(id)}/responder-location`,
+    { method: 'PUT', data: payload }
+  )
 }
 
 export function confirmRescueCompletion(id: string) {

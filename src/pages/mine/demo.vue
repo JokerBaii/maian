@@ -29,7 +29,7 @@
       <text class="flow-title">推荐演示顺序</text>
       <text class="flow-step">1. 普通用户录入设备并发起呼救</text>
       <text class="flow-step">2. 平台审核员审核设备</text>
-      <text class="flow-step">3. 救援志愿者接单并完成救援</text>
+      <text class="flow-step">3. 救援志愿者确认响应并完成救援</text>
     </view>
   </view>
 </template>

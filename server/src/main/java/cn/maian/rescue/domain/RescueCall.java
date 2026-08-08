@@ -191,7 +191,7 @@ public class RescueCall {
     public void acceptBy(UUID responderId, Instant now) {
         requireStatus(RescueStatus.MATCHING);
         if (responderUserId != null || matchedDevice == null) {
-            throw invalid("该任务已接单或尚未匹配 AED");
+            throw invalid("该任务已有人响应或尚未匹配 AED");
         }
         responderUserId = responderId;
         acceptedAt = now;
@@ -305,7 +305,7 @@ public class RescueCall {
             throw invalid("只有求救者可以取消任务");
         }
         if (status != RescueStatus.PENDING && status != RescueStatus.MATCHING) {
-            throw invalid("已有施救者接单，请联系施救者或管理员");
+            throw invalid("已有施救者响应，请联系施救者或管理员");
         }
         finishAs(RescueStatus.USER_CANCELLED, now);
     }
