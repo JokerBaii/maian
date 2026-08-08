@@ -42,8 +42,19 @@
 
         <view class="chart-header">
           <view>
-            <text class="chart-title">近 24 小时</text>
-            <text class="chart-subtitle">{{ trendModeLabel }}</text>
+            <text class="chart-title">{{ trendTitle }}</text>
+            <view class="range-switch" aria-label="心率趋势时间范围">
+              <text
+                class="range-option"
+                :class="{ 'range-option-active': activeRange === 'hour' }"
+                @tap.stop="selectRange('hour')"
+              >1小时</text>
+              <text
+                class="range-option"
+                :class="{ 'range-option-active': activeRange === 'day' }"
+                @tap.stop="selectRange('day')"
+              >24小时</text>
+            </view>
           </view>
           <view class="chart-detail" @tap="goDetail">
             <text>查看详情</text>
@@ -51,36 +62,32 @@
           </view>
         </view>
 
-        <view class="trend-chart">
+        <view class="trend-chart" :class="{ 'trend-chart-switching': trendSwitching }">
           <canvas canvas-id="healthTrendCanvas" id="healthTrendCanvas" class="trend-canvas"></canvas>
-          <view v-if="!hasTodayTrend" class="trend-empty">
-            <text class="trend-empty-text">今日暂无心率记录</text>
+          <view v-if="!hasActiveTrend" class="trend-empty">
+            <text class="trend-empty-text">暂无心率记录</text>
             <text class="trend-empty-hint">连接穿戴设备后自动同步</text>
           </view>
         </view>
-        <view v-if="hasTodayTrend" class="trend-labels">
-          <text>24小时前</text>
-          <text>18小时前</text>
-          <text>12小时前</text>
-          <text>6小时前</text>
-          <text>现在</text>
+        <view v-if="hasActiveTrend" class="trend-labels">
+          <text v-for="label in trendLabels" :key="label">{{ label }}</text>
         </view>
 
         <view class="metric-row">
           <view class="metric">
             <text class="metric-label">最低</text>
-            <text class="metric-value">{{ heartRateData.min || '--' }}</text>
+            <text class="metric-value">{{ activeMetrics.min || '--' }}</text>
           </view>
           <view class="metric">
             <text class="metric-label">平均</text>
-            <text class="metric-value">{{ heartRateData.avg || '--' }}</text>
+            <text class="metric-value">{{ activeMetrics.avg || '--' }}</text>
           </view>
           <view class="metric">
             <text class="metric-label">最高</text>
             <text
               class="metric-value"
-              :class="{ 'metric-value-alert': heartRateData.max > heartRateData.maxHeartRate }"
-            >{{ heartRateData.max || '--' }}</text>
+              :class="{ 'metric-value-alert': activeMetrics.max > heartRateData.maxHeartRate }"
+            >{{ activeMetrics.max || '--' }}</text>
           </view>
         </view>
       </view>
@@ -171,6 +178,8 @@ import { listHealthReports, type HealthReportResponse } from '@/api/reports'
 const { monitoring: heartRateData, loadMonitoring } = useHealthMonitoring()
 const healthReports = ref<HealthReportResponse[]>([])
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
+const activeRange = ref<'hour' | 'day'>('day')
+const trendSwitching = ref(false)
 
 const isDeviceConnected = computed(() => heartRateData.value.wearable.connected)
 const latestAlert = computed(() => heartRateData.value.alerts[0] || null)
@@ -193,14 +202,30 @@ const sceneLabel = computed(() => {
   }
   return labels[heartRateData.value.scene] || '实时监测'
 })
-const trendModeLabel = computed(() =>
-  isDeviceConnected.value ? '连续监测记录' : '连接设备后显示趋势'
+const trendTitle = computed(() => activeRange.value === 'hour' ? '近 1 小时' : '近 24 小时')
+const activeTrendData = computed(() =>
+  activeRange.value === 'hour' ? heartRateData.value.hourData : heartRateData.value.todayData
 )
-
-const hasTodayTrend = computed(() => heartRateData.value.todayData.length >= 2)
+const trendLabels = computed(() => activeRange.value === 'hour'
+  ? ['60分钟前', '45分钟前', '30分钟前', '15分钟前', '现在']
+  : ['24小时前', '18小时前', '12小时前', '6小时前', '现在']
+)
+const activeMetrics = computed(() => {
+  if (activeRange.value === 'day') {
+    return { min: heartRateData.value.min, avg: heartRateData.value.avg, max: heartRateData.value.max }
+  }
+  const values = activeTrendData.value.map(point => point.value)
+  if (!values.length) return { min: 0, avg: 0, max: 0 }
+  return {
+    min: Math.min(...values),
+    avg: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length),
+    max: Math.max(...values)
+  }
+})
+const hasActiveTrend = computed(() => activeTrendData.value.length >= 2)
 
 async function drawTrendChart() {
-  const data = heartRateData.value.todayData
+  const data = activeTrendData.value
   if (data.length < 2) return
   const rect = await new Promise<any>(resolve => {
     uni.createSelectorQuery().select('#healthTrendCanvas').boundingClientRect(resolve).exec()
@@ -256,6 +281,17 @@ async function drawTrendChart() {
     canvas.stroke()
   }
   canvas.draw()
+}
+
+async function selectRange(range: 'hour' | 'day') {
+  if (range === activeRange.value) return
+  trendSwitching.value = true
+  activeRange.value = range
+  await nextTick()
+  await drawTrendChart()
+  setTimeout(() => {
+    trendSwitching.value = false
+  }, 80)
 }
 
 onMounted(async () => {
@@ -437,7 +473,6 @@ function goArchive() {
 .signal-title,
 .reading-context,
 .chart-title,
-.chart-subtitle,
 .metric-label,
 .metric-value,
 .alert-label,
@@ -536,10 +571,30 @@ function goArchive() {
   font-weight: 700;
 }
 
-.chart-subtitle {
-  margin-top: 4rpx;
-  color: #8797A6;
+.range-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2rpx;
+  margin-top: 7rpx;
+  padding: 3rpx;
+  border-radius: 9rpx;
+  background: #EDF2F6;
+}
+
+.range-option {
+  padding: 5rpx 12rpx;
+  border-radius: 7rpx;
+  color: #7A8C9D;
   font-size: 18rpx;
+  line-height: 1.25;
+  transition: color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.range-option-active {
+  background: #FFFFFF;
+  box-shadow: 0 1rpx 5rpx rgba(35, 63, 89, 0.12);
+  color: #245FAE;
+  font-weight: 650;
 }
 
 .chart-detail {
@@ -556,7 +611,11 @@ function goArchive() {
   height: 190rpx;
   margin: 18rpx -8rpx 0;
   overflow: hidden;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 180ms ease, transform 180ms ease;
 }
+.trend-chart-switching { opacity: 0.35; transform: translateY(3rpx); }
 .trend-canvas { width: 100%; height: 190rpx; }
 
 .trend-empty {

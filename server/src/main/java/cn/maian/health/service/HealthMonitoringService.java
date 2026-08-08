@@ -69,6 +69,10 @@ public class HealthMonitoringService {
             .filter(reading -> !reading.getRecordedAt().isBefore(trendStart))
             .filter(reading -> !reading.getRecordedAt().isAfter(now))
             .toList();
+        Instant hourStart = now.minus(Duration.ofHours(1));
+        List<HeartRateReading> hourReadings = trendReadings.stream()
+            .filter(reading -> !reading.getRecordedAt().isBefore(hourStart))
+            .toList();
         IntSummaryStatistics trendStats = trendReadings.stream()
             .mapToInt(HeartRateReading::getBpm)
             .summaryStatistics();
@@ -88,7 +92,8 @@ public class HealthMonitoringService {
             trendStats.getCount() == 0 ? 0 : (int) Math.round(trendStats.getAverage()),
             statusFor(latest, settings.getMinHeartRate(), settings.getMaxHeartRate()),
             latest == null ? "resting" : latest.getScene(),
-            buildTrendPoints(trendReadings),
+            buildTrendPoints(trendReadings, Duration.ofMinutes(10)),
+            buildTrendPoints(hourReadings, Duration.ofMinutes(1)),
             week,
             month,
             settings.isHealthAlert()
@@ -110,14 +115,16 @@ public class HealthMonitoringService {
     }
 
     private List<HealthMonitoringResponse.HeartRatePoint> buildTrendPoints(
-        List<HeartRateReading> readings
+        List<HeartRateReading> readings,
+        Duration bucketSize
     ) {
-        Map<Long, HeartRateReading> tenMinuteBuckets = new LinkedHashMap<>();
-        readings.forEach(reading -> tenMinuteBuckets.put(
-            reading.getRecordedAt().getEpochSecond() / 600,
+        long bucketSeconds = bucketSize.toSeconds();
+        Map<Long, HeartRateReading> buckets = new LinkedHashMap<>();
+        readings.forEach(reading -> buckets.put(
+            reading.getRecordedAt().getEpochSecond() / bucketSeconds,
             reading
         ));
-        return tenMinuteBuckets.values().stream().map(this::toPoint).toList();
+        return buckets.values().stream().map(this::toPoint).toList();
     }
 
     private List<HealthMonitoringResponse.DailyHeartRate> buildDaily(List<HeartRateReading> readings) {

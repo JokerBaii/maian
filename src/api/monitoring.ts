@@ -37,6 +37,7 @@ export interface HealthMonitoringResponse {
   status: string
   scene: string
   todayData: HeartRatePoint[]
+  hourData: HeartRatePoint[]
   weekData: DailyHeartRate[]
   monthData: DailyHeartRate[]
   alerts: HeartRateAlert[]

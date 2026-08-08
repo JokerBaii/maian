@@ -45,6 +45,7 @@ class HealthMonitoringServiceTest {
 
         assertThat(response.current()).isZero();
         assertThat(response.todayData()).isEmpty();
+        assertThat(response.hourData()).isEmpty();
         assertThat(response.alerts()).isEmpty();
         assertThat(response.wearable().connected()).isFalse();
         assertThat(response.status()).isEqualTo("no_data");
@@ -92,6 +93,7 @@ class HealthMonitoringServiceTest {
         var response = service.currentSummary();
 
         assertThat(response.todayData()).hasSize(3);
+        assertThat(response.hourData()).hasSize(1);
         assertThat(response.min()).isEqualTo(62);
         assertThat(response.max()).isEqualTo(86);
         assertThat(response.avg()).isEqualTo(74);

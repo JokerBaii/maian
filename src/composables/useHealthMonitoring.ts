@@ -13,6 +13,7 @@ const monitoring = ref<HealthMonitoringResponse>({
   status: 'normal',
   scene: 'resting',
   todayData: [],
+  hourData: [],
   weekData: [],
   monthData: [],
   alerts: [],

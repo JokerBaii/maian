@@ -10,6 +10,7 @@ public record HealthMonitoringResponse(
     String status,
     String scene,
     List<HeartRatePoint> todayData,
+    List<HeartRatePoint> hourData,
     List<DailyHeartRate> weekData,
     List<DailyHeartRate> monthData,
     List<HeartRateAlert> alerts,
