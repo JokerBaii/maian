@@ -3,9 +3,10 @@ package cn.maian.device.controller;
 import cn.maian.common.api.ApiResponse;
 import cn.maian.common.api.PageResponse;
 import cn.maian.device.domain.DeviceType;
-import cn.maian.device.dto.EmergencyDeviceResponse;
+import cn.maian.device.dto.PublicEmergencyDeviceResponse;
+import cn.maian.device.dto.OwnerEmergencyDeviceResponse;
+import cn.maian.device.dto.AdminEmergencyDeviceResponse;
 import cn.maian.device.dto.SaveEmergencyDeviceRequest;
-import cn.maian.device.dto.UpdateDeviceStatusRequest;
 import cn.maian.device.dto.ReviewEmergencyDeviceRequest;
 import cn.maian.device.dto.UpdateDeviceLocationRequest;
 import cn.maian.device.service.EmergencyDeviceService;
@@ -37,7 +38,7 @@ public class EmergencyDeviceController {
     }
 
     @GetMapping
-    public ApiResponse<PageResponse<EmergencyDeviceResponse>> findAll(
+    public ApiResponse<PageResponse<PublicEmergencyDeviceResponse>> findAll(
         @RequestParam(required = false) DeviceType type,
         Pageable pageable
     ) {
@@ -45,7 +46,7 @@ public class EmergencyDeviceController {
     }
 
     @GetMapping("/mine")
-    public ApiResponse<PageResponse<EmergencyDeviceResponse>> findMine(
+    public ApiResponse<PageResponse<OwnerEmergencyDeviceResponse>> findMine(
         @RequestParam(required = false) DeviceType type,
         Pageable pageable
     ) {
@@ -53,17 +54,22 @@ public class EmergencyDeviceController {
     }
 
     @GetMapping("/reviews/pending")
-    public ApiResponse<PageResponse<EmergencyDeviceResponse>> findPendingReviews(Pageable pageable) {
+    public ApiResponse<PageResponse<AdminEmergencyDeviceResponse>> findPendingReviews(Pageable pageable) {
         return ApiResponse.ok(PageResponse.from(emergencyDeviceService.findPendingReviews(pageable)));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<EmergencyDeviceResponse> findById(@PathVariable UUID id) {
-        return ApiResponse.ok(emergencyDeviceService.findById(id));
+    public ApiResponse<PublicEmergencyDeviceResponse> findById(@PathVariable UUID id) {
+        return ApiResponse.ok(emergencyDeviceService.findPublicById(id));
+    }
+
+    @GetMapping("/mine/{id}")
+    public ApiResponse<OwnerEmergencyDeviceResponse> findMineById(@PathVariable UUID id) {
+        return ApiResponse.ok(emergencyDeviceService.findMineById(id));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<EmergencyDeviceResponse>> create(
+    public ResponseEntity<ApiResponse<OwnerEmergencyDeviceResponse>> create(
         @Valid @RequestBody SaveEmergencyDeviceRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -71,23 +77,25 @@ public class EmergencyDeviceController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<EmergencyDeviceResponse> update(
+    public ApiResponse<OwnerEmergencyDeviceResponse> update(
         @PathVariable UUID id,
         @Valid @RequestBody SaveEmergencyDeviceRequest request
     ) {
         return ApiResponse.ok(emergencyDeviceService.update(id, request));
     }
 
-    @PatchMapping("/{id}/status")
-    public ApiResponse<EmergencyDeviceResponse> updateStatus(
-        @PathVariable UUID id,
-        @Valid @RequestBody UpdateDeviceStatusRequest request
-    ) {
-        return ApiResponse.ok(emergencyDeviceService.updateStatus(id, request.status()));
+    @PostMapping("/{id}/enable")
+    public ApiResponse<OwnerEmergencyDeviceResponse> enable(@PathVariable UUID id) {
+        return ApiResponse.ok(emergencyDeviceService.enable(id));
+    }
+
+    @PostMapping("/{id}/disable")
+    public ApiResponse<OwnerEmergencyDeviceResponse> disable(@PathVariable UUID id) {
+        return ApiResponse.ok(emergencyDeviceService.disable(id));
     }
 
     @PatchMapping("/{id}/location")
-    public ApiResponse<EmergencyDeviceResponse> updateLocation(
+    public ApiResponse<OwnerEmergencyDeviceResponse> updateLocation(
         @PathVariable UUID id,
         @Valid @RequestBody UpdateDeviceLocationRequest request
     ) {
@@ -95,7 +103,7 @@ public class EmergencyDeviceController {
     }
 
     @PatchMapping("/{id}/review")
-    public ApiResponse<EmergencyDeviceResponse> review(
+    public ApiResponse<AdminEmergencyDeviceResponse> review(
         @PathVariable UUID id,
         @Valid @RequestBody ReviewEmergencyDeviceRequest request
     ) {

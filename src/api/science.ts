@@ -1,4 +1,5 @@
 import { request } from './http'
+import { issueMediaDownload } from './files'
 
 export interface ScienceSubmissionResponse {
   id: string
@@ -7,6 +8,7 @@ export interface ScienceSubmissionResponse {
   content: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   hasCoverImage: boolean
+  coverMediaId?: string
   coverImageUrl?: string
   submittedAt: string
   reviewNote?: string
@@ -36,16 +38,38 @@ export function updateScienceArticleInteraction(
   )
 }
 
-export function createScienceSubmission(data: {
+type ScienceSubmissionWireResponse = Omit<ScienceSubmissionResponse, 'coverImageUrl'>
+type SciencePage = {
+  content: ScienceSubmissionWireResponse[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  first: boolean
+  last: boolean
+}
+
+async function normalizeSubmission(item: ScienceSubmissionWireResponse): Promise<ScienceSubmissionResponse> {
+  const coverImageUrl = item.coverMediaId
+    ? (await issueMediaDownload(item.coverMediaId)).url
+    : undefined
+  return { ...item, coverImageUrl }
+}
+
+async function normalizePage(page: SciencePage) {
+  return { ...page, content: await Promise.all(page.content.map(normalizeSubmission)) }
+}
+
+export async function createScienceSubmission(data: {
   title: string
   category: string
   content: string
-  coverImageUrl?: string
+  coverMediaId?: string
 }) {
-  return request<ScienceSubmissionResponse>('/api/v1/science-submissions', {
+  return normalizeSubmission(await request<ScienceSubmissionWireResponse>('/api/v1/science-submissions', {
     method: 'POST',
     data
-  })
+  }))
 }
 
 export async function getScienceSubmissionCount() {
@@ -53,20 +77,16 @@ export async function getScienceSubmissionCount() {
 }
 
 /** 当前用户的投稿列表，按提交时间倒序。 */
-export function listScienceSubmissions() {
-  return request<{
-    content: ScienceSubmissionResponse[]
-    page: number
-    size: number
-    totalElements: number
-    totalPages: number
-    first: boolean
-    last: boolean
-  }>('/api/v1/science-submissions?page=0&size=100&sort=submittedAt,desc')
+export async function listScienceSubmissions() {
+  return normalizePage(await request<SciencePage>(
+    '/api/v1/science-submissions?page=0&size=100&sort=submittedAt,desc'
+  ))
 }
 
-export function getScienceSubmission(id: string) {
-  return request<ScienceSubmissionResponse>(`/api/v1/science-submissions/${encodeURIComponent(id)}`)
+export async function getScienceSubmission(id: string) {
+  return normalizeSubmission(await request<ScienceSubmissionWireResponse>(
+    `/api/v1/science-submissions/${encodeURIComponent(id)}`
+  ))
 }
 
 export function deleteScienceSubmission(id: string) {
@@ -74,36 +94,24 @@ export function deleteScienceSubmission(id: string) {
 }
 
 /** 已审核通过的投稿，用于科普频道展示。 */
-export function listApprovedScienceSubmissions() {
-  return request<{
-    content: ScienceSubmissionResponse[]
-    page: number
-    size: number
-    totalElements: number
-    totalPages: number
-    first: boolean
-    last: boolean
-  }>('/api/v1/science-submissions/approved?page=0&size=100&sort=submittedAt,desc')
+export async function listApprovedScienceSubmissions() {
+  return normalizePage(await request<SciencePage>(
+    '/api/v1/science-submissions/approved?page=0&size=100&sort=submittedAt,desc'
+  ))
 }
 
-export function listPendingScienceSubmissions() {
-  return request<{
-    content: ScienceSubmissionResponse[]
-    page: number
-    size: number
-    totalElements: number
-    totalPages: number
-    first: boolean
-    last: boolean
-  }>('/api/v1/science-submissions/reviews/pending?page=0&size=100&sort=submittedAt,asc')
+export async function listPendingScienceSubmissions() {
+  return normalizePage(await request<SciencePage>(
+    '/api/v1/science-submissions/reviews/pending?page=0&size=100&sort=submittedAt,asc'
+  ))
 }
 
-export function reviewScienceSubmission(id: string, approved: boolean, reviewNote?: string) {
-  return request<ScienceSubmissionResponse>(
+export async function reviewScienceSubmission(id: string, approved: boolean, reviewNote?: string) {
+  return normalizeSubmission(await request<ScienceSubmissionWireResponse>(
     `/api/v1/science-submissions/${encodeURIComponent(id)}/review`,
     {
       method: 'PATCH' as UniNamespace.RequestOptions['method'],
       data: { approved, reviewNote }
     }
-  )
+  ))
 }

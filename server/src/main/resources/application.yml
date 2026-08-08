@@ -1,5 +1,6 @@
 server:
   port: ${SERVER_PORT:8080}
+  address: ${SERVER_ADDRESS:127.0.0.1}
 
 spring:
   application:
@@ -26,7 +27,7 @@ spring:
   servlet:
     multipart:
       # 手机直接拍照的原图通常 4-8MB，上限留足余量；
-      # 业务侧真正的大小校验在 ImageStorageService（app.upload.max-file-size）。
+      # 业务侧还会按 app.media.max-file-size 做类型、大小和配额校验。
       max-file-size: 20MB
       max-request-size: 22MB
   ai:
@@ -36,37 +37,62 @@ spring:
       api-key: ${OPENAI_API_KEY:disabled}
       chat:
         options:
-          model: ${OPENAI_MODEL:deepseek-chat}
+          model: ${OPENAI_MODEL:deepseek-v4-flash}
           temperature: 0.2
 
 app:
+  auth:
+    issuer: ${JWT_ISSUER:maian-server}
+    secret: ${JWT_SECRET:maian-demo-development-secret-change-before-production}
+    access-token-minutes: ${JWT_ACCESS_TOKEN_MINUTES:15}
+  demo:
+    enabled: ${DEMO_MODE:false}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   ai:
     enabled: ${APP_AI_ENABLED:false}
-  upload:
-    directory: ${UPLOAD_DIRECTORY:./data/uploads}
-    max-file-size: ${UPLOAD_MAX_FILE_SIZE:15728640}
+  media:
+    directory: ${MEDIA_DIRECTORY:./data/media}
+    max-file-size: ${MEDIA_MAX_FILE_SIZE:15728640}
+    per-user-quota-bytes: ${MEDIA_USER_QUOTA_BYTES:524288000}
+    capacity-bytes: ${MEDIA_CAPACITY_BYTES:21474836480}
+    warning-ratio: ${MEDIA_WARNING_RATIO:0.70}
+    rejection-ratio: ${MEDIA_REJECTION_RATIO:0.85}
+    download-token-minutes: ${MEDIA_DOWNLOAD_TOKEN_MINUTES:5}
+    orphan-retention-hours: ${MEDIA_ORPHAN_RETENTION_HOURS:24}
+    use-x-accel: ${MEDIA_USE_X_ACCEL:false}
+    x-accel-prefix: ${MEDIA_X_ACCEL_PREFIX:/protected-media/}
+  ocr:
+    enabled: ${BAIDU_OCR_ENABLED:false}
+    api-key: ${BAIDU_OCR_API_KEY:}
+    secret-key: ${BAIDU_OCR_SECRET_KEY:}
+  abuse:
+    window-seconds: ${ABUSE_WINDOW_SECONDS:600}
+    rescue-user-limit: ${ABUSE_RESCUE_USER_LIMIT:5}
+    rescue-ip-limit: ${ABUSE_RESCUE_IP_LIMIT:20}
+    media-user-limit: ${ABUSE_MEDIA_USER_LIMIT:30}
+    mobile-heartbeat-user-limit: ${ABUSE_HEARTBEAT_USER_LIMIT:300}
   dispatch:
     # AED 取回属于争分夺秒的场景，搜索半径按"跑得到"来定，
     # 半径过大时会把几公里外的设备也算作候选，预计到达时间失去意义。
     search-radius-km: ${DISPATCH_SEARCH_RADIUS_KM:3}
-    candidate-limit: ${DISPATCH_CANDIDATE_LIMIT:80}
+    candidate-limit-per-type: ${DISPATCH_CANDIDATE_LIMIT_PER_TYPE:40}
     mobile-location-max-age-seconds: ${DISPATCH_LOCATION_MAX_AGE_SECONDS:120}
     mobile-speed-kmh: ${DISPATCH_MOBILE_SPEED_KMH:35}
     # 固定设备的取回按骑行（电动车/自行车）估算，而非步行：
     # 取回 AED 是争分夺秒的动作，志愿者会用最快的可用交通方式。
     runner-speed-kmh: ${DISPATCH_RUNNER_SPEED_KMH:18}
     route-distance-factor: ${DISPATCH_ROUTE_DISTANCE_FACTOR:1.25}
+    volunteer-offer-radius-km: ${DISPATCH_VOLUNTEER_OFFER_RADIUS_KM:5}
+    volunteer-presence-max-age-seconds: ${DISPATCH_VOLUNTEER_PRESENCE_MAX_AGE_SECONDS:90}
     mobile-dispatch-overhead-seconds: ${DISPATCH_MOBILE_OVERHEAD_SECONDS:30}
     fixed-pickup-overhead-seconds: ${DISPATCH_FIXED_OVERHEAD_SECONDS:20}
-    reservation-timeout-seconds: ${DISPATCH_RESERVATION_TIMEOUT_SECONDS:900}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health
   endpoint:
     health:
       show-details: when-authorized

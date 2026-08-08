@@ -1,32 +1,23 @@
 package cn.maian.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
+@Validated
 @ConfigurationProperties(prefix = "app.dispatch")
 public record DispatchProperties(
-    double searchRadiusKm,
-    int candidateLimit,
-    long mobileLocationMaxAgeSeconds,
-    double mobileSpeedKmh,
-    double runnerSpeedKmh,
-    double routeDistanceFactor,
-    int mobileDispatchOverheadSeconds,
-    int fixedPickupOverheadSeconds,
-    long reservationTimeoutSeconds
+    @DecimalMin("0.1") double searchRadiusKm,
+    @Min(1) @Max(250) int candidateLimitPerType,
+    @Min(1) long mobileLocationMaxAgeSeconds,
+    @DecimalMin("0.1") double mobileSpeedKmh,
+    @DecimalMin("0.1") double runnerSpeedKmh,
+    @DecimalMin("1.0") double routeDistanceFactor,
+    @DecimalMin("0.1") double volunteerOfferRadiusKm,
+    @Min(15) long volunteerPresenceMaxAgeSeconds,
+    @Min(0) int mobileDispatchOverheadSeconds,
+    @Min(0) int fixedPickupOverheadSeconds
 ) {
-    public DispatchProperties {
-        searchRadiusKm = searchRadiusKm > 0 ? Math.min(searchRadiusKm, 50) : 15;
-        candidateLimit = candidateLimit > 0 ? Math.min(candidateLimit, 500) : 80;
-        mobileLocationMaxAgeSeconds = mobileLocationMaxAgeSeconds > 0
-            ? mobileLocationMaxAgeSeconds : 120;
-        mobileSpeedKmh = mobileSpeedKmh > 0 ? mobileSpeedKmh : 35;
-        runnerSpeedKmh = runnerSpeedKmh > 0 ? runnerSpeedKmh : 6.5;
-        routeDistanceFactor = routeDistanceFactor >= 1 ? routeDistanceFactor : 1.25;
-        mobileDispatchOverheadSeconds = mobileDispatchOverheadSeconds >= 0
-            ? mobileDispatchOverheadSeconds : 30;
-        fixedPickupOverheadSeconds = fixedPickupOverheadSeconds >= 0
-            ? fixedPickupOverheadSeconds : 20;
-        reservationTimeoutSeconds = reservationTimeoutSeconds >= 60
-            ? reservationTimeoutSeconds : 900;
-    }
 }

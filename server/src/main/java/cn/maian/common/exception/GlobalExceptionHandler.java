@@ -67,11 +67,26 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.error("HEALTH_ANALYSIS_UNAVAILABLE", exception.getMessage()));
     }
 
+    @ExceptionHandler(ExternalRecognitionUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRecognitionUnavailable(
+        ExternalRecognitionUnavailableException exception
+    ) {
+        log.warn("External OCR unavailable", exception);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ApiResponse.error("OCR_UNAVAILABLE", exception.getMessage()));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataConflict(DataIntegrityViolationException exception) {
         log.warn("Database constraint conflict", exception);
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ApiResponse.error("DATA_CONFLICT", "请求与已有数据冲突，请刷新后重试"));
+    }
+
+    @ExceptionHandler(StorageCapacityException.class)
+    public ResponseEntity<ApiResponse<Void>> handleStorageCapacity(StorageCapacityException exception) {
+        return ResponseEntity.status(HttpStatus.INSUFFICIENT_STORAGE)
+            .body(ApiResponse.error("STORAGE_CAPACITY_EXCEEDED", exception.getMessage()));
     }
 
     // Spring 在进入 controller 前抛出，业务层的大小校验来不及执行

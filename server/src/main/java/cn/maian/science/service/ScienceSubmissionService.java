@@ -15,19 +15,24 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import cn.maian.media.domain.MediaPurpose;
+import cn.maian.media.service.MediaStorageService;
 
 @Service
 public class ScienceSubmissionService {
 
     private final ScienceSubmissionRepository scienceSubmissionRepository;
     private final CurrentUserService currentUserService;
+    private final MediaStorageService mediaStorageService;
 
     public ScienceSubmissionService(
         ScienceSubmissionRepository scienceSubmissionRepository,
-        CurrentUserService currentUserService
+        CurrentUserService currentUserService,
+        MediaStorageService mediaStorageService
     ) {
         this.scienceSubmissionRepository = scienceSubmissionRepository;
         this.currentUserService = currentUserService;
+        this.mediaStorageService = mediaStorageService;
     }
 
     @Transactional
@@ -37,9 +42,16 @@ public class ScienceSubmissionService {
             request.title().trim(),
             request.category(),
             request.content().trim(),
-            request.coverImageUrl()
+            request.coverMediaId()
         );
-        return ScienceSubmissionResponse.from(scienceSubmissionRepository.save(submission));
+        submission = scienceSubmissionRepository.save(submission);
+        if (request.coverMediaId() != null) {
+            mediaStorageService.syncOwnedReference(
+                java.util.List.of(request.coverMediaId()), MediaPurpose.SCIENCE_COVER,
+                "SCIENCE_SUBMISSION", submission.getId(), false
+            );
+        }
+        return ScienceSubmissionResponse.from(submission);
     }
 
     @Transactional(readOnly = true)
@@ -86,12 +98,14 @@ public class ScienceSubmissionService {
         } catch (IllegalStateException exception) {
             throw new cn.maian.common.exception.InvalidStateTransitionException(exception.getMessage());
         }
+        mediaStorageService.setReferencePublic("SCIENCE_SUBMISSION", id, request.approved());
         return ScienceSubmissionResponse.from(submission);
     }
 
     @Transactional
     public void delete(UUID id) {
         scienceSubmissionRepository.delete(findOwned(id));
+        mediaStorageService.detachReference("SCIENCE_SUBMISSION", id);
     }
 
     /** 按当前用户校验归属，避免通过 id 访问他人投稿。 */

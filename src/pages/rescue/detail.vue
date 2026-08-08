@@ -55,7 +55,7 @@
             </view>
             <view class="eta-badge">
               <text class="eta-value">{{ formatEta(rescueCall.matchedAed.estimatedArrivalSeconds) }}</text>
-              <text class="eta-label">预计到达</text>
+              <text class="eta-label">匹配时预计</text>
             </view>
           </view>
           <view class="match-resource">
@@ -76,7 +76,7 @@
           </view>
           <view class="match-actions">
             <view
-              v-if="rescueCall.matchedAed.ownerPhone"
+              v-if="rescueCall.matchedAed.contactPhone"
               class="match-action match-action-secondary"
               @tap="callMatchedDevice"
             >
@@ -200,7 +200,16 @@
         </view>
 
         <view
-          v-if="['PENDING', 'MATCHING', 'ACCEPTED', 'RESCUING'].includes(rescueCall.status)"
+          v-if="rescueCall.status === 'PENDING_CONFIRMATION' && !isResponder"
+          class="completion-card"
+        >
+          <text class="completion-title">施救者已提交完成</text>
+          <text class="completion-desc">请确认本次救援已结束，确认后双方任务将同步完成</text>
+          <view class="completion-button" @tap="confirmCompletion">确认完成救援</view>
+        </view>
+
+        <view
+          v-if="!isResponder && ['PENDING', 'MATCHING'].includes(rescueCall.status)"
           class="cancel-card"
         >
           <text class="cancel-desc">误发或现场已缓解？可以取消这次呼救</text>
@@ -266,27 +275,29 @@ import { addBaseTileLayer } from '@/common/mapTiles'
 import { resolveApiUrl } from '@/api/http'
 import {
   cancelRescueCall,
+  confirmRescueCompletion,
   getRescueCall,
+  getResponderTask,
   getRescueFeedback,
-  retryRescueMatch,
   submitRescueFeedback,
   type RescueCallResponse,
   type RescueFeedbackResponse,
   type RescueStatus
 } from '@/api/rescue'
+import { issueMediaDownload } from '@/api/files'
+import { connectRescueEvents } from '@/utils/rescueEvents'
 
 const rescueId = ref('')
 const rescueCall = ref<RescueCallResponse | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
+const isResponder = ref(false)
 const mapUnavailable = ref(false)
 let mapInstance: any = null
 let mapDataLayer: any = null
 let pollingTimer: ReturnType<typeof setInterval> | null = null
+let disconnectEvents: (() => void) | null = null
 let renderedGeometryKey = ''
-let matchRetryCount = 0
-/** 约 3 分钟内的重试上限（每 3 轮轮询触发一次，轮询间隔 3 秒）。 */
-const MATCH_RETRY_LIMIT = 60
 
 const feedbackRating = ref(0)
 const feedbackComment = ref('')
@@ -294,7 +305,7 @@ const feedbackSubmitting = ref(false)
 const feedbackSubmitted = ref<RescueFeedbackResponse | null>(null)
 
 /** 完成后展示评价卡片；呼救方对已完成的救援只能评价一次。 */
-const feedbackCard = computed(() => rescueCall.value?.status === 'COMPLETED')
+const feedbackCard = computed(() => !isResponder.value && rescueCall.value?.status === 'COMPLETED')
 
 async function loadFeedback() {
   if (!rescueId.value || rescueCall.value?.status !== 'COMPLETED') return
@@ -349,10 +360,16 @@ const progressSteps = ['已呼救', '匹配中', '救援中', '已完成']
 const statusMap: Record<RescueStatus, { label: string; description: string; step: number }> = {
   PENDING: { label: '呼救已发出', description: '救援请求已进入调度队列，请保持电话畅通', step: 0 },
   MATCHING: { label: '正在匹配资源', description: '平台正在查找附近设备与救援力量', step: 1 },
-  ACCEPTED: { label: '救援已响应', description: '救援人员已接单，请留在安全且显眼的位置', step: 2 },
+  EN_ROUTE_TO_AED: { label: '施救者正在取用 AED', description: '设备已锁定，施救者正在赶往取用点', step: 2 },
+  EN_ROUTE_TO_REQUESTER: { label: '施救者正在赶来', description: '请留在安全且显眼的位置并保持电话畅通', step: 2 },
+  ARRIVED: { label: '施救者已到达', description: '请按照现场指引配合救援', step: 2 },
   RESCUING: { label: '救援进行中', description: '请遵循专业人员指导并保持现场通道畅通', step: 2 },
+  PENDING_CONFIRMATION: { label: '等待确认完成', description: '施救者已提交完成，请求救者确认', step: 2 },
   COMPLETED: { label: '救援已完成', description: '本次救援流程已结束，感谢每一位参与者', step: 3 },
-  CANCELLED: { label: '呼救已取消', description: '本次呼救已经取消，如仍需帮助请重新发起', step: 0 }
+  NO_RESOURCE: { label: '暂无可用资源', description: '当前范围内未找到可调度 AED，危急情况请立即拨打 120', step: 1 },
+  EXPIRED: { label: '匹配已超时', description: '本次调度已超时，危急情况请立即拨打 120', step: 1 },
+  USER_CANCELLED: { label: '呼救已取消', description: '本次呼救已经取消，如仍需帮助请重新发起', step: 0 },
+  SYSTEM_FAILED: { label: '调度异常', description: '系统未能完成调度，危急情况请立即拨打 120', step: 1 }
 }
 
 const statusMeta = computed(() => statusMap[rescueCall.value?.status || 'PENDING'])
@@ -362,9 +379,7 @@ const urgencyLabel = computed(() => {
   return labels[rescueCall.value?.urgency || 'MEDIUM']
 })
 
-const displayImageUrls = computed(() => (
-  rescueCall.value?.imageUrls.map(resolveApiUrl) || []
-))
+const displayImageUrls = ref<string[]>([])
 
 const nativeMarkers = computed(() => {
   if (!rescueCall.value) return []
@@ -407,14 +422,38 @@ const nativeMarkers = computed(() => {
       }
     })
   }
+  const live = rescueCall.value.liveTracking
+  if (live) {
+    markers.push({
+      id: 3,
+      longitude: live.responderLongitude,
+      latitude: live.responderLatitude,
+      iconPath: '/static/map/marker-mobile.png',
+      width: 26,
+      height: 32,
+      callout: {
+        content: live.source === 'MOBILE_AED' ? 'AED 实时位置' : '施救者实时位置',
+        color: '#147452',
+        fontSize: 12,
+        borderRadius: 8,
+        bgColor: '#FFFFFF',
+        padding: 7,
+        display: 'ALWAYS'
+      }
+    })
+  }
   return markers
 })
 
 onLoad((query) => {
   rescueId.value = typeof query?.id === 'string' ? query.id : ''
+  isResponder.value = query?.mode === 'responder'
   loadDetail()
   if (rescueId.value) {
     pollingTimer = setInterval(() => loadDetail(false), 3000)
+    disconnectEvents = connectRescueEvents(event => {
+      if (!event.rescueCallId || event.rescueCallId === rescueId.value) loadDetail(false)
+    })
   }
 })
 
@@ -428,23 +467,17 @@ async function loadDetail(showLoading = true) {
   if (showLoading) loading.value = true
   errorMessage.value = ''
   try {
-    let latest = await getRescueCall(rescueId.value)
-    // 重新匹配是写操作，每 3 轮（约 9 秒）才试一次并设上限
-    if (!latest.matchedAed && latest.status === 'MATCHING' && !showLoading) {
-      matchRetryCount += 1
-      if (matchRetryCount % 3 === 1 && matchRetryCount <= MATCH_RETRY_LIMIT) {
-        latest = await retryRescueMatch(rescueId.value)
-      }
-    } else if (latest.matchedAed) {
-      matchRetryCount = 0
-    }
+    const latest = isResponder.value
+      ? await loadResponderDetail()
+      : await getRescueCall(rescueId.value)
     rescueCall.value = latest
+    await refreshAttachmentUrls(latest.attachmentMediaIds)
     loading.value = false
     await nextTick()
     // #ifdef H5
     await initMap()
     // #endif
-    if (['COMPLETED', 'CANCELLED'].includes(rescueCall.value.status)) {
+    if (['COMPLETED', 'NO_RESOURCE', 'EXPIRED', 'USER_CANCELLED', 'SYSTEM_FAILED'].includes(rescueCall.value.status)) {
       stopPolling()
       await loadFeedback()
     }
@@ -455,6 +488,32 @@ async function loadDetail(showLoading = true) {
   } finally {
     if (showLoading) loading.value = false
   }
+}
+
+async function loadResponderDetail(): Promise<RescueCallResponse> {
+  const task = await getResponderTask(rescueId.value)
+  if (!task.detailAvailable || task.latitude == null || task.longitude == null || !task.address) {
+    throw new Error('接单成功后才能查看完整救援信息')
+  }
+  return {
+    ...task,
+    latitude: task.latitude,
+    longitude: task.longitude,
+    address: task.address,
+    eventSequence: task.eventSequence
+  }
+}
+
+const attachmentUrlCache = new Map<string, string>()
+async function refreshAttachmentUrls(mediaIds: string[]) {
+  const urls = await Promise.all(mediaIds.map(async mediaId => {
+    if (!attachmentUrlCache.has(mediaId)) {
+      const download = await issueMediaDownload(mediaId)
+      attachmentUrlCache.set(mediaId, resolveApiUrl(download.url))
+    }
+    return attachmentUrlCache.get(mediaId) as string
+  }))
+  displayImageUrls.value = urls
 }
 
 // #ifdef H5
@@ -479,12 +538,15 @@ async function initMap() {
 
     // 只有位置或匹配结果变化才重绘，否则每轮 fitBounds 会让画面抖动
     const matched = rescueCall.value.matchedAed
+    const live = rescueCall.value.liveTracking
     const geometryKey = [
       latitude,
       longitude,
       matched?.deviceId ?? '',
       matched?.latitude ?? '',
-      matched?.longitude ?? ''
+      matched?.longitude ?? '',
+      live?.responderLatitude ?? '',
+      live?.responderLongitude ?? ''
     ].join('|')
     if (geometryKey === renderedGeometryKey) {
       return
@@ -517,6 +579,16 @@ async function initMap() {
         { padding: [42, 42], maxZoom: 15 }
       )
     }
+    if (live) {
+      const liveMarker = Leaflet.divIcon({
+        className: 'matched-aed-marker',
+        html: `<span>${live.source === 'MOBILE_AED' ? 'AED' : '施救'}</span>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      })
+      Leaflet.marker([live.responderLatitude, live.responderLongitude], { icon: liveMarker })
+        .addTo(mapDataLayer)
+    }
   } catch {
     mapUnavailable.value = true
   }
@@ -547,8 +619,20 @@ function callEmergency() {
 }
 
 function callMatchedDevice() {
-  const phoneNumber = rescueCall.value?.matchedAed?.ownerPhone
+  const phoneNumber = rescueCall.value?.matchedAed?.contactPhone
   if (phoneNumber) uni.makePhoneCall({ phoneNumber })
+}
+
+async function confirmCompletion() {
+  if (!rescueId.value || rescueCall.value?.status !== 'PENDING_CONFIRMATION') return
+  try {
+    rescueCall.value = await confirmRescueCompletion(rescueId.value)
+    uni.showToast({ title: '救援已完成', icon: 'success' })
+    stopPolling()
+    await loadFeedback()
+  } catch (error: any) {
+    uni.showToast({ title: error?.message || '确认失败，请重试', icon: 'none' })
+  }
 }
 
 function openMatchedDevice() {
@@ -589,6 +673,7 @@ function previewSceneImage(index: number) {
 
 onUnmounted(() => {
   stopPolling()
+  disconnectEvents?.()
   if (mapInstance) {
     mapInstance.remove()
     mapInstance = null
@@ -1118,6 +1203,40 @@ onUnmounted(() => {
   border: 1rpx solid #E1E8F0;
   border-radius: 22rpx;
   background: #FFFFFF;
+}
+
+.completion-card {
+  margin: 24rpx 24rpx 0;
+  padding: 28rpx;
+  border: 1rpx solid #D5E3F8;
+  border-radius: 22rpx;
+  background: #FFFFFF;
+}
+
+.completion-title {
+  display: block;
+  color: #1C2B45;
+  font-size: 29rpx;
+  font-weight: 700;
+}
+
+.completion-desc {
+  display: block;
+  margin-top: 10rpx;
+  color: #68758A;
+  font-size: 23rpx;
+  line-height: 1.6;
+}
+
+.completion-button {
+  margin-top: 22rpx;
+  padding: 18rpx 0;
+  border-radius: 14rpx;
+  background: #1F63D5;
+  color: #FFFFFF;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 700;
 }
 
 .cancel-desc {

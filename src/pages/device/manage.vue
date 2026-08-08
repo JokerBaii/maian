@@ -153,7 +153,8 @@ import { resolveApiUrl } from '@/api/http'
 import {
   listMyEmergencyDevices,
   deleteEmergencyDevice,
-  updateEmergencyDeviceStatus,
+  enableEmergencyDevice,
+  disableEmergencyDevice,
   updateEmergencyDeviceLocation,
   type EmergencyDeviceResponse
 } from '@/api/devices'
@@ -174,7 +175,9 @@ let syncingLocation = false
 function toView(device: EmergencyDeviceResponse): DeviceView {
   return {
     ...device,
-    online: device.status === 'AVAILABLE'
+    online: device.type === 'MOBILE'
+      ? device.mobilePresenceStatus === 'ONLINE'
+      : device.status === 'AVAILABLE'
   }
 }
 
@@ -183,16 +186,20 @@ function deviceImages(device: DeviceView) {
 }
 
 function canToggleDevice(device: DeviceView) {
-  return ['AVAILABLE', 'MAINTENANCE', 'OFFLINE'].includes(device.status)
+  return ['AVAILABLE', 'DISABLED'].includes(device.status)
 }
 
 function deviceStatusLabel(device: DeviceView) {
+  if (device.type === 'MOBILE' && device.status === 'AVAILABLE') {
+    return ({ ONLINE: '在线', STALE: '位置已过期', OFFLINE: '离线' } as Record<string, string>)[
+      device.mobilePresenceStatus || 'OFFLINE'
+    ]
+  }
   const labels: Record<string, string> = {
     PENDING_REVIEW: '待平台审核',
     AVAILABLE: device.type === 'FIXED' ? '可用' : '在线',
     RESERVED: '救援占用中',
-    MAINTENANCE: '维护中',
-    OFFLINE: '离线',
+    DISABLED: device.type === 'FIXED' ? '维护中' : '离线',
     EXPIRED: '已过期',
     REJECTED: '审核未通过'
   }
@@ -200,6 +207,7 @@ function deviceStatusLabel(device: DeviceView) {
 }
 
 function statusTone(device: DeviceView) {
+  if (device.type === 'MOBILE' && device.mobilePresenceStatus !== 'ONLINE') return 'offline'
   if (device.status === 'AVAILABLE') return 'online'
   if (device.status === 'PENDING_REVIEW') return 'pending'
   if (device.status === 'REJECTED' || device.status === 'EXPIRED') return 'rejected'
@@ -228,9 +236,11 @@ async function toggleDeviceStatus(device: DeviceView) {
     uni.showToast({ title: '设备正在执行救援', icon: 'none' })
     return
   }
-  const nextStatus = device.status === 'AVAILABLE' ? 'MAINTENANCE' : 'AVAILABLE'
+  const nextStatus = device.status === 'AVAILABLE' ? 'DISABLED' : 'AVAILABLE'
   try {
-    const updated = await updateEmergencyDeviceStatus(device.id, nextStatus)
+    const updated = nextStatus === 'AVAILABLE'
+      ? await enableEmergencyDevice(device.id)
+      : await disableEmergencyDevice(device.id)
     Object.assign(device, toView(updated))
     uni.showToast({ title: nextStatus === 'AVAILABLE' ? '设备已上线' : '设备已维护', icon: 'none' })
   } catch {
@@ -244,7 +254,7 @@ async function toggleMobileStatus(device: DeviceView) {
     uni.showToast({ title: '设备正在执行救援', icon: 'none' })
     return
   }
-  const nextStatus = device.status === 'AVAILABLE' ? 'OFFLINE' : 'AVAILABLE'
+  const nextStatus = device.status === 'AVAILABLE' ? 'DISABLED' : 'AVAILABLE'
   try {
     if (nextStatus === 'AVAILABLE') {
       const location = await getCurrentLocation()
@@ -253,7 +263,9 @@ async function toggleMobileStatus(device: DeviceView) {
         address: `实时位置 · ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
       })
     }
-    const updated = await updateEmergencyDeviceStatus(device.id, nextStatus)
+    const updated = nextStatus === 'AVAILABLE'
+      ? await enableEmergencyDevice(device.id)
+      : await disableEmergencyDevice(device.id)
     Object.assign(device, toView(updated))
     uni.showToast({ title: nextStatus === 'AVAILABLE' ? '设备已上线' : '设备已离线', icon: 'none' })
   } catch {

@@ -1,4 +1,9 @@
-import { getDemoUserId } from '@/utils/demoSession'
+import {
+  clearDemoAccessToken,
+  getDemoAccessToken,
+  getDemoUserId,
+  saveDemoAccessToken
+} from '@/utils/demoSession'
 
 export interface ApiError {
   code: string
@@ -48,6 +53,19 @@ export function request<T>(
     timeout?: number
   } = {}
 ): Promise<T> {
+  return authenticatedRequest(path, options, true)
+}
+
+async function authenticatedRequest<T>(
+  path: string,
+  options: {
+    method?: UniNamespace.RequestOptions['method']
+    data?: UniNamespace.RequestOptions['data']
+    timeout?: number
+  },
+  allowRefresh: boolean
+): Promise<T> {
+  const accessToken = await ensureAccessToken()
   return new Promise((resolve, reject) => {
     uni.request({
       url: resolveApiUrl(path),
@@ -57,9 +75,9 @@ export function request<T>(
       header: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        'X-Demo-User-Id': getDemoUserId()
+        Authorization: `Bearer ${accessToken}`
       },
-      success(response: UniNamespace.RequestSuccessCallbackResult) {
+      async success(response: UniNamespace.RequestSuccessCallbackResult) {
         if (response.statusCode === 204) {
           resolve(undefined as T)
           return
@@ -67,6 +85,16 @@ export function request<T>(
         const body = response.data as unknown as ApiResponse<T>
         if (response.statusCode >= 200 && response.statusCode < 300 && body.success && body.data !== undefined) {
           resolve(body.data)
+          return
+        }
+
+        if (response.statusCode === 401 && allowRefresh) {
+          clearDemoAccessToken()
+          try {
+            resolve(await authenticatedRequest<T>(path, options, false))
+          } catch (error) {
+            reject(error)
+          }
           return
         }
 
@@ -82,4 +110,31 @@ export function request<T>(
       }
     })
   })
+}
+
+export async function ensureAccessToken(): Promise<string> {
+  const existing = getDemoAccessToken()
+  if (existing) return existing
+
+  const response = await new Promise<UniNamespace.RequestSuccessCallbackResult>((resolve, reject) => {
+    uni.request({
+      url: resolveApiUrl('/api/v1/auth/demo'),
+      method: 'POST',
+      data: { userId: getDemoUserId() },
+      header: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      success: resolve,
+      fail: reject
+    })
+  })
+  const body = response.data as ApiResponse<{ accessToken: string; expiresAt: string }>
+  if (response.statusCode < 200 || response.statusCode >= 300 || !body.success || !body.data) {
+    throw new ApiRequestError(
+      body.error?.message || '登录失败',
+      body.error?.code || 'AUTH_FAILED',
+      body.error?.details || [],
+      response.statusCode
+    )
+  }
+  saveDemoAccessToken(body.data.accessToken, body.data.expiresAt)
+  return body.data.accessToken
 }

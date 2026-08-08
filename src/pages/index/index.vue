@@ -181,7 +181,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
-import { FIXED_LOCATION, FIXED_LOCATION_SHORT_NAME } from '@/utils/location'
+import { FIXED_LOCATION_SHORT_NAME, isDemoMode } from '@/utils/location'
 import { scienceArticles, officialFirstAidVideos } from '@/data/editorial'
 
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
@@ -191,17 +191,13 @@ const homeArticles = scienceArticles.slice(0, 3)
 const homeVideos = officialFirstAidVideos.slice(0, 2)
 
 const deviceSnapshot = ref<EmergencyDeviceResponse[]>([])
-const currentCoordinates = ref<{ longitude: number; latitude: number } | null>({
-  longitude: FIXED_LOCATION.longitude,
-  latitude: FIXED_LOCATION.latitude
-})
 const devicesLoaded = ref(false)
 
 const availableDeviceCount = computed(() => (
   deviceSnapshot.value.filter(device => device.status === 'AVAILABLE').length
 ))
 
-const locationLabel = FIXED_LOCATION_SHORT_NAME
+const locationLabel = isDemoMode ? FIXED_LOCATION_SHORT_NAME : '当前位置'
 
 const networkSummary = computed(() => (
   devicesLoaded.value ? `${availableDeviceCount.value} 台设备可用` : '正在同步设备'

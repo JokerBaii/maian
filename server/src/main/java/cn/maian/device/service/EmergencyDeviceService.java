@@ -1,7 +1,10 @@
 package cn.maian.device.service;
 
 import cn.maian.device.domain.DeviceType;
-import cn.maian.device.dto.EmergencyDeviceResponse;
+import cn.maian.device.domain.DeviceServiceWindow;
+import cn.maian.device.dto.PublicEmergencyDeviceResponse;
+import cn.maian.device.dto.OwnerEmergencyDeviceResponse;
+import cn.maian.device.dto.AdminEmergencyDeviceResponse;
 import cn.maian.device.dto.SaveEmergencyDeviceRequest;
 import cn.maian.device.dto.UpdateDeviceLocationRequest;
 import cn.maian.device.dto.ReviewEmergencyDeviceRequest;
@@ -15,43 +18,56 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 import java.time.Instant;
 import cn.maian.user.service.CurrentUserService;
+import cn.maian.media.service.MediaStorageService;
+import cn.maian.media.domain.MediaPurpose;
+import cn.maian.config.DispatchProperties;
+import java.time.Clock;
 
 @Service
 public class EmergencyDeviceService {
 
     private final EmergencyDeviceRepository emergencyDeviceRepository;
     private final CurrentUserService currentUserService;
+    private final MediaStorageService mediaStorageService;
+    private final DispatchProperties dispatchProperties;
+    private final Clock clock;
 
     public EmergencyDeviceService(
         EmergencyDeviceRepository emergencyDeviceRepository,
-        CurrentUserService currentUserService
+        CurrentUserService currentUserService,
+        MediaStorageService mediaStorageService,
+        DispatchProperties dispatchProperties,
+        Clock clock
     ) {
         this.emergencyDeviceRepository = emergencyDeviceRepository;
         this.currentUserService = currentUserService;
+        this.mediaStorageService = mediaStorageService;
+        this.dispatchProperties = dispatchProperties;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
-    public Page<EmergencyDeviceResponse> findAll(DeviceType type, Pageable pageable) {
-        var hiddenStatuses = java.util.List.of(
-            cn.maian.device.domain.DeviceStatus.PENDING_REVIEW,
-            cn.maian.device.domain.DeviceStatus.REJECTED
+    public Page<PublicEmergencyDeviceResponse> findAll(DeviceType type, Pageable pageable) {
+        var publicStatuses = java.util.List.of(
+            cn.maian.device.domain.DeviceStatus.AVAILABLE,
+            cn.maian.device.domain.DeviceStatus.RESERVED
         );
         var devices = type == null
-            ? emergencyDeviceRepository.findAllByStatusNotIn(hiddenStatuses, pageable)
-            : emergencyDeviceRepository.findAllByTypeAndStatusNotIn(type, hiddenStatuses, pageable);
-        return devices.map(EmergencyDeviceResponse::from);
+            ? emergencyDeviceRepository.findAllByStatusIn(publicStatuses, pageable)
+            : emergencyDeviceRepository.findAllByTypeAndStatusIn(type, publicStatuses, pageable);
+        return devices.map(this::toPublicResponse);
     }
 
     @Transactional(readOnly = true)
-    public Page<EmergencyDeviceResponse> findPendingReviews(Pageable pageable) {
+    public Page<AdminEmergencyDeviceResponse> findPendingReviews(Pageable pageable) {
         currentUserService.requireAnyRole("ADMIN");
         return emergencyDeviceRepository
             .findAllByStatus(cn.maian.device.domain.DeviceStatus.PENDING_REVIEW, pageable)
-            .map(EmergencyDeviceResponse::from);
+            .map(this::toAdminResponse);
     }
 
     @Transactional(readOnly = true)
-    public Page<EmergencyDeviceResponse> findMine(DeviceType type, Pageable pageable) {
+    public Page<OwnerEmergencyDeviceResponse> findMine(DeviceType type, Pageable pageable) {
         var devices = type == null
             ? emergencyDeviceRepository.findAllByRegisteredByUserId(
                 currentUserService.currentUserId(), pageable
@@ -59,65 +75,82 @@ public class EmergencyDeviceService {
             : emergencyDeviceRepository.findAllByRegisteredByUserIdAndType(
                 currentUserService.currentUserId(), type, pageable
             );
-        return devices.map(EmergencyDeviceResponse::from);
+        return devices.map(this::toOwnerResponse);
     }
 
     @Transactional(readOnly = true)
-    public EmergencyDeviceResponse findById(UUID id) {
-        return EmergencyDeviceResponse.from(findEntity(id));
+    public PublicEmergencyDeviceResponse findPublicById(UUID id) {
+        var device = findEntity(id);
+        if (device.getStatus() != cn.maian.device.domain.DeviceStatus.AVAILABLE
+            && device.getStatus() != cn.maian.device.domain.DeviceStatus.RESERVED) {
+            throw new ResourceNotFoundException("急救设备不存在");
+        }
+        return toPublicResponse(device);
+    }
+
+    @Transactional(readOnly = true)
+    public OwnerEmergencyDeviceResponse findMineById(UUID id) {
+        var device = emergencyDeviceRepository.findOwnedById(id, currentUserService.currentUserId())
+            .orElseThrow(() -> new ResourceNotFoundException("急救设备不存在"));
+        return toOwnerResponse(device);
     }
 
     @Transactional
-    public EmergencyDeviceResponse create(SaveEmergencyDeviceRequest request) {
+    public OwnerEmergencyDeviceResponse create(SaveEmergencyDeviceRequest request) {
         validateTypeFields(request);
         var device = cn.maian.device.domain.EmergencyDevice.create(
             request.type(), request.category(), request.name(), request.address(),
-            request.longitude(), request.latitude(), request.ownerPhone(), request.serviceTime(),
+            request.longitude(), request.latitude(), request.ownerPhone(), toServiceWindows(request),
             request.expireDate(), request.owner(), request.vehicleInfo(), request.serviceRange(),
-            request.instructions(), request.imageUrls(), request.vehicleImageUrls()
+            request.instructions(), request.imageMediaIds(), request.vehicleImageMediaIds()
         );
         device.registerTo(currentUserService.currentUserId());
-        return EmergencyDeviceResponse.from(emergencyDeviceRepository.save(device));
+        device = emergencyDeviceRepository.save(device);
+        syncMedia(device);
+        return toOwnerResponse(device);
     }
 
     @Transactional
-    public EmergencyDeviceResponse update(UUID id, SaveEmergencyDeviceRequest request) {
+    public OwnerEmergencyDeviceResponse update(UUID id, SaveEmergencyDeviceRequest request) {
         validateTypeFields(request);
         var device = findEntityForUpdate(id);
         ensureNotReserved(device);
         device.update(
             request.type(), request.category(), request.name(), request.address(),
-            request.longitude(), request.latitude(), request.ownerPhone(), request.serviceTime(),
+            request.longitude(), request.latitude(), request.ownerPhone(), toServiceWindows(request),
             request.expireDate(), request.owner(), request.vehicleInfo(), request.serviceRange(),
-            request.instructions(), request.imageUrls(), request.vehicleImageUrls()
+            request.instructions(), request.imageMediaIds(), request.vehicleImageMediaIds()
         );
-        return EmergencyDeviceResponse.from(device);
+        syncMedia(device);
+        return toOwnerResponse(device);
     }
 
     @Transactional
-    public EmergencyDeviceResponse updateStatus(UUID id, cn.maian.device.domain.DeviceStatus status) {
+    public OwnerEmergencyDeviceResponse enable(UUID id) {
         var device = findEntityForUpdate(id);
-        if (status == cn.maian.device.domain.DeviceStatus.RESERVED
-            || status == cn.maian.device.domain.DeviceStatus.PENDING_REVIEW
-            || status == cn.maian.device.domain.DeviceStatus.REJECTED) {
-            throw new IllegalArgumentException("该设备状态只能由审核或救援流程设置");
-        }
-        ensureNotReserved(device);
-        device.changeStatus(status);
-        return EmergencyDeviceResponse.from(device);
+        device.enable();
+        return toOwnerResponse(device);
     }
 
     @Transactional
-    public EmergencyDeviceResponse review(UUID id, ReviewEmergencyDeviceRequest request) {
+    public OwnerEmergencyDeviceResponse disable(UUID id) {
+        var device = findEntityForUpdate(id);
+        device.disable();
+        return toOwnerResponse(device);
+    }
+
+    @Transactional
+    public AdminEmergencyDeviceResponse review(UUID id, ReviewEmergencyDeviceRequest request) {
         currentUserService.requireAnyRole("ADMIN");
         var device = emergencyDeviceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("急救设备不存在"));
         device.review(request.approved(), request.reviewNote());
-        return EmergencyDeviceResponse.from(device);
+        mediaStorageService.setReferencePublic("EMERGENCY_DEVICE", id, request.approved());
+        return toAdminResponse(device);
     }
 
     @Transactional
-    public EmergencyDeviceResponse updateLocation(UUID id, UpdateDeviceLocationRequest request) {
+    public OwnerEmergencyDeviceResponse updateLocation(UUID id, UpdateDeviceLocationRequest request) {
         var device = findEntityForUpdate(id);
         if (device.getType() != DeviceType.MOBILE) {
             throw new IllegalArgumentException("只有移动设备可以更新实时位置");
@@ -128,7 +161,7 @@ public class EmergencyDeviceService {
             request.address(),
             Instant.now()
         );
-        return EmergencyDeviceResponse.from(device);
+        return toOwnerResponse(device);
     }
 
     @Transactional
@@ -136,6 +169,7 @@ public class EmergencyDeviceService {
         var device = findEntityForUpdate(id);
         ensureNotReserved(device);
         emergencyDeviceRepository.delete(device);
+        mediaStorageService.detachReference("EMERGENCY_DEVICE", id);
     }
 
     private cn.maian.device.domain.EmergencyDevice findEntity(UUID id) {
@@ -152,9 +186,20 @@ public class EmergencyDeviceService {
     }
 
     private void validateTypeFields(SaveEmergencyDeviceRequest request) {
+        if (request.serviceWindows().isEmpty()) {
+            throw new IllegalArgumentException("至少需要设置一个服务时段");
+        }
         if (request.type() == DeviceType.MOBILE && (request.vehicleInfo() == null || request.vehicleInfo().isBlank())) {
             throw new IllegalArgumentException("移动设备必须填写车辆或携带信息");
         }
+    }
+
+    private java.util.List<DeviceServiceWindow> toServiceWindows(SaveEmergencyDeviceRequest request) {
+        return request.serviceWindows().stream()
+            .map(window -> new DeviceServiceWindow(
+                window.dayOfWeek(), window.opensAt(), window.closesAt()
+            ))
+            .toList();
     }
 
     private void ensureNotReserved(cn.maian.device.domain.EmergencyDevice device) {
@@ -163,5 +208,41 @@ public class EmergencyDeviceService {
                 "设备正在执行救援，暂时不能修改或删除"
             );
         }
+    }
+
+    private void syncMedia(cn.maian.device.domain.EmergencyDevice device) {
+        boolean makePublic = device.getStatus() == cn.maian.device.domain.DeviceStatus.AVAILABLE;
+        mediaStorageService.syncOwnedReference(
+            device.getImageMediaIds(), MediaPurpose.DEVICE_IMAGE,
+            "EMERGENCY_DEVICE", device.getId(), makePublic
+        );
+        mediaStorageService.syncOwnedReference(
+            device.getVehicleImageMediaIds(), MediaPurpose.VEHICLE_IMAGE,
+            "EMERGENCY_DEVICE", device.getId(), makePublic
+        );
+    }
+
+    private PublicEmergencyDeviceResponse toPublicResponse(
+        cn.maian.device.domain.EmergencyDevice device
+    ) {
+        return PublicEmergencyDeviceResponse.from(
+            device, clock.instant(), dispatchProperties.mobileLocationMaxAgeSeconds()
+        );
+    }
+
+    private OwnerEmergencyDeviceResponse toOwnerResponse(
+        cn.maian.device.domain.EmergencyDevice device
+    ) {
+        return OwnerEmergencyDeviceResponse.from(
+            device, clock.instant(), dispatchProperties.mobileLocationMaxAgeSeconds()
+        );
+    }
+
+    private AdminEmergencyDeviceResponse toAdminResponse(
+        cn.maian.device.domain.EmergencyDevice device
+    ) {
+        return AdminEmergencyDeviceResponse.from(
+            device, clock.instant(), dispatchProperties.mobileLocationMaxAgeSeconds()
+        );
     }
 }

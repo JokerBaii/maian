@@ -13,7 +13,7 @@ public record ScienceSubmissionResponse(
     String content,
     SubmissionStatus status,
     boolean hasCoverImage,
-    String coverImageUrl,
+    UUID coverMediaId,
     Instant submittedAt,
     String reviewNote,
     Instant reviewedAt
@@ -26,7 +26,7 @@ public record ScienceSubmissionResponse(
             submission.getContent(),
             submission.getStatus(),
             submission.isHasCoverImage(),
-            submission.getCoverImageUrl(),
+            submission.getCoverMediaId(),
             submission.getSubmittedAt(),
             submission.getReviewNote(),
             submission.getReviewedAt()

@@ -12,7 +12,7 @@ class EmergencyDeviceReviewTest {
     void newlySubmittedDeviceRequiresReviewBeforeBecomingAvailable() {
         var device = EmergencyDevice.create(
             DeviceType.FIXED, "AED", "演示 AED", "演示地址",
-            120.1, 30.2, null, "全天", null,
+            120.1, 30.2, null, DeviceServiceWindow.alwaysOpen(), null,
             "演示资源方", null, null, null, List.of(), List.of()
         );
 

@@ -10,6 +10,7 @@ import cn.maian.rescue.dto.RescueFeedbackResponse;
 import cn.maian.rescue.repository.RescueCallRepository;
 import cn.maian.rescue.repository.RescueFeedbackRepository;
 import cn.maian.user.service.CurrentUserService;
+import cn.maian.security.AuthorizationPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,15 +22,18 @@ public class RescueFeedbackService {
     private final RescueFeedbackRepository feedbackRepository;
     private final RescueCallRepository rescueCallRepository;
     private final CurrentUserService currentUserService;
+    private final AuthorizationPolicy authorizationPolicy;
 
     public RescueFeedbackService(
         RescueFeedbackRepository feedbackRepository,
         RescueCallRepository rescueCallRepository,
-        CurrentUserService currentUserService
+        CurrentUserService currentUserService,
+        AuthorizationPolicy authorizationPolicy
     ) {
         this.feedbackRepository = feedbackRepository;
         this.rescueCallRepository = rescueCallRepository;
         this.currentUserService = currentUserService;
+        this.authorizationPolicy = authorizationPolicy;
     }
 
     @Transactional
@@ -40,9 +44,7 @@ public class RescueFeedbackService {
         if (rescueCall.getStatus() != RescueStatus.COMPLETED) {
             throw new cn.maian.common.exception.InvalidStateTransitionException("救援完成后才能评价");
         }
-        if (!currentUserService.currentUserId().equals(rescueCall.getRequestedByUserId())) {
-            throw new ForbiddenOperationException("只有呼救方可以评价");
-        }
+        authorizationPolicy.requireRequester(rescueCall, "只有呼救方可以评价");
         if (feedbackRepository.existsByRescueCallId(rescueCallId)) {
             throw new cn.maian.common.exception.InvalidStateTransitionException("该呼救已评价过");
         }
@@ -60,6 +62,11 @@ public class RescueFeedbackService {
 
     @Transactional(readOnly = true)
     public RescueFeedbackResponse getForRescue(UUID rescueCallId) {
+        RescueCall rescueCall = rescueCallRepository.findById(rescueCallId)
+            .orElseThrow(() -> new ResourceNotFoundException("呼救不存在"));
+        authorizationPolicy.requireRescueParticipantOrAdmin(
+            rescueCall, "只有救援参与者或管理员可查看评价"
+        );
         return feedbackRepository.findByRescueCallId(rescueCallId)
             .map(RescueFeedbackResponse::from)
             .orElseThrow(() -> new ResourceNotFoundException("暂无评价"));

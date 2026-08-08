@@ -40,7 +40,7 @@ public class HealthReportController {
     public ApiResponse<ReportRecognitionResponse> recognize(
         @Valid @RequestBody ReportRecognitionRequest request
     ) {
-        return ApiResponse.ok(reportRecognitionService.recognize(request.sourceImageUrl()));
+        return ApiResponse.ok(reportRecognitionService.recognize(request.mediaId()));
     }
 
     @PostMapping

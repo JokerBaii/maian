@@ -10,7 +10,7 @@
 -- bpm 用确定性伪随机（d/n 取模）保证每次执行结果一致、可复现。
 
 -- ============ 志愿者账号补穿戴设备 ============
-INSERT INTO wearable_devices (
+INSERT IGNORE INTO wearable_devices (
   id, user_id, device_identifier, name, type, connected, battery, last_seen_at, created_at, updated_at
 ) VALUES (
   '70000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002',

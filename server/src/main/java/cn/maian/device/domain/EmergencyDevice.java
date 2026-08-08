@@ -15,10 +15,14 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.time.Duration;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Objects;
 
 @Entity
 @Table(name = "emergency_devices")
@@ -55,8 +59,10 @@ public class EmergencyDevice {
     @Column(length = 40)
     private String ownerPhone;
 
-    @Column(length = 80)
-    private String serviceTime;
+    @ElementCollection(fetch = jakarta.persistence.FetchType.EAGER)
+    @CollectionTable(name = "emergency_device_service_windows", joinColumns = @JoinColumn(name = "device_id"))
+    @OrderColumn(name = "position")
+    private List<DeviceServiceWindow> serviceWindows = new ArrayList<>();
 
     private LocalDate expireDate;
 
@@ -94,8 +100,9 @@ public class EmergencyDevice {
         joinColumns = @JoinColumn(name = "device_id")
     )
     @OrderColumn(name = "position")
-    @Column(name = "image_url", length = 500, nullable = false)
-    private List<String> imageUrls = new ArrayList<>();
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "media_id", length = 36, nullable = false)
+    private List<UUID> imageMediaIds = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(
@@ -103,8 +110,9 @@ public class EmergencyDevice {
         joinColumns = @JoinColumn(name = "device_id")
     )
     @OrderColumn(name = "position")
-    @Column(name = "image_url", length = 500, nullable = false)
-    private List<String> vehicleImageUrls = new ArrayList<>();
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "media_id", length = 36, nullable = false)
+    private List<UUID> vehicleImageMediaIds = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -124,24 +132,21 @@ public class EmergencyDevice {
         double longitude,
         double latitude,
         String ownerPhone,
-        String serviceTime,
+        List<DeviceServiceWindow> serviceWindows,
         LocalDate expireDate,
         String owner,
         String vehicleInfo,
         Integer serviceRange,
         String instructions,
-        List<String> imageUrls,
-        List<String> vehicleImageUrls
+        List<UUID> imageMediaIds,
+        List<UUID> vehicleImageMediaIds
     ) {
         var device = new EmergencyDevice();
         device.id = UUID.randomUUID();
         device.status = DeviceStatus.PENDING_REVIEW;
         device.createdAt = Instant.now();
-        device.update(type, category, name, address, longitude, latitude, ownerPhone, serviceTime,
-            expireDate, owner, vehicleInfo, serviceRange, instructions, imageUrls, vehicleImageUrls);
-        if (type == DeviceType.MOBILE) {
-            device.lastLocationAt = device.createdAt;
-        }
+        device.update(type, category, name, address, longitude, latitude, ownerPhone, serviceWindows,
+            expireDate, owner, vehicleInfo, serviceRange, instructions, imageMediaIds, vehicleImageMediaIds);
         return device;
     }
 
@@ -153,16 +158,29 @@ public class EmergencyDevice {
         double longitude,
         double latitude,
         String ownerPhone,
-        String serviceTime,
+        List<DeviceServiceWindow> serviceWindows,
         LocalDate expireDate,
         String owner,
         String vehicleInfo,
         Integer serviceRange,
         String instructions,
-        List<String> imageUrls,
-        List<String> vehicleImageUrls
+        List<UUID> imageMediaIds,
+        List<UUID> vehicleImageMediaIds
     ) {
         DeviceType previousType = this.type;
+        boolean criticalChanged = this.type != null && (
+            this.type != type
+                || !Objects.equals(this.category, category)
+                || !Objects.equals(this.address, address)
+                || Double.compare(this.longitude, longitude) != 0
+                || Double.compare(this.latitude, latitude) != 0
+                || !Objects.equals(this.serviceWindows, serviceWindows)
+                || !Objects.equals(this.expireDate, expireDate)
+                || !Objects.equals(this.vehicleInfo, vehicleInfo)
+                || !Objects.equals(this.serviceRange, serviceRange)
+                || !Objects.equals(this.imageMediaIds, imageMediaIds)
+                || !Objects.equals(this.vehicleImageMediaIds, vehicleImageMediaIds)
+        );
         this.type = type;
         this.category = category;
         this.name = name;
@@ -170,33 +188,46 @@ public class EmergencyDevice {
         this.longitude = longitude;
         this.latitude = latitude;
         this.ownerPhone = ownerPhone;
-        this.serviceTime = serviceTime;
+        this.serviceWindows = new ArrayList<>(serviceWindows);
         this.expireDate = expireDate;
         this.owner = owner;
         this.vehicleInfo = vehicleInfo;
         this.serviceRange = serviceRange;
         this.instructions = instructions;
-        this.imageUrls = new ArrayList<>(imageUrls);
-        this.vehicleImageUrls = new ArrayList<>(vehicleImageUrls);
-        if (this.status == DeviceStatus.REJECTED) {
+        this.imageMediaIds = new ArrayList<>(imageMediaIds);
+        this.vehicleImageMediaIds = new ArrayList<>(vehicleImageMediaIds);
+        if (criticalChanged && this.status != DeviceStatus.PENDING_REVIEW) {
             this.status = DeviceStatus.PENDING_REVIEW;
             this.reviewNote = null;
             this.reviewedAt = null;
         }
         if (type == DeviceType.MOBILE && previousType != DeviceType.MOBILE) {
-            this.lastLocationAt = Instant.now();
+            this.lastLocationAt = null;
         } else if (type == DeviceType.FIXED) {
             this.lastLocationAt = null;
         }
     }
 
-    public void changeStatus(DeviceStatus status) {
-        this.status = status;
+    public void enable() {
+        if (status != DeviceStatus.DISABLED) {
+            throw invalid("只有已停用设备可以启用");
+        }
+        if (reviewedAt == null) {
+            throw invalid("设备通过审核后才能启用");
+        }
+        status = DeviceStatus.AVAILABLE;
+    }
+
+    public void disable() {
+        if (status != DeviceStatus.AVAILABLE) {
+            throw invalid("只有可用设备可以停用");
+        }
+        status = DeviceStatus.DISABLED;
     }
 
     public void review(boolean approved, String note) {
         if (status != DeviceStatus.PENDING_REVIEW && status != DeviceStatus.REJECTED) {
-            throw new IllegalStateException("只有待审核或已驳回设备可以审核");
+            throw invalid("只有待审核或已驳回设备可以审核");
         }
         this.status = approved ? DeviceStatus.AVAILABLE : DeviceStatus.REJECTED;
         this.reviewNote = note == null || note.isBlank() ? null : note.trim();
@@ -224,6 +255,19 @@ public class EmergencyDevice {
         this.status = DeviceStatus.AVAILABLE;
         this.reservedForCallId = null;
         this.reservedAt = null;
+    }
+
+    public void markReserved(UUID rescueCallId, Instant at) {
+        if (status != DeviceStatus.AVAILABLE || reservedForCallId != null) {
+            throw invalid("设备当前不可预约");
+        }
+        status = DeviceStatus.RESERVED;
+        reservedForCallId = rescueCallId;
+        reservedAt = at;
+    }
+
+    private cn.maian.common.exception.InvalidStateTransitionException invalid(String message) {
+        return new cn.maian.common.exception.InvalidStateTransitionException(message);
     }
 
     public UUID getId() {
@@ -262,8 +306,28 @@ public class EmergencyDevice {
         return ownerPhone;
     }
 
-    public String getServiceTime() {
-        return serviceTime;
+    public List<DeviceServiceWindow> getServiceWindows() {
+        return List.copyOf(serviceWindows);
+    }
+
+    public boolean isWithinServiceWindow(DayOfWeek dayOfWeek, LocalTime time) {
+        return serviceWindows.stream().anyMatch(window -> window.contains(dayOfWeek, time));
+    }
+
+    public MobilePresenceStatus mobilePresenceAt(Instant now, long freshSeconds) {
+        if (type != DeviceType.MOBILE) {
+            return null;
+        }
+        if (status == DeviceStatus.DISABLED || lastLocationAt == null) {
+            return MobilePresenceStatus.OFFLINE;
+        }
+        long ageSeconds = Math.max(0, Duration.between(lastLocationAt, now).toSeconds());
+        if (ageSeconds <= freshSeconds) {
+            return MobilePresenceStatus.ONLINE;
+        }
+        return ageSeconds <= freshSeconds * 3
+            ? MobilePresenceStatus.STALE
+            : MobilePresenceStatus.OFFLINE;
     }
 
     public LocalDate getExpireDate() {
@@ -286,12 +350,12 @@ public class EmergencyDevice {
         return instructions;
     }
 
-    public List<String> getImageUrls() {
-        return List.copyOf(imageUrls);
+    public List<UUID> getImageMediaIds() {
+        return List.copyOf(imageMediaIds);
     }
 
-    public List<String> getVehicleImageUrls() {
-        return List.copyOf(vehicleImageUrls);
+    public List<UUID> getVehicleImageMediaIds() {
+        return List.copyOf(vehicleImageMediaIds);
     }
 
     public Instant getCreatedAt() {

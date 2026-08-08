@@ -12,7 +12,8 @@ public record ReportRecognitionResponse(
     String notice,
     String hospital,
     LocalDate checkupDate,
-    List<HealthIndicator> indicators
+    List<HealthIndicator> indicators,
+    List<String> rawLines
 ) {
     public static final String REVIEW_NOTICE = "已识别以下指标，请逐项核对后保存。";
 }

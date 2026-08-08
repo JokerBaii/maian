@@ -1,0 +1,21 @@
+CREATE TABLE media_assets (
+  id char(36) NOT NULL,
+  owner_user_id char(36) NOT NULL,
+  purpose varchar(30) NOT NULL,
+  visibility varchar(12) NOT NULL,
+  status varchar(16) NOT NULL,
+  storage_key varchar(160) NOT NULL,
+  content_type varchar(40) NOT NULL,
+  size_bytes bigint NOT NULL,
+  sha256 varchar(64) NOT NULL,
+  reference_type varchar(30) NULL,
+  reference_id char(36) NULL,
+  created_at timestamp(6) NOT NULL,
+  attached_at timestamp(6) NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_media_storage_key (storage_key),
+  KEY idx_media_owner_created (owner_user_id, created_at),
+  KEY idx_media_reference (reference_type, reference_id),
+  KEY idx_media_orphan_gc (status, created_at),
+  CONSTRAINT fk_media_owner FOREIGN KEY (owner_user_id) REFERENCES user_profiles(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

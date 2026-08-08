@@ -56,9 +56,9 @@
             <text>{{ report.hospital }}</text>
           </view>
           <image
-            v-if="report.sourceImageUrl"
+            v-if="sourceImageUrl"
             class="source-image"
-            :src="resolveApiUrl(report.sourceImageUrl)"
+            :src="resolveApiUrl(sourceImageUrl)"
             mode="aspectFill"
             @tap="previewSourceImage"
           />
@@ -141,6 +141,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { resolveApiUrl } from '@/api/http'
+import { issueMediaDownload } from '@/api/files'
 import {
   getHealthReport,
   listHealthReports,
@@ -150,6 +151,7 @@ import {
 const report = ref<HealthReportResponse | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
+const sourceImageUrl = ref('')
 
 const abnormalIndicators = computed(() => report.value?.indicators.filter(item => item.abnormal) || [])
 const normalCount = computed(() => (report.value?.indicators.length || 0) - abnormalIndicators.value.length)
@@ -167,6 +169,9 @@ onLoad(async (query) => {
       const reports = await listHealthReports()
       report.value = reports[0] || null
     }
+    if (report.value?.sourceMediaId) {
+      sourceImageUrl.value = (await issueMediaDownload(report.value.sourceMediaId)).url
+    }
   } catch (error: any) {
     errorMessage.value = error?.message || '报告加载失败'
   } finally {
@@ -175,8 +180,8 @@ onLoad(async (query) => {
 })
 
 function previewSourceImage() {
-  if (!report.value?.sourceImageUrl) return
-  const url = resolveApiUrl(report.value.sourceImageUrl)
+  if (!sourceImageUrl.value) return
+  const url = resolveApiUrl(sourceImageUrl.value)
   uni.previewImage({ current: url, urls: [url] })
 }
 

@@ -5,20 +5,15 @@ import cn.maian.device.domain.DeviceType;
 import cn.maian.device.domain.EmergencyDevice;
 
 import java.time.Duration;
-import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.util.regex.Pattern;
 
 public final class AedDispatchScorer {
 
     private static final double EARTH_RADIUS_METERS = 6_371_000;
     private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Shanghai");
-    private static final Pattern SERVICE_WINDOW = Pattern.compile(
-        "(\\d{1,2}):(\\d{2})\\s*[-–至]\\s*(\\d{1,2}):(\\d{2})"
-    );
 
     private AedDispatchScorer() {
     }
@@ -101,6 +96,7 @@ public final class AedDispatchScorer {
             + Math.cos(Math.toRadians(latitudeA))
             * Math.cos(Math.toRadians(latitudeB))
             * sinLongitude * sinLongitude;
+        a = Math.max(0, Math.min(1, a));
         return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
@@ -134,40 +130,8 @@ public final class AedDispatchScorer {
             return false;
         }
 
-        String serviceTime = device.getServiceTime();
-        if (serviceTime == null || serviceTime.isBlank() || serviceTime.contains("全天")) {
-            return true;
-        }
-
-        DayOfWeek day = currentDate.getDayOfWeek();
-        if (serviceTime.contains("工作日")
-            && (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY)) {
-            return false;
-        }
-
-        var matcher = SERVICE_WINDOW.matcher(serviceTime);
-        if (!matcher.find()) {
-            return true;
-        }
-
-        try {
-            LocalTime start = LocalTime.of(
-                Integer.parseInt(matcher.group(1)),
-                Integer.parseInt(matcher.group(2))
-            );
-            LocalTime end = LocalTime.of(
-                Integer.parseInt(matcher.group(3)),
-                Integer.parseInt(matcher.group(4))
-            );
-            LocalTime current = LocalTime.ofInstant(now, SERVICE_ZONE);
-            if (start.equals(end)) return true;
-            if (start.isBefore(end)) {
-                return !current.isBefore(start) && !current.isAfter(end);
-            }
-            return !current.isBefore(start) || !current.isAfter(end);
-        } catch (RuntimeException ignored) {
-            return true;
-        }
+        LocalTime current = LocalTime.ofInstant(now, SERVICE_ZONE);
+        return device.isWithinServiceWindow(currentDate.getDayOfWeek(), current);
     }
 
     public record DispatchScore(

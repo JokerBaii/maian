@@ -15,6 +15,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.time.Duration;
 import java.util.IntSummaryStatistics;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,6 +28,11 @@ public class HealthMonitoringService {
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("MM-dd");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter ALERT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final int HYSTERESIS_BPM = 5;
+    private static final int MIN_EPISODE_SAMPLES = 3;
+    private static final Duration MIN_EPISODE_DURATION = Duration.ofSeconds(30);
+    private static final Duration MAX_SAMPLE_GAP = Duration.ofMinutes(2);
+    private static final Duration ALERT_COOLDOWN = Duration.ofMinutes(10);
 
     private final HeartRateReadingRepository heartRateReadingRepository;
     private final WearableDeviceRepository wearableDeviceRepository;
@@ -119,22 +125,99 @@ public class HealthMonitoringService {
         int minimum,
         int maximum
     ) {
+        List<HeartRateEpisode> episodes = aggregateEpisodes(readings, minimum, maximum);
+        Map<String, Instant> lastAlertByType = new java.util.HashMap<>();
         var alerts = new ArrayList<HealthMonitoringResponse.HeartRateAlert>();
-        readings.stream()
-            .filter(reading -> reading.getBpm() < minimum || reading.getBpm() > maximum)
-            .sorted(Comparator.comparing(HeartRateReading::getRecordedAt).reversed())
+        for (HeartRateEpisode episode : episodes) {
+            Instant previous = lastAlertByType.get(episode.type());
+            if (previous != null && Duration.between(previous, episode.startedAt()).compareTo(ALERT_COOLDOWN) < 0) {
+                continue;
+            }
+            lastAlertByType.put(episode.type(), episode.startedAt());
+            long minutes = Math.max(1, Duration.between(episode.startedAt(), episode.endedAt()).toMinutes());
+            alerts.add(new HealthMonitoringResponse.HeartRateAlert(
+                ALERT_FORMAT.format(episode.startedAt().atZone(USER_ZONE)),
+                episode.extremeBpm(),
+                episode.type(),
+                "high".equals(episode.type())
+                    ? "心率持续偏高约 " + minutes + " 分钟，请停止活动并休息"
+                    : "心率持续偏低约 " + minutes + " 分钟，如伴有不适请及时就医"
+            ));
+        }
+        return alerts.stream()
+            .sorted(Comparator.comparing(HealthMonitoringResponse.HeartRateAlert::time).reversed())
             .limit(50)
-            .forEach(reading -> {
-                boolean high = reading.getBpm() > maximum;
-                alerts.add(new HealthMonitoringResponse.HeartRateAlert(
-                    ALERT_FORMAT.format(reading.getRecordedAt().atZone(USER_ZONE)),
-                    reading.getBpm(),
-                    high ? "high" : "low",
-                    high ? "心率超过预警阈值，请停止活动并休息"
-                        : "心率低于预警阈值，如持续不适请及时就医"
-                ));
-            });
-        return alerts;
+            .toList();
+    }
+
+    private List<HeartRateEpisode> aggregateEpisodes(
+        List<HeartRateReading> readings,
+        int minimum,
+        int maximum
+    ) {
+        var episodes = new ArrayList<HeartRateEpisode>();
+        EpisodeBuilder active = null;
+        for (HeartRateReading reading : readings) {
+            String triggerType = reading.getBpm() > maximum
+                ? "high"
+                : reading.getBpm() < minimum ? "low" : null;
+            if (active == null) {
+                if (triggerType != null) active = new EpisodeBuilder(triggerType, reading);
+                continue;
+            }
+            boolean gapTooLarge = Duration.between(active.lastAt, reading.getRecordedAt())
+                .compareTo(MAX_SAMPLE_GAP) > 0;
+            boolean recovered = "high".equals(active.type)
+                ? reading.getBpm() <= maximum - HYSTERESIS_BPM
+                : reading.getBpm() >= minimum + HYSTERESIS_BPM;
+            if (gapTooLarge || recovered) {
+                active.addIfQualified(episodes);
+                active = triggerType == null ? null : new EpisodeBuilder(triggerType, reading);
+                continue;
+            }
+            active.add(reading);
+        }
+        if (active != null) active.addIfQualified(episodes);
+        return episodes;
+    }
+
+    private static final class EpisodeBuilder {
+        private final String type;
+        private final Instant startedAt;
+        private Instant lastAt;
+        private int samples;
+        private int extremeBpm;
+
+        private EpisodeBuilder(String type, HeartRateReading reading) {
+            this.type = type;
+            this.startedAt = reading.getRecordedAt();
+            this.lastAt = reading.getRecordedAt();
+            this.samples = 1;
+            this.extremeBpm = reading.getBpm();
+        }
+
+        private void add(HeartRateReading reading) {
+            lastAt = reading.getRecordedAt();
+            samples++;
+            extremeBpm = "high".equals(type)
+                ? Math.max(extremeBpm, reading.getBpm())
+                : Math.min(extremeBpm, reading.getBpm());
+        }
+
+        private void addIfQualified(List<HeartRateEpisode> episodes) {
+            if (samples >= MIN_EPISODE_SAMPLES
+                && Duration.between(startedAt, lastAt).compareTo(MIN_EPISODE_DURATION) >= 0) {
+                episodes.add(new HeartRateEpisode(type, startedAt, lastAt, extremeBpm));
+            }
+        }
+    }
+
+    private record HeartRateEpisode(
+        String type,
+        Instant startedAt,
+        Instant endedAt,
+        int extremeBpm
+    ) {
     }
 
     private HealthMonitoringResponse.HeartRatePoint toPoint(HeartRateReading reading) {

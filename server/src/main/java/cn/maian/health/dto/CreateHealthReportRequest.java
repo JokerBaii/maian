@@ -9,11 +9,12 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public record CreateHealthReportRequest(
     @NotNull @PastOrPresent LocalDate checkupDate,
     @NotBlank @Size(max = 120) String hospital,
-    @Size(max = 500) String sourceImageUrl,
+    UUID sourceMediaId,
     @NotEmpty @Size(max = 50) List<@Valid HealthIndicator> indicators
 ) {
 }

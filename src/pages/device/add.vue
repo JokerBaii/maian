@@ -496,10 +496,10 @@ function displayImageSource(path: string) {
   return path.startsWith('/api/') ? resolveApiUrl(path) : path
 }
 
-async function persistImagePaths(paths: string[]) {
+async function persistImagePaths(paths: string[], purpose: 'DEVICE_IMAGE' | 'VEHICLE_IMAGE') {
   return Promise.all(paths.map(async (path) => {
     if (path.startsWith('/api/') || /^https?:\/\//.test(path)) return path
-    return (await uploadImage(path)).url
+    return (await uploadImage(path, purpose)).mediaId
   }))
 }
 
@@ -779,10 +779,10 @@ async function handleSubmit() {
       ? await getCurrentLocation()
       : { longitude: fixedForm.value.longitude, latitude: fixedForm.value.latitude }
     const [imageUrls, vehicleImageUrls] = deviceType.value === 'fixed'
-      ? [await persistImagePaths(fixedForm.value.images), []]
+      ? [await persistImagePaths(fixedForm.value.images, 'DEVICE_IMAGE'), []]
       : await Promise.all([
-          persistImagePaths(mobileForm.value.deviceImages),
-          persistImagePaths(mobileForm.value.vehicleImages)
+          persistImagePaths(mobileForm.value.deviceImages, 'DEVICE_IMAGE'),
+          persistImagePaths(mobileForm.value.vehicleImages, 'VEHICLE_IMAGE')
         ])
     const payload: SaveEmergencyDeviceRequest = deviceType.value === 'fixed'
       ? {

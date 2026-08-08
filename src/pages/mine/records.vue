@@ -99,7 +99,12 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
-import { listRescueCalls, listResponderTasks, type RescueCallResponse } from '@/api/rescue'
+import {
+  listRescueCalls,
+  listResponderTasks,
+  type RescueCallResponse,
+  type ResponderTaskResponse
+} from '@/api/rescue'
 import { demoUsers, getDemoUserId } from '@/utils/demoSession'
 
 const currentTab = ref<'initiated' | 'participated'>('initiated')
@@ -135,8 +140,20 @@ function toRecord(call: RescueCallResponse): RescueRecordView {
   }
 }
 
+function responderToRecord(call: ResponderTaskResponse): RescueRecordView {
+  return {
+    id: call.id,
+    address: call.address || '接单后可查看精确位置',
+    description: call.description || call.symptoms.join('、') || '紧急救援请求',
+    urgency: call.urgency.toLowerCase(),
+    status: call.status.toLowerCase(),
+    createTime: formatTime(call.createdAt)
+  }
+}
+
 function goDetail(rescueId: string) {
-  uni.navigateTo({ url: `/pages/rescue/detail?id=${encodeURIComponent(rescueId)}` })
+  const mode = currentTab.value === 'participated' ? '&mode=responder' : ''
+  uni.navigateTo({ url: `/pages/rescue/detail?id=${encodeURIComponent(rescueId)}${mode}` })
 }
 
 async function loadRecords() {
@@ -147,8 +164,8 @@ async function loadRecords() {
     ])
     initiatedRecords.value = initiated.content.map(toRecord)
     participatedRecords.value = participated?.content
-      .filter(call => call.responderUserId === getDemoUserId())
-      .map(toRecord) || []
+      .filter(call => call.detailAvailable)
+      .map(responderToRecord) || []
   } catch {
     uni.showToast({ title: '救援记录加载失败', icon: 'none' })
   }

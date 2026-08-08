@@ -4,7 +4,7 @@ import cn.maian.health.domain.HeartRateReading;
 import cn.maian.health.repository.HeartRateReadingRepository;
 import cn.maian.health.repository.WearableDeviceRepository;
 import cn.maian.user.domain.UserSettings;
-import cn.maian.user.context.DemoUserContext;
+import cn.maian.security.DemoAccounts;
 import cn.maian.user.service.CurrentUserService;
 import cn.maian.user.service.UserSettingsService;
 import org.junit.jupiter.api.Test;
@@ -36,9 +36,9 @@ class HealthMonitoringServiceTest {
     void returnsHonestEmptyStateInsteadOfFabricatedMeasurements() {
         stubSettings();
         when(readingRepository.findAllByUserIdAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(
-            eq(DemoUserContext.DEFAULT_USER_ID), any(Instant.class)
+            eq(DemoAccounts.USER_ID), any(Instant.class)
         )).thenReturn(List.of());
-        when(wearableRepository.findByUserId(DemoUserContext.DEFAULT_USER_ID))
+        when(wearableRepository.findByUserId(DemoAccounts.USER_ID))
             .thenReturn(Optional.empty());
 
         var response = service.currentSummary();
@@ -55,26 +55,28 @@ class HealthMonitoringServiceTest {
         stubSettings();
         Instant now = Instant.now();
         var readings = List.of(
-            HeartRateReading.create(DemoUserContext.DEFAULT_USER_ID, null, 72, "resting", now.minusSeconds(60)),
-            HeartRateReading.create(DemoUserContext.DEFAULT_USER_ID, null, 132, "exercise", now)
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 72, "resting", now.minusSeconds(60)),
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 128, "exercise", now),
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 132, "exercise", now.plusSeconds(15)),
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 130, "exercise", now.plusSeconds(30))
         );
         when(readingRepository.findAllByUserIdAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(
-            eq(DemoUserContext.DEFAULT_USER_ID), any(Instant.class)
+            eq(DemoAccounts.USER_ID), any(Instant.class)
         )).thenReturn(readings);
-        when(wearableRepository.findByUserId(DemoUserContext.DEFAULT_USER_ID))
+        when(wearableRepository.findByUserId(DemoAccounts.USER_ID))
             .thenReturn(Optional.empty());
 
         var response = service.currentSummary();
 
-        assertThat(response.current()).isEqualTo(132);
+        assertThat(response.current()).isEqualTo(130);
         assertThat(response.status()).isEqualTo("high");
         assertThat(response.alerts()).hasSize(1);
         assertThat(response.alerts().getFirst().value()).isEqualTo(132);
     }
 
     private void stubSettings() {
-        when(currentUserService.currentUserId()).thenReturn(DemoUserContext.DEFAULT_USER_ID);
+        when(currentUserService.currentUserId()).thenReturn(DemoAccounts.USER_ID);
         when(settingsService.findOrCreate())
-            .thenReturn(UserSettings.defaults(DemoUserContext.DEFAULT_USER_ID));
+            .thenReturn(UserSettings.defaults(DemoAccounts.USER_ID));
     }
 }

@@ -43,6 +43,17 @@ public class UserProfile {
     protected UserProfile() {
     }
 
+    public static UserProfile register(UUID id, String nickname, String phone, Instant now) {
+        UserProfile profile = new UserProfile();
+        profile.id = id;
+        profile.nickname = nickname;
+        profile.phone = phone;
+        profile.role = "USER";
+        profile.verified = false;
+        profile.createdAt = now;
+        return profile;
+    }
+
     public void verify(String realName, String idCardMasked) {
         this.realName = realName;
         this.idCardMasked = idCardMasked;

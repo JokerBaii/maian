@@ -37,8 +37,9 @@ public class ScienceSubmission {
     @Column(nullable = false)
     private boolean hasCoverImage;
 
-    @Column(length = 500)
-    private String coverImageUrl;
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 36)
+    private UUID coverMediaId;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
@@ -60,7 +61,7 @@ public class ScienceSubmission {
         String title,
         String category,
         String content,
-        String coverImageUrl
+        UUID coverMediaId
     ) {
         var submission = new ScienceSubmission();
         submission.id = UUID.randomUUID();
@@ -68,8 +69,8 @@ public class ScienceSubmission {
         submission.title = title;
         submission.category = category;
         submission.content = content;
-        submission.coverImageUrl = coverImageUrl;
-        submission.hasCoverImage = coverImageUrl != null && !coverImageUrl.isBlank();
+        submission.coverMediaId = coverMediaId;
+        submission.hasCoverImage = coverMediaId != null;
         submission.status = SubmissionStatus.PENDING;
         submission.submittedAt = Instant.now();
         return submission;
@@ -112,8 +113,8 @@ public class ScienceSubmission {
         return hasCoverImage;
     }
 
-    public String getCoverImageUrl() {
-        return coverImageUrl;
+    public UUID getCoverMediaId() {
+        return coverMediaId;
     }
 
     public Instant getSubmittedAt() {

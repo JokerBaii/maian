@@ -24,17 +24,11 @@
             @tap.stop="accept(task)"
           >{{ busyTaskId === task.id ? '处理中…' : '立即接单' }}</view>
           <view
-            v-else-if="task.status === 'ACCEPTED'"
+            v-else-if="nextAction(task)"
             class="primary"
             :class="{ 'action-busy': busyTaskId === task.id }"
-            @tap.stop="progress(task, 'RESCUING')"
-          >{{ busyTaskId === task.id ? '处理中…' : '开始赶往现场' }}</view>
-          <view
-            v-else-if="task.status === 'RESCUING'"
-            class="complete"
-            :class="{ 'action-busy': busyTaskId === task.id }"
-            @tap.stop="progress(task, 'COMPLETED')"
-          >{{ busyTaskId === task.id ? '处理中…' : '完成救援' }}</view>
+            @tap.stop="progress(task)"
+          >{{ busyTaskId === task.id ? '处理中…' : nextAction(task)?.label }}</view>
           <view v-else class="done">任务已结束</view>
         </view>
       </view>
@@ -44,15 +38,27 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
-import { acceptRescueTask, listResponderTasks, updateResponderProgress, type RescueCallResponse } from '@/api/rescue'
+import { onHide, onShow } from '@dcloudio/uni-app'
+import {
+  acceptRescueTask,
+  listResponderTasks,
+  performResponderAction,
+  updateResponderPresence,
+  type ResponderTaskResponse
+} from '@/api/rescue'
+import { getCurrentGcj02Location } from '@/utils/location'
+import { connectRescueEvents } from '@/utils/rescueEvents'
 
-const tasks = ref<RescueCallResponse[]>([])
+const tasks = ref<ResponderTaskResponse[]>([])
 const loading = ref(true)
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+let disconnectEvents: (() => void) | null = null
 
 async function load() {
   loading.value = true
   try {
+    const location = await getCurrentGcj02Location()
+    await updateResponderPresence({ ...location, available: true })
     tasks.value = (await listResponderTasks()).content
   } catch (error: any) {
     uni.showToast({ title: error?.message || '救援任务加载失败', icon: 'none' })
@@ -61,13 +67,17 @@ async function load() {
   }
 }
 
-function goDetail(task: RescueCallResponse) {
-  uni.navigateTo({ url: `/pages/rescue/detail?id=${encodeURIComponent(task.id)}` })
+function goDetail(task: ResponderTaskResponse) {
+  if (!task.detailAvailable) {
+    uni.showToast({ title: '接单后可查看精确位置与现场资料', icon: 'none' })
+    return
+  }
+  uni.navigateTo({ url: `/pages/rescue/detail?id=${encodeURIComponent(task.id)}&mode=responder` })
 }
 
 const busyTaskId = ref('')
 
-async function accept(task: RescueCallResponse) {
+async function accept(task: ResponderTaskResponse) {
   if (busyTaskId.value) return
   busyTaskId.value = task.id
   try {
@@ -81,12 +91,31 @@ async function accept(task: RescueCallResponse) {
   }
 }
 
-async function progress(task: RescueCallResponse, status: 'RESCUING' | 'COMPLETED') {
+type TaskAction = 'aed-arrival' | 'aed-pickup' | 'requester-arrival' | 'rescue-start' | 'completion-submission' | 'aed-return'
+
+function nextAction(task: ResponderTaskResponse): { action: TaskAction; label: string } | null {
+  if (task.status === 'EN_ROUTE_TO_AED') {
+    return task.arrivedAtAedAt
+      ? { action: 'aed-pickup', label: '已取出 AED，赶往现场' }
+      : { action: 'aed-arrival', label: '已到达 AED 取用点' }
+  }
+  if (task.status === 'EN_ROUTE_TO_REQUESTER') return { action: 'requester-arrival', label: '已到达求救者位置' }
+  if (task.status === 'ARRIVED') return { action: 'rescue-start', label: '开始现场施救' }
+  if (task.status === 'RESCUING') return { action: 'completion-submission', label: '完成救援' }
+  if (task.status === 'COMPLETED' && task.aedCustodyStatus === 'RETURNING') {
+    return { action: 'aed-return', label: '已归还 AED' }
+  }
+  return null
+}
+
+async function progress(task: ResponderTaskResponse) {
+  const next = nextAction(task)
+  if (!next) return
   if (busyTaskId.value) return
   busyTaskId.value = task.id
   try {
-    Object.assign(task, await updateResponderProgress(task.id, status))
-    uni.showToast({ title: status === 'RESCUING' ? '已开始救援' : '救援已完成', icon: 'success' })
+    Object.assign(task, await performResponderAction(task.id, next.action))
+    uni.showToast({ title: '状态已同步', icon: 'success' })
   } catch (error: any) {
     uni.showToast({ title: error?.message || '状态更新失败', icon: 'none' })
   } finally {
@@ -98,13 +127,29 @@ function urgencyLabel(value: string) {
   return ({ CRITICAL: '危急', HIGH: '紧急', MEDIUM: '一般' } as Record<string, string>)[value] || value
 }
 function statusLabel(value: string) {
-  return ({ MATCHING: '等待接单', ACCEPTED: '已接单', RESCUING: '赶往现场', COMPLETED: '已完成', CANCELLED: '已取消' } as Record<string, string>)[value] || value
+  return ({
+    MATCHING: '等待接单', EN_ROUTE_TO_AED: '赶往 AED',
+    EN_ROUTE_TO_REQUESTER: '赶往现场', ARRIVED: '已到达', RESCUING: '施救中',
+    PENDING_CONFIRMATION: '待求救者确认', COMPLETED: '已完成', USER_CANCELLED: '已取消',
+    NO_RESOURCE: '暂无资源', EXPIRED: '已超时', SYSTEM_FAILED: '系统异常'
+  } as Record<string, string>)[value] || value
 }
 function formatEta(seconds: number) {
   return seconds < 60 ? `${seconds}秒` : `${Math.ceil(seconds / 60)}分钟`
 }
 
-onShow(load)
+onShow(() => {
+  load()
+  refreshTimer = setInterval(load, 10000)
+  disconnectEvents = connectRescueEvents(() => load())
+})
+
+onHide(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+  refreshTimer = null
+  disconnectEvents?.()
+  disconnectEvents = null
+})
 </script>
 
 <style lang="scss" scoped>

@@ -1,0 +1,26 @@
+[Unit]
+Description=Maian Rescue Spring Boot Service
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=maian
+Group=maian
+WorkingDirectory=/opt/maian
+EnvironmentFile=/opt/maian/db.env
+EnvironmentFile=/opt/maian/app.env
+ExecStart=/usr/bin/java -XX:MaxRAMPercentage=70 -jar /opt/maian/maian-server.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/maian/media
+
+[Install]
+WantedBy=multi-user.target

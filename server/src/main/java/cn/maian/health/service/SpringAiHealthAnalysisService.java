@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import cn.maian.user.service.UserSettingsService;
 
 import java.util.stream.Collectors;
 
@@ -20,19 +21,25 @@ public class SpringAiHealthAnalysisService implements HealthAnalysisService {
     private final ChatClient chatClient;
     private final Resource promptTemplate;
     private final RuleBasedHealthAnalysisService fallback;
+    private final UserSettingsService userSettingsService;
 
     public SpringAiHealthAnalysisService(
         ChatClient.Builder chatClientBuilder,
         @Value("classpath:prompts/analyze-health-report.st") Resource promptTemplate,
-        RuleBasedHealthAnalysisService fallback
+        RuleBasedHealthAnalysisService fallback,
+        UserSettingsService userSettingsService
     ) {
         this.chatClient = chatClientBuilder.build();
         this.promptTemplate = promptTemplate;
         this.fallback = fallback;
+        this.userSettingsService = userSettingsService;
     }
 
     @Override
     public HealthAnalysisResponse analyze(HealthAnalysisRequest request) {
+        if (!userSettingsService.findOrCreate().isHealthDataShare()) {
+            return fallback.analyze(request);
+        }
         HealthAnalysisResponse result;
         try {
             result = chatClient.prompt()

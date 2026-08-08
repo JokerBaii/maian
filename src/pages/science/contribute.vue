@@ -181,13 +181,13 @@ async function handleSubmit() {
 
   try {
     const cover = formData.value.coverImage
-      ? await uploadImage(formData.value.coverImage)
+      ? await uploadImage(formData.value.coverImage, 'SCIENCE_COVER')
       : null
     await createScienceSubmission({
       title: formData.value.title.trim(),
       category: formData.value.category,
       content: formData.value.content.trim(),
-      coverImageUrl: cover?.url
+      coverMediaId: cover?.mediaId
     })
     uni.hideLoading()
     uni.showToast({

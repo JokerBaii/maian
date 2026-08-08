@@ -5,7 +5,6 @@ import cn.maian.device.domain.DeviceStatus;
 import cn.maian.device.domain.EmergencyDevice;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.Lock;
@@ -23,6 +22,12 @@ public interface EmergencyDeviceRepository extends JpaRepository<EmergencyDevice
     Page<EmergencyDevice> findAllByType(DeviceType type, Pageable pageable);
 
     Page<EmergencyDevice> findAllByStatus(DeviceStatus status, Pageable pageable);
+    Page<EmergencyDevice> findAllByStatusIn(Collection<DeviceStatus> statuses, Pageable pageable);
+    Page<EmergencyDevice> findAllByTypeAndStatusIn(
+        DeviceType type,
+        Collection<DeviceStatus> statuses,
+        Pageable pageable
+    );
     Page<EmergencyDevice> findAllByStatusNotIn(Collection<DeviceStatus> statuses, Pageable pageable);
     Page<EmergencyDevice> findAllByTypeAndStatusNotIn(
         DeviceType type,
@@ -48,7 +53,17 @@ public interface EmergencyDeviceRepository extends JpaRepository<EmergencyDevice
 
     @Query("""
         select device from EmergencyDevice device
+        where device.id = :id and device.registeredByUserId = :userId
+        """)
+    java.util.Optional<EmergencyDevice> findOwnedById(
+        @Param("id") UUID id,
+        @Param("userId") UUID userId
+    );
+
+    @Query("""
+        select device from EmergencyDevice device
         where device.category = 'AED'
+          and device.type = :type
           and device.status = cn.maian.device.domain.DeviceStatus.AVAILABLE
           and device.latitude between :minLatitude and :maxLatitude
           and device.longitude between :minLongitude and :maxLongitude
@@ -59,6 +74,7 @@ public interface EmergencyDeviceRepository extends JpaRepository<EmergencyDevice
                + (device.longitude - :centerLongitude) * (device.longitude - :centerLongitude)) asc
         """)
     List<EmergencyDevice> findDispatchCandidates(
+        @Param("type") DeviceType type,
         @Param("centerLatitude") double centerLatitude,
         @Param("centerLongitude") double centerLongitude,
         @Param("minLatitude") double minLatitude,
@@ -70,20 +86,9 @@ public interface EmergencyDeviceRepository extends JpaRepository<EmergencyDevice
         Pageable pageable
     );
 
-    @Modifying(flushAutomatically = true)
-    @Query("""
-        update EmergencyDevice device
-           set device.status = cn.maian.device.domain.DeviceStatus.RESERVED,
-               device.reservedForCallId = :rescueCallId,
-               device.reservedAt = :reservedAt,
-               device.version = device.version + 1
-         where device.id = :deviceId
-           and device.status = cn.maian.device.domain.DeviceStatus.AVAILABLE
-           and device.reservedForCallId is null
-        """)
-    int reserveIfAvailable(
-        @Param("deviceId") UUID deviceId,
-        @Param("rescueCallId") UUID rescueCallId,
-        @Param("reservedAt") Instant reservedAt
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select device from EmergencyDevice device where device.id = :deviceId")
+    java.util.Optional<EmergencyDevice> findDispatchCandidateForUpdateById(
+        @Param("deviceId") UUID deviceId
     );
 }

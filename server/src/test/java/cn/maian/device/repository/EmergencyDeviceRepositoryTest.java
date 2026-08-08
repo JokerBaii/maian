@@ -3,6 +3,7 @@ package cn.maian.device.repository;
 import cn.maian.device.domain.DeviceStatus;
 import cn.maian.device.domain.DeviceType;
 import cn.maian.device.domain.EmergencyDevice;
+import cn.maian.device.domain.DeviceServiceWindow;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -29,12 +30,13 @@ class EmergencyDeviceRepositoryTest {
     private EntityManager entityManager;
 
     @Test
-    void narrowsCandidatesAndClaimsDeviceAtomically() {
+    void narrowsCandidatesAndLocksDeviceBeforeReservation() {
         EmergencyDevice available = repository.save(device("AED", 30.2810, 120.1510));
         repository.save(device("急救包", 30.2805, 120.1505));
         repository.flush();
 
         var candidates = repository.findDispatchCandidates(
+            DeviceType.FIXED,
             30.2800,
             120.1500,
             30.20,
@@ -50,12 +52,10 @@ class EmergencyDeviceRepositoryTest {
             .containsExactly(available.getId());
 
         UUID rescueCallId = UUID.randomUUID();
-        assertThat(repository.reserveIfAvailable(
-            available.getId(), rescueCallId, Instant.now()
-        )).isEqualTo(1);
-        assertThat(repository.reserveIfAvailable(
-            available.getId(), UUID.randomUUID(), Instant.now()
-        )).isZero();
+        EmergencyDevice locked = repository.findDispatchCandidateForUpdateById(
+            available.getId()
+        ).orElseThrow();
+        locked.markReserved(rescueCallId, Instant.now());
 
         repository.flush();
         entityManager.clear();
@@ -76,7 +76,7 @@ class EmergencyDeviceRepositoryTest {
             longitude,
             latitude,
             "13500000000",
-            "全天",
+            DeviceServiceWindow.alwaysOpen(),
             null,
             "测试资源方",
             null,

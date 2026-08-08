@@ -4,8 +4,7 @@ public enum DeviceStatus {
     PENDING_REVIEW,
     AVAILABLE,
     RESERVED,
-    MAINTENANCE,
-    OFFLINE,
+    DISABLED,
     EXPIRED,
     REJECTED
 }

@@ -6,7 +6,15 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-@EnableConfigurationProperties({CorsProperties.class, UploadProperties.class, DispatchProperties.class})
+@EnableConfigurationProperties({
+    CorsProperties.class,
+    DispatchProperties.class,
+    AuthProperties.class,
+    DemoProperties.class,
+    MediaProperties.class,
+    OcrProperties.class,
+    AbuseProperties.class
+})
 public class WebConfiguration implements WebMvcConfigurer {
 
     private final CorsProperties corsProperties;

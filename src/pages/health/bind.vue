@@ -137,6 +137,8 @@ import {
   getWearableDevice,
   saveWearableDevice
 } from '@/api/monitoring'
+import { bleHeartRateService } from '@/services/bleHeartRateService'
+import { parseHeartRateMeasurement } from '@/utils/heartRateMeasurement'
 
 const { updateWearable } = useHealthMonitoring()
 
@@ -233,12 +235,14 @@ function startBluetoothScan() {
   discoveredDevices.length = 0
   uni.openBluetoothAdapter({
     success: async () => {
-      uni.onBluetoothDeviceFound(handleBluetoothDevicesFound)
+      bleHeartRateService.markAdapterOpen()
+      bleHeartRateService.registerDiscovery(handleBluetoothDevicesFound)
       uni.startBluetoothDevicesDiscovery({
         allowDuplicatesKey: false,
         interval: 500,
         success: () => {
           isScanning.value = true
+          bleHeartRateService.markScanning()
           scanTimer = setTimeout(stopScan, 10000)
         },
         fail: showBluetoothError
@@ -309,7 +313,11 @@ function startHeartRateNotifications(deviceId: string) {
             && (item.properties?.notify || item.properties?.indicate)
           ))
           if (!characteristic) return
-          uni.onBLECharacteristicValueChange(handleHeartRateValue)
+          bleHeartRateService.registerHeartRateNotification({
+            deviceId,
+            serviceId: service.uuid,
+            characteristicId: characteristic.uuid
+          }, handleHeartRateValue)
           uni.notifyBLECharacteristicValueChange({
             deviceId,
             serviceId: service.uuid,
@@ -324,14 +332,10 @@ function startHeartRateNotifications(deviceId: string) {
 
 function handleHeartRateValue(result: any) {
   if (!result?.value) return
-  const view = new DataView(result.value)
-  if (view.byteLength < 2) return
-  const usesSixteenBits = (view.getUint8(0) & 0x01) === 0x01
-  const bpm = usesSixteenBits && view.byteLength >= 3
-    ? view.getUint16(1, true)
-    : view.getUint8(1)
+  const bpm = parseHeartRateMeasurement(result.value)
+  if (bpm == null) return
   const now = Date.now()
-  if (bpm < 25 || bpm > 250 || now - lastReadingUploadAt < 15000) return
+  if (now - lastReadingUploadAt < 15000) return
   lastReadingUploadAt = now
   createHeartRateReading({
     bpm,
@@ -350,7 +354,7 @@ function stopScan() {
   }
   isScanning.value = false
   // #ifdef APP-PLUS
-  uni.stopBluetoothDevicesDiscovery({})
+  bleHeartRateService.stopDiscovery()
   // #endif
 }
 
@@ -373,6 +377,7 @@ function handleBind(device: DiscoveredDevice) {
 
   // #ifdef APP-PLUS
   stopScan()
+  bleHeartRateService.markConnecting()
   uni.createBLEConnection({
     deviceId: device.id,
     timeout: 10000,
@@ -380,6 +385,7 @@ function handleBind(device: DiscoveredDevice) {
       device.binding = false
       device.bound = true
       connectedDeviceId.value = device.id
+      bleHeartRateService.markConnected(device.id)
       boundDeviceName.value = device.name
       boundDevice.value = {
         name: device.name,
@@ -453,10 +459,7 @@ function handleDisconnect() {
         }
         // #ifdef APP-PLUS
         if (connectedDeviceId.value) {
-          uni.closeBLEConnection({
-            deviceId: connectedDeviceId.value,
-            complete: clearDevice
-          })
+          bleHeartRateService.disconnect(connectedDeviceId.value, clearDevice)
         } else {
           clearDevice()
         }
@@ -469,7 +472,10 @@ function handleDisconnect() {
   })
 }
 
-onUnmounted(stopScan)
+onUnmounted(() => {
+  stopScan()
+  // 心率通知由 App 级单例继续接收；扫描监听会随页面释放。
+})
 
 </script>
 

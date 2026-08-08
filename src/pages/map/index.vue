@@ -75,8 +75,8 @@
     <map
       id="native-rescue-map"
       class="map-container"
-      :longitude="myLocation[0]"
-      :latitude="myLocation[1]"
+      :longitude="myLocation?.[0] ?? FIXED_LOCATION.longitude"
+      :latitude="myLocation?.[1] ?? FIXED_LOCATION.latitude"
       :markers="nativeMarkers"
       :scale="13"
       show-location
@@ -234,7 +234,7 @@ import { onShow } from '@dcloudio/uni-app'
 import 'leaflet/dist/leaflet.css'
 // #endif
 import AppIcon from '@/components/AppIcon.vue'
-import { getCurrentGcj02Location, FIXED_LOCATION } from '@/utils/location'
+import { getCurrentGcj02Location, FIXED_LOCATION, isDemoMode } from '@/utils/location'
 import { loadAMap } from '@/common/amap'
 import { addBaseTileLayer } from '@/common/mapTiles'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
@@ -277,11 +277,14 @@ const SELF_MARKER_HTML =
   + '<i style="position:absolute;inset:4px;border-radius:50%;border:1.5px solid #FFFFFF;'
   + 'background:#2F73E8;box-shadow:0 1px 4px rgba(47,115,232,0.5)"></i></span>'
 
-// 位置固定可用，距离与排序无需等待定位授权
-const myLocation = ref([FIXED_LOCATION.longitude, FIXED_LOCATION.latitude])
+// 固定坐标只是 Demo Mode 的演示位置；正式模式在真实定位前不伪造用户位置。
+const myLocation = ref<number[] | null>(isDemoMode
+  ? [FIXED_LOCATION.longitude, FIXED_LOCATION.latitude]
+  : null)
 const remoteDevices = ref<any[] | null>(null)
 
 function calculateDistance(longitude: number, latitude: number) {
+  if (!myLocation.value) return Number.POSITIVE_INFINITY
   const [myLongitude, myLatitude] = myLocation.value
   const toRadians = (value: number) => value * Math.PI / 180
   const latDelta = toRadians(latitude - myLatitude)
@@ -293,6 +296,7 @@ function calculateDistance(longitude: number, latitude: number) {
 }
 
 function formatDistance(distance: number) {
+  if (!Number.isFinite(distance)) return '定位中'
   return distance < 1 ? `${Math.max(50, Math.round(distance * 1000))}m` : `${distance.toFixed(1)}km`
 }
 
@@ -438,11 +442,12 @@ async function initMap() {
   mapUnavailable.value = false
   mapProvider = 'amap'
   const AMap = (window as any).AMap
+  const center = myLocation.value || [FIXED_LOCATION.longitude, FIXED_LOCATION.latitude]
 
   // 与 Leaflet 分支保持一致，统一以当前位置为中心
   mapInstance = new AMap.Map('map-container', {
     zoom: 14,
-    center: [...myLocation.value],
+    center: [...center],
     mapStyle: 'amap://styles/whitesmoke',
     resizeEnable: true
   })
@@ -457,11 +462,12 @@ async function initLeafletMap() {
     leafletApi = module.default || module
     mapProvider = 'leaflet'
     mapUnavailable.value = false
+    const center = myLocation.value || [FIXED_LOCATION.longitude, FIXED_LOCATION.latitude]
     mapInstance = leafletApi.map('map-container', {
       zoomControl: false,
       attributionControl: true,
       preferCanvas: true
-    }).setView([myLocation.value[1], myLocation.value[0]], 14)
+    }).setView([center[1], center[0]], 14)
     addBaseTileLayer(leafletApi, mapInstance, () => {
       mapUnavailable.value = true
       uni.showToast({ title: '底图加载失败，已切换为资源视图', icon: 'none', duration: 2000 })
@@ -479,7 +485,7 @@ async function initLeafletMap() {
 
 /** 画出或移动自身位置标记，让用户能看到自己与附近设备的相对位置。 */
 function updateSelfMarker() {
-  if (!mapInstance) return
+  if (!mapInstance || !myLocation.value) return
   const [longitude, latitude] = myLocation.value
 
   if (mapProvider === 'leaflet') {
@@ -680,7 +686,7 @@ function handleSearch() {
   addMarkers()
 }
 
-function locateMe(showResult = true) {
+async function locateMe(showResult = true) {
   const applyLocation = (longitude: number, latitude: number) => {
     myLocation.value = [longitude, latitude]
     updateSelfMarker()
@@ -698,7 +704,7 @@ function locateMe(showResult = true) {
     if (showResult) uni.showToast({ title: '定位已更新', icon: 'success' })
   }
 
-  getCurrentGcj02Location().then((result) => {
+  return getCurrentGcj02Location().then((result) => {
     applyLocation(result.longitude, result.latitude)
   })
 }
@@ -748,11 +754,11 @@ function toggleDrawer() {
 onMounted(() => {
   nextTick(async () => {
     preloadMarkerAssets()
+    await locateMe(false)
     const devicesPromise = loadDevices()
     // #ifdef H5
     const mapPromise = initMap()
     // #endif
-    locateMe(false)
     await devicesPromise
     // #ifdef H5
     await mapPromise

@@ -94,8 +94,9 @@ import { computed, onMounted, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { uploadImage } from '@/api/files'
 import { ApiRequestError } from '@/api/http'
-import { createRescueCall, type RescueUrgency } from '@/api/rescue'
-import { getCurrentGcj02Location, FIXED_LOCATION, FIXED_LOCATION_ADDRESS } from '@/utils/location'
+import { attachRescueMedia, createRescueCall, type RescueUrgency } from '@/api/rescue'
+import { getCurrentGcj02Location, FIXED_LOCATION, FIXED_LOCATION_ADDRESS, isDemoMode } from '@/utils/location'
+import { createClientRequestId } from '@/utils/requestId'
 
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
 const isSubmitting = ref(false)
@@ -105,12 +106,12 @@ const selectedUrgency = ref('critical')
 const selectedSymptoms = ref<string[]>([])
 const description = ref('')
 const photoList = ref<string[]>([])
-const locationText = ref(FIXED_LOCATION_ADDRESS)
-// 位置固定，坐标从一开始就可用，呼救不会因缺少定位被拦住
-const rescueCoordinates = ref<{ latitude: number; longitude: number } | null>({
+const locationText = ref(isDemoMode ? FIXED_LOCATION_ADDRESS : '正在获取真实位置')
+const rescueCoordinates = ref<{ latitude: number; longitude: number } | null>(isDemoMode ? {
   latitude: FIXED_LOCATION.latitude,
   longitude: FIXED_LOCATION.longitude
-})
+} : null)
+const sosRequestId = ref(createClientRequestId())
 const flowSteps = [
   { label: '获取定位', icon: 'location-filled' },
   { label: '智能匹配', icon: 'map-filled' },
@@ -135,7 +136,8 @@ async function refreshLocation() {
   try {
     const result = await getCurrentGcj02Location()
     rescueCoordinates.value = { latitude: result.latitude, longitude: result.longitude }
-    locationText.value = FIXED_LOCATION_ADDRESS
+    locationText.value = result.address
+      || `${result.latitude.toFixed(5)}, ${result.longitude.toFixed(5)}`
     return true
   } finally {
     isLocating.value = false
@@ -171,7 +173,6 @@ async function submitRescue() {
   if (!coordinates || isSubmitting.value) return
   isSubmitting.value = true
   try {
-    const uploadedImages = await Promise.all(photoList.value.map(uploadImage))
     const rescueCall = await createRescueCall({
       urgency: selectedUrgency.value.toUpperCase() as RescueUrgency,
       latitude: coordinates.latitude,
@@ -179,15 +180,26 @@ async function submitRescue() {
       address: locationText.value,
       description: description.value.trim() || '一键呼救，请尽快联系确认现场情况',
       symptoms: selectedSymptoms.value.length ? selectedSymptoms.value : ['需要紧急救助'],
-      imageUrls: uploadedImages.map(image => image.url),
-      clientRequestId: `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+      clientRequestId: sosRequestId.value
     })
     uni.navigateTo({ url: `/pages/rescue/detail?id=${encodeURIComponent(rescueCall.id)}` })
+    void uploadRescueAttachments(rescueCall.id, [...photoList.value])
   } catch (error) {
     const message = error instanceof ApiRequestError ? error.message : '救援请求发送失败，请重试'
     uni.showModal({ title: '发送失败', content: `${message}\n如情况危急，请立即拨打 120。`, showCancel: false })
   } finally {
     isSubmitting.value = false
+  }
+}
+
+async function uploadRescueAttachments(rescueCallId: string, paths: string[]) {
+  for (const path of paths) {
+    try {
+      const media = await uploadImage(path, 'RESCUE_ATTACHMENT')
+      await attachRescueMedia(rescueCallId, media.mediaId)
+    } catch (error) {
+      console.warn('救援附件后台上传失败', error)
+    }
   }
 }
 

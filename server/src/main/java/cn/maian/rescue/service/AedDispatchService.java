@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 public class AedDispatchService {
@@ -41,7 +42,8 @@ public class AedDispatchService {
         double longitudeRadius = properties.searchRadiusKm()
             / (LATITUDE_KM_PER_DEGREE * longitudeScale);
 
-        var rankedCandidates = emergencyDeviceRepository.findDispatchCandidates(
+        var fixedCandidates = emergencyDeviceRepository.findDispatchCandidates(
+                DeviceType.FIXED,
                 rescueCall.getLatitude(),
                 rescueCall.getLongitude(),
                 rescueCall.getLatitude() - latitudeRadius,
@@ -50,8 +52,22 @@ public class AedDispatchService {
                 rescueCall.getLongitude() + longitudeRadius,
                 LocalDate.ofInstant(now, SERVICE_ZONE),
                 now.minusSeconds(properties.mobileLocationMaxAgeSeconds()),
-                PageRequest.of(0, properties.candidateLimit())
-            ).stream()
+                PageRequest.of(0, properties.candidateLimitPerType())
+            );
+        var mobileCandidates = emergencyDeviceRepository.findDispatchCandidates(
+                DeviceType.MOBILE,
+                rescueCall.getLatitude(),
+                rescueCall.getLongitude(),
+                rescueCall.getLatitude() - latitudeRadius,
+                rescueCall.getLatitude() + latitudeRadius,
+                rescueCall.getLongitude() - longitudeRadius,
+                rescueCall.getLongitude() + longitudeRadius,
+                LocalDate.ofInstant(now, SERVICE_ZONE),
+                now.minusSeconds(properties.mobileLocationMaxAgeSeconds()),
+                PageRequest.of(0, properties.candidateLimitPerType())
+            );
+
+        var rankedCandidates = Stream.concat(fixedCandidates.stream(), mobileCandidates.stream())
             .map(device -> toCandidate(rescueCall, device, now))
             .filter(candidate -> candidate.score().eligible())
             .filter(candidate -> candidate.score().distanceMeters()
@@ -67,13 +83,14 @@ public class AedDispatchService {
             .toList();
 
         for (RankedCandidate candidate : rankedCandidates) {
-            int reserved = emergencyDeviceRepository.reserveIfAvailable(
-                candidate.device().getId(),
-                rescueCall.getId(),
-                now
-            );
-            if (reserved == 1) {
-                return Optional.of(new DispatchResult(candidate.device(), candidate.score(), now));
+            var lockedDevice = emergencyDeviceRepository.findDispatchCandidateForUpdateById(
+                candidate.device().getId()
+            ).orElse(null);
+            if (lockedDevice != null
+                && lockedDevice.getStatus() == cn.maian.device.domain.DeviceStatus.AVAILABLE
+                && lockedDevice.getReservedForCallId() == null) {
+                lockedDevice.markReserved(rescueCall.getId(), now);
+                return Optional.of(new DispatchResult(lockedDevice, candidate.score(), now));
             }
         }
         return Optional.empty();

@@ -14,20 +14,20 @@ export interface HealthReportResponse {
   id: string
   checkupDate: string
   hospital: string
-  sourceImageUrl?: string
+  sourceMediaId?: string
   riskLevel: HealthRiskLevel
   summary: string
   indicators: HealthIndicatorRequest[]
   recommendations: string[]
   disclaimer: string
-  analysisSource: 'RULE_BASED' | 'SPRING_AI'
+  analysisSource: 'RULE_BASED_V2' | 'SPRING_AI'
   createdAt: string
 }
 
 export interface CreateHealthReportRequest {
   checkupDate: string
   hospital: string
-  sourceImageUrl?: string
+  sourceMediaId?: string
   indicators: HealthIndicatorRequest[]
 }
 
@@ -36,13 +36,14 @@ export interface ReportRecognitionResponse {
   hospital: string
   checkupDate: string
   indicators: HealthIndicatorRequest[]
+  rawLines: string[]
 }
 
 /** 上传原图后识别关键指标，返回结果需人工核对再保存。 */
-export function recognizeHealthReport(sourceImageUrl: string) {
+export function recognizeHealthReport(mediaId: string) {
   return request<ReportRecognitionResponse>('/api/v1/health-reports/recognition', {
     method: 'POST',
-    data: { sourceImageUrl },
+    data: { mediaId },
     timeout: 20000
   })
 }

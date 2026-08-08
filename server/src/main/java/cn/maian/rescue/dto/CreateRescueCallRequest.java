@@ -9,7 +9,6 @@ import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
 
 import java.util.Set;
-import java.util.List;
 
 public record CreateRescueCallRequest(
     @NotNull UrgencyLevel urgency,
@@ -18,12 +17,8 @@ public record CreateRescueCallRequest(
     @NotBlank @Size(max = 255) String address,
     @Size(max = 1000) String description,
     @NotNull @Size(min = 1, max = 10) Set<@NotBlank @Size(max = 50) String> symptoms,
-    @Size(max = 9) List<@NotBlank @Size(max = 500) String> imageUrls,
     @Size(max = 64)
     @Pattern(regexp = "^[A-Za-z0-9._:-]+$")
     String clientRequestId
 ) {
-    public CreateRescueCallRequest {
-        imageUrls = imageUrls == null ? List.of() : List.copyOf(imageUrls);
-    }
 }

@@ -41,8 +41,9 @@ public class HealthReport {
     @Column(length = 120, nullable = false)
     private String hospital;
 
-    @Column(length = 500)
-    private String sourceImageUrl;
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 36)
+    private UUID sourceMediaId;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
@@ -84,7 +85,7 @@ public class HealthReport {
         UUID userId,
         LocalDate checkupDate,
         String hospital,
-        String sourceImageUrl,
+        UUID sourceMediaId,
         List<HealthIndicator> indicators,
         HealthAnalysisResponse analysis
     ) {
@@ -93,7 +94,7 @@ public class HealthReport {
         report.userId = userId;
         report.checkupDate = checkupDate;
         report.hospital = hospital.trim();
-        report.sourceImageUrl = normalize(sourceImageUrl);
+        report.sourceMediaId = sourceMediaId;
         report.riskLevel = analysis.riskLevel();
         report.summary = analysis.summary();
         report.disclaimer = analysis.disclaimer();
@@ -102,10 +103,6 @@ public class HealthReport {
         report.indicators = indicators.stream().map(HealthReportIndicator::from).toList();
         report.recommendations = List.copyOf(analysis.recommendations());
         return report;
-    }
-
-    private static String normalize(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 
     public UUID getId() {
@@ -120,8 +117,8 @@ public class HealthReport {
         return hospital;
     }
 
-    public String getSourceImageUrl() {
-        return sourceImageUrl;
+    public UUID getSourceMediaId() {
+        return sourceMediaId;
     }
 
     public HealthRiskLevel getRiskLevel() {

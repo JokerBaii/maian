@@ -21,9 +21,10 @@ class AedDispatchScorerTest {
         35,
         6.5,
         1.25,
+        5,
+        90,
         30,
-        20,
-        900
+        20
     );
 
     @Test
@@ -104,7 +105,7 @@ class AedDispatchScorerTest {
             longitude,
             latitude,
             "13500000000",
-            "全天",
+            cn.maian.device.domain.DeviceServiceWindow.alwaysOpen(),
             null,
             "测试资源方",
             type == DeviceType.MOBILE ? "测试车辆" : null,

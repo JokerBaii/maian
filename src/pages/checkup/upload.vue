@@ -199,8 +199,8 @@ const imagePath = ref('')
 const submitting = ref(false)
 const recognizing = ref(false)
 const recognizeNotice = ref('')
-/** 识别时已上传的图片地址，保存时直接复用，避免重复上传同一张图。 */
-const uploadedImageUrl = ref('')
+/** 识别时已上传的私有媒体 ID，保存时直接复用。 */
+const uploadedMediaId = ref('')
 
 function createIndicator(key: number): IndicatorForm {
   return {
@@ -225,7 +225,7 @@ function chooseImage() {
     success: (result) => {
       imagePath.value = result.tempFilePaths[0] || ''
       // 换图后此前的上传结果和识别提示都不再对应当前图片
-      uploadedImageUrl.value = ''
+      uploadedMediaId.value = ''
       recognizeNotice.value = ''
     }
   })
@@ -233,7 +233,7 @@ function chooseImage() {
 
 function clearImage() {
   imagePath.value = ''
-  uploadedImageUrl.value = ''
+  uploadedMediaId.value = ''
   recognizeNotice.value = ''
 }
 
@@ -242,11 +242,11 @@ async function recognizeReport() {
   recognizing.value = true
   uni.showLoading({ title: '识别中…' })
   try {
-    if (!uploadedImageUrl.value) {
-      const uploaded = await uploadImage(imagePath.value)
-      uploadedImageUrl.value = uploaded.url
+    if (!uploadedMediaId.value) {
+      const uploaded = await uploadImage(imagePath.value, 'HEALTH_REPORT')
+      uploadedMediaId.value = uploaded.mediaId
     }
-    const result = await recognizeHealthReport(uploadedImageUrl.value)
+    const result = await recognizeHealthReport(uploadedMediaId.value)
 
     form.hospital = result.hospital
     form.checkupDate = result.checkupDate
@@ -305,14 +305,14 @@ async function submitReport() {
   uni.showLoading({ title: '生成分析中…' })
   try {
     // 识别时已上传过就直接复用，避免同一张图上传两次
-    if (imagePath.value && !uploadedImageUrl.value) {
-      const uploaded = await uploadImage(imagePath.value)
-      uploadedImageUrl.value = uploaded.url
+    if (imagePath.value && !uploadedMediaId.value) {
+      const uploaded = await uploadImage(imagePath.value, 'HEALTH_REPORT')
+      uploadedMediaId.value = uploaded.mediaId
     }
     const report = await createHealthReport({
       checkupDate: form.checkupDate,
       hospital,
-      sourceImageUrl: uploadedImageUrl.value || undefined,
+      sourceMediaId: uploadedMediaId.value || undefined,
       indicators
     })
     uni.hideLoading()
