@@ -46,11 +46,11 @@
           ></canvas>
         </view>
         <view class="chart-axis">
-          <text>00:00</text>
-          <text>06:00</text>
-          <text>12:00</text>
-          <text>18:00</text>
-          <text>23:00</text>
+          <text>24小时前</text>
+          <text>18小时前</text>
+          <text>12小时前</text>
+          <text>6小时前</text>
+          <text>现在</text>
         </view>
         <view class="scene-labels">
           <view class="scene-label-item">
@@ -258,7 +258,7 @@ const weekBars = computed(() => {
     const avgTop = ((globalMax - item.avg) / range) * chartHeight
 
     let barColor = 'linear-gradient(180deg, #2E6DD1 0%, #2E6DD1 100%)'
-    if (item.max > 110) barColor = 'linear-gradient(180deg, #C93D46 0%, #FF7D7D 100%)'
+    if (item.max > heartRateData.value.maxHeartRate) barColor = 'linear-gradient(180deg, #C93D46 0%, #FF7D7D 100%)'
     else if (item.max > 100) barColor = 'linear-gradient(180deg, #FF9A2E 0%, #FFCF8B 100%)'
 
     return {

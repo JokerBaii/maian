@@ -35,88 +35,6 @@
         </view>
       </view>
 
-      <view v-if="boundDevice" class="card telemetry-card">
-        <view class="telemetry-heading">
-          <view>
-            <text class="telemetry-kicker">今日监测</text>
-            <text class="telemetry-title">生命信号持续同步</text>
-          </view>
-          <view class="telemetry-live">
-            <view class="telemetry-live-dot"></view>
-            <text>{{ boundDevice.connected ? '同步中' : '已暂停' }}</text>
-          </view>
-        </view>
-
-        <view class="pulse-reading">
-          <view class="pulse-wave" aria-hidden="true">
-            <view class="pulse-line"></view>
-          </view>
-          <view class="pulse-value-wrap">
-            <text class="pulse-value">{{ heartRateData.current || '--' }}</text>
-            <text class="pulse-unit">BPM</text>
-          </view>
-          <text class="pulse-scene">{{ currentSceneLabel }}</text>
-        </view>
-
-        <view class="telemetry-metrics">
-          <view class="telemetry-metric">
-            <text class="telemetry-value">{{ todaySampleCount }}</text>
-            <text class="telemetry-label">今日采样</text>
-          </view>
-          <view class="telemetry-divider"></view>
-          <view class="telemetry-metric">
-            <text class="telemetry-value">{{ todayRange }}</text>
-            <text class="telemetry-label">心率区间</text>
-          </view>
-          <view class="telemetry-divider"></view>
-          <view class="telemetry-metric">
-            <text class="telemetry-value">{{ heartRateData.avg || '--' }}</text>
-            <text class="telemetry-label">今日平均</text>
-          </view>
-        </view>
-
-        <view class="sync-row">
-          <text>最近同步</text>
-          <text class="sync-value">{{ lastSyncLabel }}</text>
-        </view>
-
-        <view class="monitor-profile">
-          <view class="profile-head">
-            <text class="profile-title">监测摘要</text>
-            <text class="profile-period">近 7 天</text>
-          </view>
-          <view class="profile-grid">
-            <view class="profile-item">
-              <text class="profile-label">静息基线</text>
-              <text class="profile-value">{{ sevenDayBaseline }} BPM</text>
-            </view>
-            <view class="profile-item">
-              <text class="profile-label">数据完整度</text>
-              <text class="profile-value profile-value-good">{{ dataCompleteness }}%</text>
-            </view>
-            <view class="profile-item">
-              <text class="profile-label">采样频率</text>
-              <text class="profile-value">每分钟</text>
-            </view>
-            <view class="profile-item">
-              <text class="profile-label">连续稳定</text>
-              <text class="profile-value profile-value-good">{{ stableDayCount }} 天</text>
-            </view>
-            <view class="profile-item">
-              <text class="profile-label">监测场景</text>
-              <text class="profile-value">睡眠 · 静息 · 运动</text>
-            </view>
-            <view class="profile-item">
-              <text class="profile-label">异常片段</text>
-              <text class="profile-value" :class="{ 'profile-value-alert': heartRateData.alerts.length }">
-                {{ heartRateData.alerts.length }} 次
-              </text>
-            </view>
-          </view>
-          <text class="profile-note">近 7 日记录连续，睡眠、静息与运动心率均处于平稳区间。</text>
-        </view>
-      </view>
-
       <view v-if="!boundDevice" class="empty-bound">
         <app-icon-tile
           class="empty-icon"
@@ -204,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
@@ -217,14 +135,13 @@ import {
 import { bleHeartRateService } from '@/services/bleHeartRateService'
 import { parseHeartRateMeasurement } from '@/utils/heartRateMeasurement'
 
-const { monitoring: heartRateData, loadMonitoring, updateWearable } = useHealthMonitoring()
+const { updateWearable } = useHealthMonitoring()
 
 const boundDevice = ref<{
   name: string
   type: string
   connected: boolean
   battery: number | null
-  lastSeenAt: string | null
 } | null>(null)
 const connectedDeviceId = ref('')
 let scanTimer: ReturnType<typeof setTimeout> | null = null
@@ -233,43 +150,6 @@ let lastReadingUploadAt = 0
 const isScanning = ref(false)
 const showBindSuccess = ref(false)
 const boundDeviceName = ref('')
-
-const todaySampleCount = computed(() => heartRateData.value.todayData.length)
-const sevenDayBaseline = computed(() => {
-  const values = heartRateData.value.weekData.map(item => item.avg).filter(Boolean)
-  if (!values.length) return '--'
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
-})
-const stableDayCount = computed(() => heartRateData.value.weekData.length)
-const dataCompleteness = computed(() => {
-  const now = new Date()
-  const elapsedMinutes = now.getHours() * 60 + now.getMinutes() + 1
-  if (!elapsedMinutes) return 0
-  return Math.min(100, Math.round(todaySampleCount.value / elapsedMinutes * 100))
-})
-const todayRange = computed(() => {
-  if (!heartRateData.value.todayData.length) return '--'
-  return `${heartRateData.value.min}–${heartRateData.value.max}`
-})
-const currentSceneLabel = computed(() => {
-  const labels: Record<string, string> = {
-    resting: '静息',
-    exercise: '运动',
-    sleeping: '睡眠'
-  }
-  return labels[heartRateData.value.scene] || '实时'
-})
-const lastSyncLabel = computed(() => {
-  const value = boundDevice.value?.lastSeenAt
-  if (!value) return '等待首次同步'
-  const timestamp = new Date(value).getTime()
-  if (!Number.isFinite(timestamp)) return '已同步'
-  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000))
-  if (elapsedMinutes < 1) return '刚刚'
-  if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`
-  const date = new Date(timestamp)
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-})
 
 interface DiscoveredDevice {
   id: string
@@ -284,24 +164,19 @@ interface DiscoveredDevice {
 const discoveredDevices = reactive<DiscoveredDevice[]>([])
 
 onMounted(async () => {
-  const [deviceResult] = await Promise.allSettled([
-    getWearableDevice(),
-    loadMonitoring(true)
-  ])
-  if (deviceResult.status === 'fulfilled') {
-    const device = deviceResult.value
+  try {
+    const device = await getWearableDevice()
     if (device.type !== 'none') {
       connectedDeviceId.value = device.deviceIdentifier || ''
       boundDevice.value = {
         name: device.name,
         type: device.type,
         connected: device.connected,
-        battery: device.battery,
-        lastSeenAt: device.lastSeenAt || null
+        battery: device.battery
       }
       updateWearable(device)
     }
-  } else {
+  } catch {
     uni.showToast({ title: '绑定设备信息加载失败', icon: 'none' })
   }
 })
@@ -486,8 +361,7 @@ function handleBind(device: DiscoveredDevice) {
         name: device.name,
         type: 'bluetooth',
         connected: true,
-        battery: null,
-        lastSeenAt: new Date().toISOString()
+        battery: null
       }
       updateWearable({
         name: device.name,
@@ -614,252 +488,6 @@ onUnmounted(() => {
   font-size: 30rpx;
   font-weight: 700;
   color: #20364D;
-}
-
-.telemetry-card {
-  border: 1rpx solid rgba(60, 60, 67, .14);
-}
-
-.telemetry-heading,
-.pulse-reading,
-.telemetry-metrics,
-.sync-row {
-  display: flex;
-  align-items: center;
-}
-
-.telemetry-heading,
-.sync-row {
-  justify-content: space-between;
-}
-
-.telemetry-kicker,
-.telemetry-title {
-  display: block;
-}
-
-.telemetry-kicker {
-  color: #8E8E93;
-  font-size: 19rpx;
-  font-weight: 750;
-  letter-spacing: 2rpx;
-}
-
-.telemetry-title {
-  margin-top: 4rpx;
-  color: #20364D;
-  font-size: 29rpx;
-  font-weight: 780;
-}
-
-.telemetry-live {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  color: #23865F;
-  font-size: 21rpx;
-  font-weight: 700;
-}
-
-.telemetry-live-dot {
-  width: 10rpx;
-  height: 10rpx;
-  border-radius: 50%;
-  background: #28A474;
-  box-shadow: 0 0 0 7rpx rgba(40, 164, 116, .1);
-  animation: telemetryPulse 2.2s ease-in-out infinite;
-}
-
-.pulse-reading {
-  min-height: 108rpx;
-  margin-top: 24rpx;
-  padding: 0 20rpx;
-  border-radius: 18rpx;
-  background: #F6F8FB;
-}
-
-.pulse-wave {
-  position: relative;
-  width: 92rpx;
-  height: 44rpx;
-  overflow: hidden;
-}
-
-.pulse-line {
-  position: absolute;
-  top: 20rpx;
-  left: 0;
-  width: 92rpx;
-  height: 2rpx;
-  background: #D9E2EA;
-}
-
-.pulse-line::after {
-  content: '';
-  position: absolute;
-  top: -18rpx;
-  left: 16rpx;
-  width: 52rpx;
-  height: 36rpx;
-  border-right: 4rpx solid #C93D46;
-  border-bottom: 4rpx solid #C93D46;
-  transform: skewX(-28deg) rotate(-42deg);
-  animation: telemetryBeat 1.65s cubic-bezier(.2, .72, .2, 1) infinite;
-}
-
-.pulse-value-wrap {
-  display: flex;
-  align-items: baseline;
-  gap: 7rpx;
-  margin-left: 18rpx;
-}
-
-.pulse-value {
-  color: #1C1C1E;
-  font-size: 48rpx;
-  font-weight: 820;
-  line-height: 1;
-}
-
-.pulse-unit,
-.pulse-scene {
-  color: #8E8E93;
-  font-size: 19rpx;
-}
-
-.pulse-scene {
-  margin-left: auto;
-  padding: 7rpx 12rpx;
-  border-radius: 10rpx;
-  background: #FFFFFF;
-}
-
-.telemetry-metrics {
-  margin-top: 22rpx;
-}
-
-.telemetry-metric {
-  min-width: 0;
-  flex: 1;
-  text-align: center;
-}
-
-.telemetry-value,
-.telemetry-label {
-  display: block;
-}
-
-.telemetry-value {
-  color: #20364D;
-  font-size: 27rpx;
-  font-weight: 780;
-}
-
-.telemetry-label {
-  margin-top: 4rpx;
-  color: #8E8E93;
-  font-size: 19rpx;
-}
-
-.telemetry-divider {
-  width: 1rpx;
-  height: 42rpx;
-  background: rgba(60, 60, 67, .14);
-}
-
-.sync-row {
-  margin-top: 22rpx;
-  padding-top: 18rpx;
-  border-top: 1rpx solid rgba(60, 60, 67, .12);
-  color: #8E8E93;
-  font-size: 20rpx;
-}
-
-.sync-value {
-  color: #636366;
-  font-weight: 650;
-}
-
-.monitor-profile {
-  margin-top: 20rpx;
-  padding-top: 20rpx;
-  border-top: 1rpx solid rgba(60, 60, 67, .12);
-}
-
-.profile-head,
-.profile-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.profile-title {
-  color: #20364D;
-  font-size: 23rpx;
-  font-weight: 760;
-}
-
-.profile-period {
-  color: #8E8E93;
-  font-size: 19rpx;
-}
-
-.profile-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 28rpx;
-  margin-top: 10rpx;
-}
-
-.profile-item {
-  min-width: 0;
-  min-height: 58rpx;
-  border-bottom: 1rpx solid rgba(60, 60, 67, .09);
-}
-
-.profile-label {
-  flex: none;
-  color: #8E8E93;
-  font-size: 18rpx;
-}
-
-.profile-value {
-  min-width: 0;
-  margin-left: 10rpx;
-  overflow: hidden;
-  color: #3A3A3C;
-  font-size: 19rpx;
-  font-weight: 670;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-value-good {
-  color: #23865F;
-}
-
-.profile-value-alert {
-  color: #C93D46;
-}
-
-.profile-note {
-  display: block;
-  margin-top: 16rpx;
-  color: #8E8E93;
-  font-size: 18rpx;
-  line-height: 1.55;
-}
-
-@keyframes telemetryPulse {
-  0%, 100% { opacity: .65; transform: scale(.92); }
-  50% { opacity: 1; transform: scale(1.08); }
-}
-
-@keyframes telemetryBeat {
-  0%, 42%, 100% { opacity: .38; transform: skewX(-28deg) rotate(-42deg) scale(.92); }
-  48% { opacity: 1; transform: skewX(-28deg) rotate(-42deg) scale(1.08); }
-  58% { opacity: .58; transform: skewX(-28deg) rotate(-42deg) scale(.98); }
 }
 
 .connected-badge {

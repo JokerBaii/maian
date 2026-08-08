@@ -64,13 +64,17 @@ public class HealthMonitoringService {
         var settings = userSettingsService.findOrCreate();
         var wearable = wearableDeviceRepository.findByUserId(currentUserService.currentUserId());
 
-        List<HeartRateReading> todayReadings = readings.stream()
-            .filter(reading -> toDate(reading).equals(today))
+        Instant trendStart = now.minus(Duration.ofHours(24));
+        List<HeartRateReading> trendReadings = readings.stream()
+            .filter(reading -> !reading.getRecordedAt().isBefore(trendStart))
+            .filter(reading -> !reading.getRecordedAt().isAfter(now))
             .toList();
-        IntSummaryStatistics todayStats = todayReadings.stream()
+        IntSummaryStatistics trendStats = trendReadings.stream()
             .mapToInt(HeartRateReading::getBpm)
             .summaryStatistics();
-        HeartRateReading latest = readings.isEmpty() ? null : readings.get(readings.size() - 1);
+        HeartRateReading latest = trendReadings.isEmpty()
+            ? null
+            : trendReadings.get(trendReadings.size() - 1);
 
         List<HealthMonitoringResponse.DailyHeartRate> month = buildDaily(readings);
         List<HealthMonitoringResponse.DailyHeartRate> week = month.stream()
@@ -79,12 +83,12 @@ public class HealthMonitoringService {
 
         return new HealthMonitoringResponse(
             latest == null ? 0 : latest.getBpm(),
-            todayStats.getCount() == 0 ? 0 : todayStats.getMin(),
-            todayStats.getCount() == 0 ? 0 : todayStats.getMax(),
-            todayStats.getCount() == 0 ? 0 : (int) Math.round(todayStats.getAverage()),
+            trendStats.getCount() == 0 ? 0 : trendStats.getMin(),
+            trendStats.getCount() == 0 ? 0 : trendStats.getMax(),
+            trendStats.getCount() == 0 ? 0 : (int) Math.round(trendStats.getAverage()),
             statusFor(latest, settings.getMinHeartRate(), settings.getMaxHeartRate()),
             latest == null ? "resting" : latest.getScene(),
-            todayReadings.stream().map(this::toPoint).toList(),
+            buildTrendPoints(trendReadings),
             week,
             month,
             settings.isHealthAlert()
@@ -103,6 +107,17 @@ public class HealthMonitoringService {
             settings.getMinHeartRate(),
             settings.getMaxHeartRate()
         );
+    }
+
+    private List<HealthMonitoringResponse.HeartRatePoint> buildTrendPoints(
+        List<HeartRateReading> readings
+    ) {
+        Map<Long, HeartRateReading> tenMinuteBuckets = new LinkedHashMap<>();
+        readings.forEach(reading -> tenMinuteBuckets.put(
+            reading.getRecordedAt().getEpochSecond() / 600,
+            reading
+        ));
+        return tenMinuteBuckets.values().stream().map(this::toPoint).toList();
     }
 
     private List<HealthMonitoringResponse.DailyHeartRate> buildDaily(List<HeartRateReading> readings) {

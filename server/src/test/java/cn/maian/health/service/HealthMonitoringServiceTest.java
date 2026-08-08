@@ -56,9 +56,9 @@ class HealthMonitoringServiceTest {
         Instant now = Instant.now();
         var readings = List.of(
             HeartRateReading.create(DemoAccounts.USER_ID, null, 72, "resting", now.minusSeconds(60)),
-            HeartRateReading.create(DemoAccounts.USER_ID, null, 128, "exercise", now),
-            HeartRateReading.create(DemoAccounts.USER_ID, null, 132, "exercise", now.plusSeconds(15)),
-            HeartRateReading.create(DemoAccounts.USER_ID, null, 130, "exercise", now.plusSeconds(30))
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 128, "exercise", now.minusSeconds(30)),
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 132, "exercise", now.minusSeconds(15)),
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 130, "exercise", now)
         );
         when(readingRepository.findAllByUserIdAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(
             eq(DemoAccounts.USER_ID), any(Instant.class)
@@ -72,6 +72,29 @@ class HealthMonitoringServiceTest {
         assertThat(response.status()).isEqualTo("high");
         assertThat(response.alerts()).hasSize(1);
         assertThat(response.alerts().getFirst().value()).isEqualTo(132);
+    }
+
+    @Test
+    void usesRollingTwentyFourHoursInsteadOfOnlyCurrentCalendarDay() {
+        stubSettings();
+        Instant now = Instant.now();
+        var readings = List.of(
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 62, "sleeping", now.minusSeconds(23 * 3600)),
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 86, "resting", now.minusSeconds(8 * 3600)),
+            HeartRateReading.create(DemoAccounts.USER_ID, null, 74, "resting", now.minusSeconds(25 * 60))
+        );
+        when(readingRepository.findAllByUserIdAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(
+            eq(DemoAccounts.USER_ID), any(Instant.class)
+        )).thenReturn(readings);
+        when(wearableRepository.findByUserId(DemoAccounts.USER_ID))
+            .thenReturn(Optional.empty());
+
+        var response = service.currentSummary();
+
+        assertThat(response.todayData()).hasSize(3);
+        assertThat(response.min()).isEqualTo(62);
+        assertThat(response.max()).isEqualTo(86);
+        assertThat(response.avg()).isEqualTo(74);
     }
 
     private void stubSettings() {

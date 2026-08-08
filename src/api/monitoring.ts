@@ -27,7 +27,6 @@ export interface WearableDevice {
   type: string
   connected: boolean
   battery: number
-  lastSeenAt?: string | null
 }
 
 export interface HealthMonitoringResponse {

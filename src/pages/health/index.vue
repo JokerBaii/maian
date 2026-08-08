@@ -42,7 +42,7 @@
 
         <view class="chart-header">
           <view>
-            <text class="chart-title">今日趋势</text>
+            <text class="chart-title">近 24 小时</text>
             <text class="chart-subtitle">{{ trendModeLabel }}</text>
           </view>
           <view class="chart-detail" @tap="goDetail">
@@ -59,11 +59,11 @@
           </view>
         </view>
         <view v-if="hasTodayTrend" class="trend-labels">
-          <text>0时</text>
-          <text>6时</text>
-          <text>12时</text>
-          <text>18时</text>
-          <text>23时</text>
+          <text>24小时前</text>
+          <text>18小时前</text>
+          <text>12小时前</text>
+          <text>6小时前</text>
+          <text>现在</text>
         </view>
 
         <view class="metric-row">
@@ -77,7 +77,10 @@
           </view>
           <view class="metric">
             <text class="metric-label">最高</text>
-            <text class="metric-value metric-value-alert">{{ heartRateData.max || '--' }}</text>
+            <text
+              class="metric-value"
+              :class="{ 'metric-value-alert': heartRateData.max > heartRateData.maxHeartRate }"
+            >{{ heartRateData.max || '--' }}</text>
           </view>
         </view>
       </view>
@@ -191,7 +194,7 @@ const sceneLabel = computed(() => {
   return labels[heartRateData.value.scene] || '实时监测'
 })
 const trendModeLabel = computed(() =>
-  isDeviceConnected.value ? '设备同步记录' : '连接设备后显示趋势'
+  isDeviceConnected.value ? '连续监测记录' : '连接设备后显示趋势'
 )
 
 const hasTodayTrend = computed(() => heartRateData.value.todayData.length >= 2)
@@ -243,7 +246,7 @@ async function drawTrendChart() {
   canvas.fill()
 
   for (let index = 0; index < data.length - 1; index++) {
-    const high = Math.max(data[index].value, data[index + 1].value) > 110
+    const high = Math.max(data[index].value, data[index + 1].value) > heartRateData.value.maxHeartRate
     const controlX = (x(index) + x(index + 1)) / 2
     canvas.beginPath()
     canvas.setStrokeStyle(high ? '#EF4D5D' : '#249C6B')
