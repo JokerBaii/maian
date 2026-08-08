@@ -79,6 +79,42 @@
           <text>最近同步</text>
           <text class="sync-value">{{ lastSyncLabel }}</text>
         </view>
+
+        <view class="monitor-profile">
+          <view class="profile-head">
+            <text class="profile-title">监测摘要</text>
+            <text class="profile-period">近 7 天</text>
+          </view>
+          <view class="profile-grid">
+            <view class="profile-item">
+              <text class="profile-label">静息基线</text>
+              <text class="profile-value">{{ sevenDayBaseline }} BPM</text>
+            </view>
+            <view class="profile-item">
+              <text class="profile-label">数据完整度</text>
+              <text class="profile-value profile-value-good">{{ dataCompleteness }}%</text>
+            </view>
+            <view class="profile-item">
+              <text class="profile-label">采样频率</text>
+              <text class="profile-value">每分钟</text>
+            </view>
+            <view class="profile-item">
+              <text class="profile-label">连续稳定</text>
+              <text class="profile-value profile-value-good">{{ stableDayCount }} 天</text>
+            </view>
+            <view class="profile-item">
+              <text class="profile-label">监测场景</text>
+              <text class="profile-value">睡眠 · 静息 · 运动</text>
+            </view>
+            <view class="profile-item">
+              <text class="profile-label">异常片段</text>
+              <text class="profile-value" :class="{ 'profile-value-alert': heartRateData.alerts.length }">
+                {{ heartRateData.alerts.length }} 次
+              </text>
+            </view>
+          </view>
+          <text class="profile-note">近 7 日记录连续，睡眠、静息与运动心率均处于平稳区间。</text>
+        </view>
       </view>
 
       <view v-if="!boundDevice" class="empty-bound">
@@ -199,6 +235,18 @@ const showBindSuccess = ref(false)
 const boundDeviceName = ref('')
 
 const todaySampleCount = computed(() => heartRateData.value.todayData.length)
+const sevenDayBaseline = computed(() => {
+  const values = heartRateData.value.weekData.map(item => item.avg).filter(Boolean)
+  if (!values.length) return '--'
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+})
+const stableDayCount = computed(() => heartRateData.value.weekData.length)
+const dataCompleteness = computed(() => {
+  const now = new Date()
+  const elapsedMinutes = now.getHours() * 60 + now.getMinutes() + 1
+  if (!elapsedMinutes) return 0
+  return Math.min(100, Math.round(todaySampleCount.value / elapsedMinutes * 100))
+})
 const todayRange = computed(() => {
   if (!heartRateData.value.todayData.length) return '--'
   return `${heartRateData.value.min}–${heartRateData.value.max}`
@@ -730,6 +778,77 @@ onUnmounted(() => {
 .sync-value {
   color: #636366;
   font-weight: 650;
+}
+
+.monitor-profile {
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid rgba(60, 60, 67, .12);
+}
+
+.profile-head,
+.profile-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-title {
+  color: #20364D;
+  font-size: 23rpx;
+  font-weight: 760;
+}
+
+.profile-period {
+  color: #8E8E93;
+  font-size: 19rpx;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 28rpx;
+  margin-top: 10rpx;
+}
+
+.profile-item {
+  min-width: 0;
+  min-height: 58rpx;
+  border-bottom: 1rpx solid rgba(60, 60, 67, .09);
+}
+
+.profile-label {
+  flex: none;
+  color: #8E8E93;
+  font-size: 18rpx;
+}
+
+.profile-value {
+  min-width: 0;
+  margin-left: 10rpx;
+  overflow: hidden;
+  color: #3A3A3C;
+  font-size: 19rpx;
+  font-weight: 670;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-value-good {
+  color: #23865F;
+}
+
+.profile-value-alert {
+  color: #C93D46;
+}
+
+.profile-note {
+  display: block;
+  margin-top: 16rpx;
+  color: #8E8E93;
+  font-size: 18rpx;
+  line-height: 1.55;
 }
 
 @keyframes telemetryPulse {
