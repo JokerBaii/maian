@@ -117,7 +117,7 @@ export async function getScienceSubmissionCount() {
   return request<{ count: number }>('/api/v1/science-submissions/count')
 }
 
-/** 当前用户的投稿列表，按提交时间倒序。 */
+
 export async function listScienceSubmissions() {
   return normalizePage(await request<SciencePage>(
     '/api/v1/science-submissions?page=0&size=100&sort=submittedAt,desc'
@@ -134,7 +134,7 @@ export function deleteScienceSubmission(id: string) {
   return request<void>(`/api/v1/science-submissions/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-/** 已审核通过的投稿，用于科普频道展示。 */
+
 export async function listApprovedScienceSubmissions() {
   return normalizePage(await request<SciencePage>(
     '/api/v1/science-submissions/approved?page=0&size=100&sort=submittedAt,desc'

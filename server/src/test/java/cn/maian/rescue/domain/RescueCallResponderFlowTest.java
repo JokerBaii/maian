@@ -28,7 +28,7 @@ class RescueCallResponderFlowTest {
 
         RescueCall call = RescueCall.create(
             UrgencyLevel.CRITICAL, 30.2, 120.1, "演示呼救点",
-            "需要 AED", Set.of("意识丧失"), "demo-flow", requesterId, now
+            "需要 AED", Set.of("意识丧失"), "responder-flow", requesterId, now
         );
         call.beginMatching(now);
         device.markReserved(call.getId(), now);

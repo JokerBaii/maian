@@ -78,7 +78,7 @@ public class ScienceSubmissionService {
         return ScienceSubmissionResponse.from(findOwned(id));
     }
 
-    /** 已审核通过的投稿，供科普频道展示。 */
+
     @Transactional(readOnly = true)
     public Page<ScienceSubmissionResponse> findApproved(Pageable pageable) {
         return scienceSubmissionRepository
@@ -118,7 +118,7 @@ public class ScienceSubmissionService {
         mediaStorageService.detachReference("SCIENCE_SUBMISSION", id);
     }
 
-    /** 按当前用户校验归属，避免通过 id 访问他人投稿。 */
+
     private ScienceSubmission findOwned(UUID id) {
         var submission = scienceSubmissionRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("投稿不存在"));

@@ -129,7 +129,6 @@ public class ReportRecognitionService {
             LocalDate checkupDate = result.checkupDate() == null ? findDate(lines) : result.checkupDate();
             return new ReportInterpretation(hospital, checkupDate, indicators);
         } catch (Exception ignored) {
-            // 模型超时、限流或结构化失败时回退到可复核的本地提取，不阻断报告处理。
             return null;
         }
     }
@@ -259,7 +258,6 @@ public class ReportRecognitionService {
                         Integer.parseInt(matcher.group(3))
                     );
                 } catch (RuntimeException ignored) {
-                    // Keep scanning OCR lines for another valid date.
                 }
             }
         }

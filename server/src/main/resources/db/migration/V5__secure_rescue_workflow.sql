@@ -11,7 +11,6 @@ ALTER TABLE emergency_devices
     'PENDING_REVIEW','AVAILABLE','RESERVED','DISABLED','EXPIRED','REJECTED'
   ) NOT NULL;
 
--- A mobile device only becomes dispatchable after a real heartbeat arrives.
 UPDATE emergency_devices SET last_location_at = NULL WHERE type = 'MOBILE';
 
 ALTER TABLE rescue_calls
@@ -59,8 +58,6 @@ CREATE TABLE active_rescue_locks (
   CONSTRAINT fk_active_rescue_call FOREIGN KEY (rescue_call_id) REFERENCES rescue_calls(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Legacy versions allowed several active calls for one requester. Preserve the
--- most progressed/recent one and close the rest before enforcing the lock.
 CREATE TEMPORARY TABLE active_rescue_winners (
   user_id char(36) NOT NULL PRIMARY KEY,
   rescue_call_id char(36) NOT NULL

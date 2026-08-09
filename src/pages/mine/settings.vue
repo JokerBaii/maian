@@ -160,7 +160,6 @@ import AppSwitch from '@/components/AppSwitch.vue'
 import { getUserSettings, updateUserSettings } from '@/api/user'
 import { userFacingError } from '@/utils/presentation'
 import { clearAccountSession } from '@/utils/authSession'
-import { clearDemoSession } from '@/utils/demoSession'
 
 const SETTINGS_STORAGE_KEY = 'maian:user-settings'
 const settings = reactive({
@@ -296,7 +295,6 @@ function logout() {
     success: result => {
       if (!result.confirm) return
       clearAccountSession()
-      clearDemoSession()
       uni.reLaunch({ url: '/pages/auth/login' })
     }
   })

@@ -44,8 +44,7 @@ public class SecurityConfiguration {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/actuator/health", "/api/v1/auth/demo", "/api/v1/auth/demo-accounts",
-                    "/api/v1/auth/login", "/api/v1/auth/register"
+                    "/actuator/health", "/api/v1/auth/login", "/api/v1/auth/register"
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/media/*/content").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/emergency-devices").permitAll()

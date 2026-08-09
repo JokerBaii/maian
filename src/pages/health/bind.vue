@@ -187,20 +187,15 @@ function toggleScan() {
     return
   }
 
-  // #ifdef APP-PLUS
   startBluetoothScan()
-  // #endif
-  // #ifndef APP-PLUS
   uni.showModal({
     title: '请使用 iOS 客户端连接',
     content: '网页端无法直接访问低功耗蓝牙。请在 iPhone 上打开脉安驰援并靠近手环完成连接。',
     confirmText: '我知道了',
     showCancel: false
   })
-  // #endif
 }
 
-// #ifdef APP-PLUS
 function startBluetoothScan() {
   discoveredDevices.length = 0
   uni.openBluetoothAdapter({
@@ -315,7 +310,6 @@ function handleHeartRateValue(result: any) {
     lastReadingUploadAt = 0
   })
 }
-// #endif
 
 function stopScan() {
   if (scanTimer) {
@@ -323,9 +317,7 @@ function stopScan() {
     scanTimer = null
   }
   isScanning.value = false
-  // #ifdef APP-PLUS
   bleHeartRateService.stopDiscovery()
-  // #endif
 }
 
 function signalLabel(level: number) {
@@ -345,7 +337,6 @@ function handleBind(device: DiscoveredDevice) {
   if (device.bound || device.binding) return
   device.binding = true
 
-  // #ifdef APP-PLUS
   stopScan()
   bleHeartRateService.markConnecting()
   uni.createBLEConnection({
@@ -378,9 +369,7 @@ function handleBind(device: DiscoveredDevice) {
           battery: 0
         })
         updateWearable(saved)
-        // #ifdef APP-PLUS
         startHeartRateNotifications(device.id)
-        // #endif
       } catch {
         uni.showToast({ title: '设备已连接，但同步绑定信息失败', icon: 'none' })
       }
@@ -394,11 +383,8 @@ function handleBind(device: DiscoveredDevice) {
       uni.showToast({ title: '连接失败，请靠近设备后重试', icon: 'none' })
     }
   })
-  // #endif
-  // #ifndef APP-PLUS
   device.binding = false
   uni.showToast({ title: '请在 iOS App 中绑定设备', icon: 'none' })
-  // #endif
 }
 
 function handleDisconnect() {
@@ -427,16 +413,12 @@ function handleDisconnect() {
             uni.showToast({ title: '设备已断开，请稍后确认解绑状态', icon: 'none' })
           }
         }
-        // #ifdef APP-PLUS
         if (connectedDeviceId.value) {
           bleHeartRateService.disconnect(connectedDeviceId.value, clearDevice)
         } else {
           clearDevice()
         }
-        // #endif
-        // #ifndef APP-PLUS
         clearDevice()
-        // #endif
       }
     }
   })
@@ -444,7 +426,6 @@ function handleDisconnect() {
 
 onUnmounted(() => {
   stopScan()
-  // 心率通知由 App 级单例继续接收；扫描监听会随页面释放。
 })
 
 </script>

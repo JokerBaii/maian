@@ -9,15 +9,20 @@ export MYSQL_URL='jdbc:mysql://127.0.0.1:3306/maian?useUnicode=true&characterEnc
 export MYSQL_USER=maian
 export MYSQL_PASSWORD='replace-me'
 export JWT_SECRET='at-least-32-random-characters'
+export BOOTSTRAP_ADMIN_PHONE='13800000000'
+export BOOTSTRAP_ADMIN_PASSWORD='replace-with-strong-password'
 mvn spring-boot:run
 ```
 
-正式环境不要启用 `DEMO_MODE`。比赛演示使用 `spring.profiles.active=demo`，演示身份通过短时 JWT 登录，不再信任可伪造的请求头。正式接口提供手机号密码注册/登录：
+系统不预置账户或业务数据。仅当数据库不存在管理员且同时配置上述两个初始化变量时，服务端创建首个管理员；创建成功后应移除变量。其余账户正常注册，再由管理员在客户端“账户权限”中授权角色。
+
+账户接口：
 
 ```text
 POST /api/v1/auth/register
 POST /api/v1/auth/login
-POST /api/v1/auth/demo       # 仅 Demo Profile 存在
+GET  /api/v1/admin/users
+PATCH /api/v1/admin/users/{id}/role
 ```
 
 ## 媒体与 OCR

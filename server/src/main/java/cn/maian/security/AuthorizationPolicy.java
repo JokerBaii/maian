@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/** 资源级授权统一位于 Service 边界，Controller 只负责 HTTP 映射。 */
+
 @Component
 public class AuthorizationPolicy {
     private final CurrentUserService currentUserService;

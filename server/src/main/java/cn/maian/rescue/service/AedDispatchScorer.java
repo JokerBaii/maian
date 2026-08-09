@@ -54,10 +54,8 @@ public final class AedDispatchScorer {
             strategy = uncertaintySeconds <= 20 ? "ETA_V2_MOBILE_LIVE" : "ETA_V2_MOBILE_BUFFERED";
         } else {
             double metersPerSecond = properties.runnerSpeedKmh() / 3.6;
-            // A fixed AED must be reached and brought back to the patient.
             travelSeconds = properties.fixedPickupOverheadSeconds()
                 + (routeMeters * 2) / metersPerSecond;
-            // Access control, lift and handover time make fixed-device retrieval less deterministic.
             uncertaintySeconds = 18;
             strategy = "ETA_V2_FIXED_RETRIEVAL";
         }

@@ -7,15 +7,11 @@ export interface RescueRealtimeEvent {
   occurredAt: string
 }
 
-/**
- * 前台 H5 使用带 Bearer Token 的 fetch 读取 SSE；App 端保留轮询兜底。
- * 返回值必须在页面隐藏/卸载时调用，避免残留连接。
- */
+
 export function connectRescueEvents(onEvent: (event: RescueRealtimeEvent) => void) {
   let disposed = false
   let controller: AbortController | null = null
 
-  // #ifdef H5
   controller = new AbortController()
   ;(async () => {
     try {
@@ -40,14 +36,12 @@ export function connectRescueEvents(onEvent: (event: RescueRealtimeEvent) => voi
             .map(line => line.slice(5).trim())
             .join('\n')
           if (!data) continue
-          try { onEvent(JSON.parse(data) as RescueRealtimeEvent) } catch { /* ignore malformed frame */ }
+          try { onEvent(JSON.parse(data) as RescueRealtimeEvent) } catch {  }
         }
       }
     } catch {
-      // 网络中断时由页面轮询继续保障状态同步。
     }
   })()
-  // #endif
 
   return () => {
     disposed = true

@@ -3,11 +3,7 @@ package cn.maian.health.dto;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * 体检报告识别结果。
- *
- * 识别到的指标一律需要人工核对后才能保存，notice 承载该提示。
- */
+
 public record ReportRecognitionResponse(
     String notice,
     String hospital,

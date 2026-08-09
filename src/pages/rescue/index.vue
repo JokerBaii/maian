@@ -99,7 +99,7 @@ import { computed, onMounted, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { uploadImage } from '@/api/files'
 import { attachRescueMedia, createRescueCall, type RescueUrgency } from '@/api/rescue'
-import { chooseGcj02Location, getCurrentGcj02Location, FIXED_LOCATION, FIXED_LOCATION_ADDRESS, isDemoMode } from '@/utils/location'
+import { chooseGcj02Location, getCurrentGcj02Location } from '@/utils/location'
 import { createClientRequestId } from '@/utils/requestId'
 import { userFacingError } from '@/utils/presentation'
 
@@ -111,11 +111,8 @@ const selectedUrgency = ref('critical')
 const selectedSymptoms = ref<string[]>([])
 const description = ref('')
 const photoList = ref<string[]>([])
-const locationText = ref(isDemoMode ? FIXED_LOCATION_ADDRESS : '正在获取真实位置')
-const rescueCoordinates = ref<{ latitude: number; longitude: number } | null>(isDemoMode ? {
-  latitude: FIXED_LOCATION.latitude,
-  longitude: FIXED_LOCATION.longitude
-} : null)
+const locationText = ref('正在获取真实位置')
+const rescueCoordinates = ref<{ latitude: number; longitude: number } | null>(null)
 const sosRequestId = ref(createClientRequestId())
 const urgencyOptions = [
   { value: 'critical', label: '危急' },

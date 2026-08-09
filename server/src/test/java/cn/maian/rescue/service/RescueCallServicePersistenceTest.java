@@ -11,7 +11,6 @@ import cn.maian.rescue.repository.ActiveRescueLockRepository;
 import cn.maian.rescue.repository.RescueCallRepository;
 import cn.maian.rescue.repository.RescueEventRepository;
 import cn.maian.rescue.repository.ResponderPresenceRepository;
-import cn.maian.security.DemoAccounts;
 import cn.maian.user.repository.UserProfileRepository;
 import cn.maian.user.service.CurrentUserService;
 import jakarta.persistence.EntityManager;
@@ -25,6 +24,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -35,6 +35,8 @@ import static org.mockito.Mockito.when;
     "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 class RescueCallServicePersistenceTest {
+
+    private static final UUID TEST_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Autowired EmergencyDeviceRepository deviceRepository;
     @Autowired RescueCallRepository rescueCallRepository;
@@ -54,7 +56,7 @@ class RescueCallServicePersistenceTest {
             values
               (:id, '测试用户', '未绑定', 'USER', false, CURRENT_TIMESTAMP)
             """)
-            .setParameter("id", DemoAccounts.USER_ID.toString())
+            .setParameter("id", TEST_USER_ID.toString())
             .executeUpdate();
         entityManager.flush();
 
@@ -62,7 +64,7 @@ class RescueCallServicePersistenceTest {
             15, 80, 120, 35, 6.5, 1.25, 5, 90, 30, 20
         );
         CurrentUserService currentUserService = mock(CurrentUserService.class);
-        when(currentUserService.currentUserId()).thenReturn(DemoAccounts.USER_ID);
+        when(currentUserService.currentUserId()).thenReturn(TEST_USER_ID);
         Clock clock = Clock.fixed(Instant.parse("2026-08-08T10:00:00Z"), ZoneOffset.UTC);
         rescueCallService = new RescueCallService(
             rescueCallRepository,
@@ -97,10 +99,10 @@ class RescueCallServicePersistenceTest {
         entityManager.clear();
 
         var persistedCall = rescueCallRepository.findOwnedDetailedById(
-            created.id(), DemoAccounts.USER_ID
+            created.id(), TEST_USER_ID
         ).orElseThrow();
         assertThat(persistedCall.getMatchedDevice().getId()).isEqualTo(device.getId());
-        assertThat(activeRescueLockRepository.findById(DemoAccounts.USER_ID)).isPresent();
+        assertThat(activeRescueLockRepository.findById(TEST_USER_ID)).isPresent();
 
         rescueCallService.cancel(created.id());
         entityManager.flush();
@@ -109,6 +111,6 @@ class RescueCallServicePersistenceTest {
         EmergencyDevice released = deviceRepository.findById(device.getId()).orElseThrow();
         assertThat(released.getStatus()).isEqualTo(DeviceStatus.AVAILABLE);
         assertThat(released.getReservedForCallId()).isNull();
-        assertThat(activeRescueLockRepository.findById(DemoAccounts.USER_ID)).isEmpty();
+        assertThat(activeRescueLockRepository.findById(TEST_USER_ID)).isEmpty();
     }
 }

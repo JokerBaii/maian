@@ -82,6 +82,11 @@
             <text class="menu-label">投稿审核</text>
             <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
           </view>
+          <view v-if="user.role === 'ADMIN'" class="menu-item" @tap="goAccountPermissions">
+            <app-icon-tile class="menu-icon" name="auth-filled" tone="slate" />
+            <text class="menu-label">账户权限</text>
+            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
+          </view>
           <view class="menu-item menu-item-last" @tap="goContacts">
             <app-icon-tile class="menu-icon" name="phone-filled" tone="green" />
             <text class="menu-label">紧急联系人</text>
@@ -188,6 +193,9 @@ function goDeviceReview() {
 }
 function goScienceReview() {
   uni.navigateTo({ url: '/pages/science/review' })
+}
+function goAccountPermissions() {
+  uni.navigateTo({ url: '/pages/admin/accounts' })
 }
 function goArchive() {
   uni.navigateTo({ url: '/pages/checkup/archive' })

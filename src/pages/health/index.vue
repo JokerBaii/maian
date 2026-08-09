@@ -297,7 +297,6 @@ onMounted(async () => {
   await loadHealthData()
 })
 
-// 健康页是 tab 页：切回时重新拉数据，保证新绑定设备、新预警立即可见。
 onShow(() => {
   if (initializedRef) loadHealthData()
 })

@@ -392,10 +392,8 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
-import { getCurrentGcj02Location, FIXED_LOCATION } from '@/utils/location'
-// #ifdef H5
+import { getCurrentGcj02Location, DEFAULT_MAP_CENTER } from '@/utils/location'
 import { loadAMap } from '@/common/amap'
-// #endif
 import { uploadImage } from '@/api/files'
 import { resolveApiUrl } from '@/api/http'
 import { userFacingError } from '@/utils/presentation'
@@ -459,7 +457,6 @@ const editingId = ref('')
 
 const pickedAddress = ref('')
 
-// #ifdef H5
 const showLocationPicker = ref(false)
 let pickerMapInstance: any = null
 const pickerLng = ref(0)
@@ -468,7 +465,6 @@ const pickerAddress = ref('')
 const poiSearchText = ref('')
 const poiResults = ref<any[]>([])
 const selectedPoiIdx = ref(-1)
-// #endif
 
 function triggerImageUpload(count: number, callback: (url: string) => void) {
   uni.chooseImage({
@@ -496,7 +492,6 @@ async function persistImagePaths(paths: string[], purpose: 'DEVICE_IMAGE' | 'VEH
 }
 
 function openLocationPicker() {
-  // #ifdef H5
   uni.setNavigationBarTitle({ title: '选取设备位置' })
   showLocationPicker.value = true
   poiResults.value = []
@@ -506,8 +501,6 @@ function openLocationPicker() {
   setTimeout(() => {
     initPickerMap()
   }, 300)
-  // #endif
-  // #ifndef H5
   uni.chooseLocation({
     latitude: fixedForm.value.latitude || undefined,
     longitude: fixedForm.value.longitude || undefined,
@@ -518,10 +511,8 @@ function openLocationPicker() {
       pickedAddress.value = fixedForm.value.address
     }
   })
-  // #endif
 }
 
-// #ifdef H5
 function cancelLocationPicker() {
   showLocationPicker.value = false
   uni.setNavigationBarTitle({ title: editingId.value ? '编辑急救设备' : '添加急救设备' })
@@ -563,7 +554,7 @@ async function initPickerMap() {
 
   const center = fixedForm.value.longitude
     ? [fixedForm.value.longitude, fixedForm.value.latitude]
-    : [FIXED_LOCATION.longitude, FIXED_LOCATION.latitude]
+    : [DEFAULT_MAP_CENTER.longitude, DEFAULT_MAP_CENTER.latitude]
 
   pickerMapInstance = new AMap.Map('lp-map-container', {
     zoom: 15,
@@ -658,7 +649,6 @@ function clearPOISearch() {
   poiResults.value = []
   selectedPoiIdx.value = -1
 }
-// #endif
 
 function onExpireDateChange(e: any) {
   fixedForm.value.expireDate = e.detail.value

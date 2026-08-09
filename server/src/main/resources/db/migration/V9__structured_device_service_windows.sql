@@ -10,8 +10,6 @@ CREATE TABLE emergency_device_service_windows (
     FOREIGN KEY (device_id) REFERENCES emergency_devices(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Only reliably parseable legacy schedules are migrated. Unknown text intentionally
--- becomes an empty schedule and is therefore excluded from dispatch.
 INSERT INTO emergency_device_service_windows (
   device_id, position, day_of_week, opens_at, closes_at
 )

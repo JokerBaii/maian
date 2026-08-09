@@ -75,8 +75,8 @@
     <map
       id="native-rescue-map"
       class="map-container"
-      :longitude="myLocation?.[0] ?? FIXED_LOCATION.longitude"
-      :latitude="myLocation?.[1] ?? FIXED_LOCATION.latitude"
+      :longitude="myLocation?.[0] ?? DEFAULT_MAP_CENTER.longitude"
+      :latitude="myLocation?.[1] ?? DEFAULT_MAP_CENTER.latitude"
       :markers="nativeMarkers"
       :scale="13"
       show-location
@@ -230,11 +230,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-// #ifdef H5
 import 'leaflet/dist/leaflet.css'
-// #endif
 import AppIcon from '@/components/AppIcon.vue'
-import { getCurrentGcj02Location, FIXED_LOCATION, isDemoMode, openMapNavigation } from '@/utils/location'
+import { getCurrentGcj02Location, DEFAULT_MAP_CENTER, openMapNavigation } from '@/utils/location'
 import { loadAMap } from '@/common/amap'
 import { addBaseTileLayer } from '@/common/mapTiles'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
@@ -268,16 +266,15 @@ let markerMap: Record<string, {
   latitude: number
 }> = {}
 let deviceById: Record<string, any> = {}
-/** 自身位置标记。H5 分支没有原生 show-location，需要自己画。 */
+
 let selfMarker: any = null
-/** 自身位置标记的内联结构。样式必须内联，原因见 buildLeafletIcon。 */
+
 const SELF_MARKER_HTML =
   '<span style="position:relative;display:block;width:28px;height:28px;border-radius:50%;'
   + 'background:rgba(0,122,255,0.16);box-shadow:0 0 0 8px rgba(0,122,255,0.08)">'
   + '<i style="position:absolute;inset:7px;border-radius:50%;border:3px solid #FFFFFF;'
   + 'background:#007AFF;box-shadow:0 2px 7px rgba(0,72,176,0.42)"></i></span>'
 
-// 固定坐标只是 Demo Mode 的演示位置；正式模式在真实定位前不伪造用户位置。
 const myLocation = ref<number[] | null>(null)
 const remoteDevices = ref<any[] | null>(null)
 
@@ -378,17 +375,12 @@ function markerAsset(device: any, _png = false) {
   const type = device.type === 'mobile' ? 'mobile' : 'fixed'
   const state = deviceStatusClass(device) === 'online' ? '' : '-offline'
   const filename = `marker-${type}${state}.${extension}`
-  // #ifdef H5
   const baseUrl = ((import.meta as any).env?.BASE_URL || '/').replace(/\/?$/, '/')
   return `${baseUrl}static/map/${filename}`
-  // #endif
-  // #ifndef H5
   return `/static/map/${filename}`
-  // #endif
 }
 
 function preloadMarkerAssets() {
-  // #ifdef H5
   if (typeof Image === 'undefined') return
   const assets = [
     { type: 'fixed', status: 'available' },
@@ -401,7 +393,6 @@ function preloadMarkerAssets() {
     image.decoding = 'async'
     image.src = markerAsset(device)
   })
-  // #endif
 }
 
 const selectedDevice = ref<any>(null)
@@ -430,7 +421,6 @@ function deviceStatusLabel(device: any) {
   return device.online ? '在线' : '离线'
 }
 
-// #ifdef H5
 async function initMap() {
   const loaded = await loadAMap()
   if (!loaded) {
@@ -440,9 +430,8 @@ async function initMap() {
   mapUnavailable.value = false
   mapProvider = 'amap'
   const AMap = (window as any).AMap
-  const center = myLocation.value || [FIXED_LOCATION.longitude, FIXED_LOCATION.latitude]
+  const center = myLocation.value || [DEFAULT_MAP_CENTER.longitude, DEFAULT_MAP_CENTER.latitude]
 
-  // 与 Leaflet 分支保持一致，统一以当前位置为中心
   mapInstance = new AMap.Map('map-container', {
     zoom: 14,
     center: [...center],
@@ -460,7 +449,7 @@ async function initLeafletMap() {
     leafletApi = module.default || module
     mapProvider = 'leaflet'
     mapUnavailable.value = false
-    const center = myLocation.value || [FIXED_LOCATION.longitude, FIXED_LOCATION.latitude]
+    const center = myLocation.value || [DEFAULT_MAP_CENTER.longitude, DEFAULT_MAP_CENTER.latitude]
     mapInstance = leafletApi.map('map-container', {
       zoomControl: false,
       attributionControl: true,
@@ -479,9 +468,8 @@ async function initLeafletMap() {
     uni.showToast({ title: '地图底图加载失败', icon: 'none', duration: 2000 })
   }
 }
-// #endif
 
-/** 画出或移动自身位置标记，让用户能看到自己与附近设备的相对位置。 */
+
 function updateSelfMarker() {
   if (!mapInstance || !myLocation.value) return
   const [longitude, latitude] = myLocation.value
@@ -523,12 +511,11 @@ function updateSelfMarker() {
   mapInstance.add(selfMarker)
 }
 
-/** 标记外观只由类型和状态决定，用于判断是否需要重建图标。 */
+
 function markerIconKey(device: any) {
   return `${device.type}-${deviceStatusClass(device)}`
 }
 
-// 按 id 复用标记，只处理增删和真正变化的部分；全量重建会导致明显卡顿
 function addMarkers() {
   if (!mapInstance || typeof window === 'undefined') return
   if (mapProvider !== 'leaflet' && (mapProvider !== 'amap' || !(window as any).AMap)) return
@@ -603,7 +590,6 @@ function addMarkers() {
   })
 }
 
-// divIcon 由 Leaflet 动态创建，拿不到 scoped 的 data-v 属性，尺寸必须内联
 function buildLeafletIcon(device: any) {
   return leafletApi.divIcon({
     className: 'rescue-leaflet-marker',
@@ -625,7 +611,7 @@ function buildAmapContent(device: any) {
   return markerContent
 }
 
-/** 标记复用后点击回调不能捕获旧的设备对象，统一按 id 取当前数据。 */
+
 function selectDeviceById(id: string) {
   const device = deviceById[id]
   if (device) selectDevice(device)
@@ -693,9 +679,7 @@ async function locateMe(showResult = true) {
         mapInstance.setZoom(14)
       }
     }
-    // #ifndef H5
     uni.createMapContext('native-rescue-map').moveToLocation({ longitude, latitude })
-    // #endif
     if (showResult) uni.showToast({ title: '定位已更新', icon: 'success' })
   }
 
@@ -752,29 +736,21 @@ onMounted(() => {
     try {
       await locateMe(false)
     } catch {
-      // 定位失败时仍加载公开设备；用户可稍后点击定位按钮重试。
     }
     const devicesPromise = loadDevices()
-    // #ifdef H5
     const mapPromise = initMap()
-    // #endif
     await devicesPromise
-    // #ifdef H5
     await mapPromise
-    // #endif
     initializedRef = true
   })
 })
 
-// 地图是 tab 页：切回时重新拉设备，保证"审核上架新设备"等变化立即可见。
-// initMap 只跑一次，这里只刷数据不重建地图。
 onShow(() => {
   if (!initializedRef) return
   loadDevices()
   scheduleMarkerUpdate()
 })
 
-// 搜索输入是逐字触发的，合并到一帧后再更新标记，避免每敲一个字都跑一遍。
 let markerUpdateTimer: ReturnType<typeof setTimeout> | null = null
 let initializedRef = false
 
@@ -816,7 +792,7 @@ onUnmounted(() => {
   filter: drop-shadow(0 2px 4px rgba(28, 54, 82, 0.22));
 }
 
-/* 自身位置：蓝色圆点加光圈，与设备标记明显区分 */
+
 .rescue-self-marker {
   background: transparent;
   border: 0;
@@ -1416,7 +1392,7 @@ onUnmounted(() => {
 .device-card:last-child {
   border-bottom: none;
 }
-/* 类型图标：让列表首列有可扫读的图形锚点，不再是整片文字 */
+
 .device-card-icon {
   display: flex;
   align-items: center;
@@ -1482,7 +1458,7 @@ onUnmounted(() => {
   gap: 12rpx;
   margin-top: 11rpx;
 }
-/* 状态做成带底色的胶囊，让列表在纯文字之外有可扫读的层次 */
+
 .status-chip {
   display: flex;
   align-items: center;

@@ -97,9 +97,7 @@ uni-scroll-view::-webkit-scrollbar {
 body { margin: 0; background: #F3F7FA; }
 uni-app { display: block; min-height: 100vh; overflow: visible; background: #F3F7FA; }
 
-/* Desktop H5 is a phone preview, while mobile browsers remain full width.
-   The document keeps ownership of scrolling, so this does not recreate the
-   old nested-scroll shell. */
+
 @media (min-width: 768px) {
   html {
     background: #DDE3E9;
@@ -176,7 +174,7 @@ uni-app { display: block; min-height: 100vh; overflow: visible; background: #F3F
 }
 /* #endif */
 
-/* H5 keeps the platform API, but presents it with the same iOS alert grammar. */
+
 /* #ifdef H5 */
 uni-modal .uni-mask { background: rgba(0, 0, 0, .28) !important; }
 uni-modal .uni-modal {

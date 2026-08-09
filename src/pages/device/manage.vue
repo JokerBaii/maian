@@ -218,12 +218,7 @@ function getCurrentLocation(): Promise<{ longitude: number; latitude: number }> 
   return getCurrentGcj02Location()
 }
 
-/**
- * 上报单台移动设备的当前位置。
- *
- * 只在用户点击时对指定设备生效：批量把同一个位置写到所有移动设备会让它们
- * 落在同一坐标，调度距离全部变成 0，失去调度意义。
- */
+
 async function reportMobileLocation(device: DeviceView) {
   if (syncingLocation) return
   syncingLocation = true

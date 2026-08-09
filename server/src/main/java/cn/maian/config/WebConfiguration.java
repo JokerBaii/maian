@@ -10,7 +10,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
     CorsProperties.class,
     DispatchProperties.class,
     AuthProperties.class,
-    DemoProperties.class,
+    BootstrapAdminProperties.class,
     MediaProperties.class,
     OcrProperties.class,
     AbuseProperties.class

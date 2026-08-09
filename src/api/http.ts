@@ -1,10 +1,3 @@
-import {
-  clearDemoAccessToken,
-  getDemoAccessToken,
-  getDemoUserId,
-  saveDemoAccessToken,
-  isDemoSessionActive
-} from '@/utils/demoSession'
 import { clearAccountSession, getAccountAccessToken } from '@/utils/authSession'
 
 export interface ApiError {
@@ -86,14 +79,12 @@ async function authenticatedRequest<T>(
         }
         const body = response.data as unknown as ApiResponse<T>
         if (response.statusCode >= 200 && response.statusCode < 300 && body.success) {
-          // 成功的命令型接口允许只返回 success/timestamp，不强制携带 data。
           resolve(body.data as T)
           return
         }
 
         if (response.statusCode === 401 && allowRefresh) {
-          if (getAccountAccessToken()) clearAccountSession()
-          else clearDemoAccessToken()
+          clearAccountSession()
           try {
             resolve(await authenticatedRequest<T>(path, options, false))
           } catch (error) {
@@ -119,35 +110,8 @@ async function authenticatedRequest<T>(
 export async function ensureAccessToken(): Promise<string> {
   const accountToken = getAccountAccessToken()
   if (accountToken) return accountToken
-
-  if (!isDemoSessionActive()) {
-    redirectToLogin()
-    throw new ApiRequestError('请先登录', 'AUTH_REQUIRED', [], 401)
-  }
-  const existing = getDemoAccessToken()
-  if (existing) return existing
-
-  const response = await new Promise<UniNamespace.RequestSuccessCallbackResult>((resolve, reject) => {
-    uni.request({
-      url: resolveApiUrl('/api/v1/auth/demo'),
-      method: 'POST',
-      data: { userId: getDemoUserId() },
-      header: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      success: resolve,
-      fail: reject
-    })
-  })
-  const body = response.data as ApiResponse<{ accessToken: string; expiresAt: string }>
-  if (response.statusCode < 200 || response.statusCode >= 300 || !body.success || !body.data) {
-    throw new ApiRequestError(
-      body.error?.message || '登录失败',
-      body.error?.code || 'AUTH_FAILED',
-      body.error?.details || [],
-      response.statusCode
-    )
-  }
-  saveDemoAccessToken(body.data.accessToken, body.data.expiresAt)
-  return body.data.accessToken
+  redirectToLogin()
+  throw new ApiRequestError('请先登录', 'AUTH_REQUIRED', [], 401)
 }
 
 let redirectingToLogin = false

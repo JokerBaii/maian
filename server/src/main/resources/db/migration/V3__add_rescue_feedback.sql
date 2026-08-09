@@ -1,5 +1,3 @@
--- 救援完成后呼救方对志愿者的评价。
--- 一条呼救最多一条评价，由呼救方在救援完成后提交。
 
 CREATE TABLE `rescue_feedback` (
   `id` char(36) NOT NULL,

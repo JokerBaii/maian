@@ -180,6 +180,12 @@
       "style": {
         "navigationBarTitleText": "待审核内容"
       }
+    },
+    {
+      "path": "pages/admin/accounts",
+      "style": {
+        "navigationBarTitleText": "账户权限"
+      }
     }
   ],
   "globalStyle": {

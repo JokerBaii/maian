@@ -100,7 +100,7 @@ import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 const { monitoring: heartRateData, loadMonitoring } = useHealthMonitoring()
 const alertList = computed(() => heartRateData.value.alerts)
 const totalAlerts = computed(() => heartRateData.value.alerts.length)
-/** 正常范围随用户在设置页配置的阈值变化，不能写死。 */
+
 const rangeText = computed(() => {
   const { minHeartRate, maxHeartRate } = heartRateData.value
   if (!minHeartRate || !maxHeartRate) return '-- BPM'

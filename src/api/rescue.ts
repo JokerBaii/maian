@@ -190,7 +190,7 @@ export function confirmRescueCompletion(id: string) {
   )
 }
 
-/** 呼救方取消未结束的呼救（后端状态机只允许呼救者发起取消）。 */
+
 export function cancelRescueCall(id: string) {
   return request<RescueCallResponse>(
     `/api/v1/rescue-calls/${encodeURIComponent(id)}/cancellation`,

@@ -3,36 +3,6 @@ import { loadAMap } from './amap'
 export type RouteCoordinate = [number, number]
 export type AmapRouteMode = 'walk' | 'drive'
 
-/**
- * 演示环境的道路预览兜底：用直角转折表达沿路行进，避免用一条直线穿过建筑。
- * 正式环境仍应使用高德规划结果，该几何不对外声称为真实导航路线。
- */
-export function buildDemoRoadPreview(start: RouteCoordinate, end: RouteCoordinate): RouteCoordinate[] {
-  const latitudeDelta = end[0] - start[0]
-  const longitudeDelta = end[1] - start[1]
-  const latitudeDistance = Math.abs(latitudeDelta)
-  const longitudeDistance = Math.abs(longitudeDelta * Math.cos(start[0] * Math.PI / 180))
-
-  if (latitudeDistance >= longitudeDistance) {
-    return [
-      start,
-      [start[0] + latitudeDelta * .18, start[1]],
-      [start[0] + latitudeDelta * .24, start[1] + longitudeDelta * .36],
-      [start[0] + latitudeDelta * .78, start[1] + longitudeDelta * .36],
-      [start[0] + latitudeDelta * .84, end[1]],
-      end
-    ]
-  }
-  return [
-    start,
-    [start[0], start[1] + longitudeDelta * .18],
-    [start[0] + latitudeDelta * .36, start[1] + longitudeDelta * .24],
-    [start[0] + latitudeDelta * .36, start[1] + longitudeDelta * .78],
-    [end[0], start[1] + longitudeDelta * .84],
-    end
-  ]
-}
-
 function readCoordinate(point: any): RouteCoordinate | null {
   const longitude = typeof point?.getLng === 'function' ? point.getLng() : point?.lng
   const latitude = typeof point?.getLat === 'function' ? point.getLat() : point?.lat
@@ -40,7 +10,6 @@ function readCoordinate(point: any): RouteCoordinate | null {
   return [latitude, longitude]
 }
 
-/** 将高德分路段结果转换成 Leaflet 使用的 [纬度, 经度] 道路折线。 */
 export function extractAmapRouteCoordinates(result: any): RouteCoordinate[] {
   const steps = result?.routes?.[0]?.steps
   if (!Array.isArray(steps)) return []
@@ -60,10 +29,6 @@ export function extractAmapRouteCoordinates(result: any): RouteCoordinate[] {
   return coordinates
 }
 
-/**
- * 使用高德路线服务获取真实可通行路径。未配置 JS API、无路线或请求失败时返回 null，
- * 调用方应只显示起终点，不能退化成穿越建筑或水面的伪折线。
- */
 export async function planAmapRoute(
   start: RouteCoordinate,
   end: RouteCoordinate,

@@ -116,7 +116,7 @@ import {
   updateScienceArticleInteraction
 } from '@/api/science'
 
-const articleId = ref('S001')
+const articleId = ref('')
 const pages = getCurrentPages()
 const currentPage = pages[pages.length - 1] as any
 if (currentPage?.options?.id) {
@@ -236,6 +236,11 @@ function previewImage(idx: number) {
 }
 
 onMounted(async () => {
+  if (!articleId.value) {
+    uni.showToast({ title: '内容不存在', icon: 'none' })
+    setTimeout(() => uni.navigateBack(), 800)
+    return
+  }
   try {
     const content = await getScienceContent(articleId.value)
     article.value = {
@@ -260,7 +265,7 @@ onMounted(async () => {
 </script>
 
 <style lang="scss" scoped>
-/* 扣掉导航栏高度，避免 body 多出可滚空间导致底部操作栏跟随滚动 */
+
 .page {
   height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px));
   height: calc(100dvh - var(--window-top, 0px) - var(--window-bottom, 0px));

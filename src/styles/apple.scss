@@ -1,4 +1,4 @@
-/* Native mobile baseline for every screen reached from the established home page. */
+
 .apple-page:not(.home-page) {
   --care-canvas: #F2F2F7;
   --care-paper: #FFFFFF;
@@ -25,7 +25,7 @@
   background-color: var(--care-canvas) !important;
 }
 
-/* Navigation is a quiet functional layer; content remains opaque. */
+
 .apple-page:not(.home-page):not(.emergency-page) > .nav-bar {
   border-bottom: 1rpx solid var(--care-separator);
   background: rgba(249, 249, 251, .92) !important;
@@ -56,7 +56,7 @@
   font-weight: 400;
 }
 
-/* Grouped content reads as a mobile hierarchy instead of a dashboard grid. */
+
 .apple-page:not(.home-page) :is(
   .card,
   .form-card,
@@ -121,7 +121,7 @@
   outline: none;
 }
 
-/* Native fields are quiet inset surfaces. Login fields already sit inside one grouped surface. */
+
 .apple-page:not(.home-page):not(.login-page) :is(
   .field-input,
   .picker-value,
@@ -155,7 +155,7 @@
   box-shadow: 0 0 0 3rpx rgba(0, 122, 255, .22) !important;
 }
 
-/* One action color; red, green and orange remain reserved for meaning. */
+
 .apple-page:not(.home-page) :is(
   .primary-button,
   .submit-button,
@@ -232,7 +232,7 @@
   opacity: .62;
 }
 
-/* Segmented controls switch in place and retain spatial context. */
+
 .apple-page:not(.home-page) :is(.tab-bar, .tab-switcher, .range-switch, .mode-switch) {
   border: 0 !important;
   background: rgba(118, 118, 128, .12) !important;
@@ -254,7 +254,7 @@
   box-shadow: none !important;
 }
 
-/* Touch feedback should be immediate and quiet. */
+
 .apple-page:not(.home-page) :is(
   .menu-item,
   .record-card,

@@ -50,8 +50,6 @@ public class SpringAiHealthAnalysisService implements HealthAnalysisService {
                 .call()
                 .entity(HealthAnalysisResponse.class);
         } catch (Exception exception) {
-            // AI 不可用（余额不足、网络中断、超时）时自动降级到规则分析，
-            // 保证体检报告保存不失败。规则结果 analysisSource 为 RULE_BASED。
             return fallback.analyze(request);
         }
 

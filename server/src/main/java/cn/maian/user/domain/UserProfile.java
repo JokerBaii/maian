@@ -63,6 +63,13 @@ public class UserProfile {
         this.verified = true;
     }
 
+    public void changeRole(String role) {
+        if (!"USER".equals(role) && !"VOLUNTEER".equals(role) && !"ADMIN".equals(role)) {
+            throw new IllegalArgumentException("不支持的账户角色");
+        }
+        this.role = role;
+    }
+
     public UUID getId() {
         return id;
     }

@@ -1,4 +1,4 @@
-/** Bluetooth SIG Heart Rate Measurement (0x2A37) 的 8/16 位心率解析。 */
+
 export function parseHeartRateMeasurement(value: ArrayBuffer): number | null {
   const view = new DataView(value)
   if (view.byteLength < 2) return null

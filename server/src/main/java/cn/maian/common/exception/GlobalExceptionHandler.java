@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /** 浏览器切页会主动关闭救援事件流，这属于正常断开，不应再向 SSE 响应写 JSON。 */
+
     @ExceptionHandler({AsyncRequestNotUsableException.class, AsyncRequestTimeoutException.class})
     public void handleClosedEventStream(Exception exception) {
         log.debug("Rescue event stream closed: {}", exception.getClass().getSimpleName());
@@ -97,7 +97,6 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.error("STORAGE_CAPACITY_EXCEEDED", exception.getMessage()));
     }
 
-    // Spring 在进入 controller 前抛出，业务层的大小校验来不及执行
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleUploadTooLarge(
         MaxUploadSizeExceededException exception

@@ -283,14 +283,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-// #ifdef H5
 import 'leaflet/dist/leaflet.css'
-// #endif
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import AppAvatar from '@/components/AppAvatar.vue'
 import { addBaseTileLayer } from '@/common/mapTiles'
-import { buildDemoRoadPreview, planAmapRoute } from '@/common/amapRoute'
+import { planAmapRoute } from '@/common/amapRoute'
 import { resolveApiUrl } from '@/api/http'
 import {
   cancelRescueCall,
@@ -307,7 +305,7 @@ import {
 } from '@/api/rescue'
 import { issueMediaDownload } from '@/api/files'
 import { connectRescueEvents } from '@/utils/rescueEvents'
-import { getCurrentGcj02Location, isDemoMode, openMapNavigation } from '@/utils/location'
+import { getCurrentGcj02Location, openMapNavigation } from '@/utils/location'
 import { rescueStatusPresentation, userFacingError } from '@/utils/presentation'
 
 const rescueId = ref('')
@@ -323,11 +321,8 @@ let disconnectEvents: (() => void) | null = null
 let renderedGeometryKey = ''
 let lastResponderLocationSyncAt = 0
 const responderActionBusy = ref(false)
-const routeProgress = ref(0.18)
-let routeAnimationFrame: number | null = null
-let routeAnimationStartedAt = 0
+const routeProgress = ref(0)
 let routeMovingMarker: any = null
-let routeCoordinates: [number, number][] = []
 const routePlanState = ref<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
 
 const feedbackRating = ref(0)
@@ -335,7 +330,7 @@ const feedbackComment = ref('')
 const feedbackSubmitting = ref(false)
 const feedbackSubmitted = ref<RescueFeedbackResponse | null>(null)
 
-/** 完成后展示评价卡片；呼救方对已完成的救援只能评价一次。 */
+
 const feedbackCard = computed(() => !isResponder.value && rescueCall.value?.status === 'COMPLETED')
 const rescueDuration = computed(() => {
   const call = rescueCall.value
@@ -414,7 +409,6 @@ const trackingLabel = computed(() => {
   if (routePlanState.value === 'loading') return '正在规划道路路线'
   if (routePlanState.value === 'unavailable') return '资源与现场位置'
   if (rescueCall.value?.liveTracking) return '实时驰援轨迹'
-  if (isDemoMode && isEnRoute.value) return '演示驰援轨迹'
   return '建议驰援轨迹'
 })
 const remainingDistanceMeters = computed(() => {
@@ -561,21 +555,7 @@ const nativeMarkers = computed(() => {
 })
 
 const nativePolylines = computed(() => {
-  const call = rescueCall.value
-  const matched = call?.matchedAed
-  if (!call || !matched || hasReachedScene.value) return []
-  const start: [number, number] = call.liveTracking
-    ? [call.liveTracking.responderLatitude, call.liveTracking.responderLongitude]
-    : [matched.latitude, matched.longitude]
-  const route = buildDemoRoadPreview(start, [call.latitude, call.longitude])
-  return [{
-    points: route.map(([latitude, longitude]) => ({ latitude, longitude })),
-    color: '#1677FFFF',
-    width: 7,
-    arrowLine: true,
-    borderColor: '#FFFFFFFF',
-    borderWidth: 3
-  }]
+  return []
 })
 
 onLoad((query) => {
@@ -608,10 +588,8 @@ async function loadDetail(showLoading = true) {
     await refreshAttachmentUrls(latest.attachmentMediaIds)
     loading.value = false
     await nextTick()
-    // #ifdef H5
     if (hasReachedScene.value || isAwaitingMatch.value) destroyMap()
     else await initMap()
-    // #endif
     if (['COMPLETED', 'NO_RESOURCE', 'EXPIRED', 'USER_CANCELLED', 'SYSTEM_FAILED'].includes(rescueCall.value.status)) {
       stopPolling()
       await loadFeedback()
@@ -651,7 +629,6 @@ async function refreshAttachmentUrls(mediaIds: string[]) {
   displayImageUrls.value = urls
 }
 
-// #ifdef H5
 async function initMap() {
   if (!rescueCall.value) return
   try {
@@ -671,7 +648,6 @@ async function initMap() {
       mapUnavailable.value = false
     }
 
-    // 只有位置或匹配结果变化才重绘，否则每轮 fitBounds 会让画面抖动
     const matched = rescueCall.value.matchedAed
     const live = hasReachedScene.value ? undefined : rescueCall.value.liveTracking
     const geometryKey = [
@@ -689,7 +665,6 @@ async function initMap() {
     }
     renderedGeometryKey = geometryKey
 
-    stopRouteAnimation()
     mapDataLayer.clearLayers()
     routeMovingMarker = null
     const marker = Leaflet.divIcon({
@@ -717,8 +692,7 @@ async function initMap() {
         matched.type === 'MOBILE' ? 'drive' : 'walk'
       )
       if (renderedGeometryKey !== geometryKey) return
-      const plannedRoute = amapRoute || (isDemoMode ? buildDemoRoadPreview(routeStart, routeEnd) : null)
-      routeCoordinates = plannedRoute || []
+      const plannedRoute = amapRoute
       routePlanState.value = plannedRoute ? 'ready' : 'unavailable'
 
       if (plannedRoute) {
@@ -750,7 +724,6 @@ async function initMap() {
         plannedRoute || [routeStart, routeEnd],
         { paddingTopLeft: [38, 58], paddingBottomRight: [38, 44], maxZoom: 18 }
       )
-      if (plannedRoute && isDemoMode && isEnRoute.value && !live) startRouteAnimation()
     }
     if (live) {
       const liveMarker = Leaflet.divIcon({
@@ -768,7 +741,6 @@ async function initMap() {
 }
 
 function destroyMap() {
-  stopRouteAnimation()
   renderedGeometryKey = ''
   routePlanState.value = 'idle'
   mapDataLayer = null
@@ -778,7 +750,6 @@ function destroyMap() {
     mapInstance = null
   }
 }
-// #endif
 
 function positionAlongRoute(points: [number, number][], progress: number): [number, number] {
   if (!points.length) return [0, 0]
@@ -791,23 +762,6 @@ function positionAlongRoute(points: [number, number][], progress: number): [numb
     current[0] + (next[0] - current[0]) * fraction,
     current[1] + (next[1] - current[1]) * fraction
   ]
-}
-
-function startRouteAnimation() {
-  stopRouteAnimation()
-  routeAnimationStartedAt = performance.now() - routeProgress.value * 26000
-  const animate = (now: number) => {
-    const raw = ((now - routeAnimationStartedAt) % 30000) / 26000
-    routeProgress.value = raw > 1 ? 0.94 : 0.12 + raw * 0.82
-    routeMovingMarker?.setLatLng(positionAlongRoute(routeCoordinates, routeProgress.value))
-    routeAnimationFrame = requestAnimationFrame(animate)
-  }
-  routeAnimationFrame = requestAnimationFrame(animate)
-}
-
-function stopRouteAnimation() {
-  if (routeAnimationFrame != null) cancelAnimationFrame(routeAnimationFrame)
-  routeAnimationFrame = null
 }
 
 function formatTime(value: string) {
@@ -879,7 +833,6 @@ async function syncResponderLocation() {
       longitude: location.longitude
     })
   } catch {
-    // 位置同步失败不阻断救援主流程，下一轮轮询会自动重试。
   }
 }
 
@@ -938,11 +891,8 @@ function previewSceneImage(index: number) {
 
 onUnmounted(() => {
   stopPolling()
-  stopRouteAnimation()
   disconnectEvents?.()
-  // #ifdef H5
   destroyMap()
-  // #endif
 })
 </script>
 

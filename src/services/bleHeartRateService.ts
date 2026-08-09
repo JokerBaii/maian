@@ -3,7 +3,7 @@ export type BleLifecycleState =
 
 type NotificationTarget = { deviceId: string; serviceId: string; characteristicId: string }
 
-/** App 级 BLE 生命周期：任何时刻只保留一组扫描/心率监听器。 */
+
 class BleHeartRateService {
   private stateValue: BleLifecycleState = 'IDLE'
   private discoveredHandler: ((result: any) => void) | null = null
@@ -69,7 +69,7 @@ class BleHeartRateService {
     }
   }
 
-  /** 彻底释放适配器，用于退出登录或 App 级停止监测。 */
+
   dispose() {
     this.disconnect(this.connectedDeviceId, () => {
       ;(uni as any).closeBluetoothAdapter?.({ complete: () => undefined })

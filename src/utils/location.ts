@@ -10,16 +10,12 @@ export interface MapNavigationTarget extends AppLocation {
   mode?: 'walk' | 'ride' | 'car'
 }
 
-export const FIXED_LOCATION: AppLocation = {
+export const DEFAULT_MAP_CENTER: AppLocation = {
   longitude: 120.1442,
   latitude: 30.2718,
   accuracy: 25,
   address: '杭州市西湖区黄龙体育馆东门'
 }
-
-export const FIXED_LOCATION_ADDRESS = '杭州市西湖区黄龙体育馆东门'
-export const FIXED_LOCATION_SHORT_NAME = '西湖区·黄龙体育馆'
-export const isDemoMode = String((import.meta as any).env?.VITE_DEMO_MODE || '').toLowerCase() === 'true'
 
 export function getCurrentGcj02Location(): Promise<AppLocation> {
   return new Promise((resolve, reject) => {
@@ -31,14 +27,11 @@ export function getCurrentGcj02Location(): Promise<AppLocation> {
         latitude: result.latitude,
         accuracy: result.accuracy
       }),
-      // 演示环境仍优先使用设备的真实位置；只有浏览器权限、HTTPS 或 GPS
-      // 不可用时才回退到演示坐标，保证关键救援页面不会卡死在定位阶段。
-      fail: error => isDemoMode ? resolve({ ...FIXED_LOCATION }) : reject(error)
+      fail: reject
     })
   })
 }
 
-/** 只允许在用户明确点击后调用，避免后台定位失败时突然打开选点界面。 */
 export function chooseGcj02Location(): Promise<AppLocation> {
   return new Promise((resolve, reject) => {
     uni.chooseLocation({
@@ -64,19 +57,12 @@ export function buildAmapNavigationUrl(target: MapNavigationTarget): string {
   return `https://uri.amap.com/navigation?${query.toString()}`
 }
 
-/**
- * 所有“导航”入口统一走这里：H5 使用高德路线规划，App/小程序交给系统地图。
- * 该方法只能由用户点击触发，避免浏览器拦截新窗口。
- */
 export function openMapNavigation(target: MapNavigationTarget) {
-  // #ifdef H5
   const navigationUrl = buildAmapNavigationUrl(target)
   const opened = window.open(navigationUrl, '_blank', 'noopener,noreferrer')
   if (!opened) window.location.assign(navigationUrl)
   return undefined
-  // #endif
 
-  // #ifndef H5
   uni.openLocation({
     latitude: target.latitude,
     longitude: target.longitude,
@@ -85,5 +71,4 @@ export function openMapNavigation(target: MapNavigationTarget) {
     scale: 16,
     fail: () => uni.showToast({ title: '无法打开系统地图', icon: 'none' })
   })
-  // #endif
 }

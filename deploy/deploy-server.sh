@@ -9,8 +9,7 @@ install -d -o maian -g maian -m 750 /var/lib/maian/media
 install -o root -g maian -m 640 /dev/null /opt/maian/app.env
 jwt_value="$(openssl rand -hex 48)"
 printf '%s\n' \
-  'SPRING_PROFILES_ACTIVE=demo' \
-  'DEMO_MODE=true' \
+  'SPRING_PROFILES_ACTIVE=prod' \
   "JWT_SECRET=${jwt_value}" \
   'JWT_ISSUER=maian-server' \
   'JWT_ACCESS_TOKEN_MINUTES=15' \
@@ -33,7 +32,6 @@ unset jwt_value
 
 install -o root -g root -m 644 /tmp/maian-server.service /etc/systemd/system/maian-server.service
 
-sed -i '/proxy_set_header X-Demo-User-Id/d' /etc/nginx/conf.d/maian.conf
 perl -0pi -e 's@\n    location /uploads/ \{.*?\n    \}\n@\n    location ^~ /protected-media/ {\n        internal;\n        alias /var/lib/maian/media/;\n        add_header Cache-Control "private, no-store" always;\n        add_header X-Content-Type-Options "nosniff" always;\n    }\n@s' /etc/nginx/conf.d/maian.conf
 sed -i 's/proxy_read_timeout 60s;/proxy_read_timeout 35m;/' /etc/nginx/conf.d/maian.conf
 if ! grep -q 'proxy_cache off;' /etc/nginx/conf.d/maian.conf; then
