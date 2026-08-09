@@ -20,20 +20,20 @@
       </view>
     </view>
 
-    <view v-if="currentTab === 'initiated'" class="record-scroll">
-      <view v-if="initiatedRecords.length > 0" class="record-list">
+    <view :key="currentTab" class="record-scroll">
+      <view v-if="currentRecords.length > 0" class="record-list">
         <view
-          v-for="record in initiatedRecords"
+          v-for="record in currentRecords"
           :key="record.id"
           class="record-card"
           @tap="goDetail(record.id)"
         >
           <view class="record-header">
-            <view class="urgency-badge" :class="'urgency-' + record.urgency.toLowerCase()">
-              <text class="urgency-text">{{ urgencyLabel(record.urgency) }}</text>
-            </view>
-            <view class="status-badge" :class="'status-' + statusTone(record.status)">
+            <text class="urgency-text" :class="'urgency-' + record.urgency.toLowerCase()">{{ urgencyLabel(record.urgency) }}</text>
+            <view class="status-copy" :class="'status-' + statusTone(record.status)">
+              <view class="status-dot"></view>
               <text class="status-text">{{ statusLabel(record.status) }}</text>
+              <text class="record-chevron">›</text>
             </view>
           </view>
           <view class="record-body">
@@ -50,45 +50,14 @@
         </view>
       </view>
       <view v-else class="empty-state">
-        <app-icon-tile class="empty-icon" name="rescue-notice" tone="coral" size="large" />
-        <text class="empty-text">暂无发起的救援记录</text>
-        <text class="empty-hint">遇到紧急情况可一键呼救</text>
-      </view>
-    </view>
-
-    <view v-if="currentTab === 'participated'" class="record-scroll">
-      <view v-if="participatedRecords.length > 0" class="record-list">
-        <view
-          v-for="record in participatedRecords"
-          :key="record.id"
-          class="record-card"
-          @tap="goDetail(record.id)"
-        >
-          <view class="record-header">
-            <view class="urgency-badge" :class="'urgency-' + record.urgency.toLowerCase()">
-              <text class="urgency-text">{{ urgencyLabel(record.urgency) }}</text>
-            </view>
-            <view class="status-badge" :class="'status-' + statusTone(record.status)">
-              <text class="status-text">{{ statusLabel(record.status) }}</text>
-            </view>
-          </view>
-          <view class="record-body">
-            <text class="record-desc">{{ record.description }}</text>
-            <view class="record-info-row">
-              <app-icon class="record-info-icon" name="location-filled" :size="14" color="#8994A8" />
-              <text class="record-info-text">{{ record.address }}</text>
-            </view>
-            <view class="record-info-row">
-              <app-icon class="record-info-icon" name="calendar" :size="14" color="#8994A8" />
-              <text class="record-info-text">{{ record.createTime }}</text>
-            </view>
-          </view>
-        </view>
-      </view>
-      <view v-else class="empty-state">
-        <app-icon-tile class="empty-icon" name="volunteer" tone="green" size="large" />
-        <text class="empty-text">暂无参与的救援记录</text>
-        <text class="empty-hint">参与救援可积累志愿时长</text>
+        <app-icon-tile
+          class="empty-icon"
+          :name="currentTab === 'initiated' ? 'rescue-notice' : 'volunteer'"
+          :tone="currentTab === 'initiated' ? 'coral' : 'green'"
+          size="large"
+        />
+        <text class="empty-text">暂无{{ currentTab === 'initiated' ? '发起' : '参与' }}的救援记录</text>
+        <text class="empty-hint">{{ currentTab === 'initiated' ? '遇到紧急情况可一键呼救' : '参与救援可积累志愿时长' }}</text>
       </view>
     </view>
   </view>
@@ -105,7 +74,7 @@ import {
   type RescueCallResponse,
   type ResponderTaskResponse
 } from '@/api/rescue'
-import { demoUsers, getDemoUserId } from '@/utils/demoSession'
+import { getCurrentProfile } from '@/api/user'
 import { rescueStatusLabel, rescueUrgencyLabel } from '@/utils/presentation'
 
 const currentTab = ref<'initiated' | 'participated'>('initiated')
@@ -121,8 +90,9 @@ interface RescueRecordView {
 
 const initiatedRecords = ref<RescueRecordView[]>([])
 const participatedRecords = ref<RescueRecordView[]>([])
-const currentDemoUser = computed(() => demoUsers.find(user => user.id === getDemoUserId()) || demoUsers[0])
-const canParticipate = computed(() => ['VOLUNTEER', 'ADMIN'].includes(currentDemoUser.value.role))
+const currentRecords = computed(() => currentTab.value === 'initiated' ? initiatedRecords.value : participatedRecords.value)
+const currentRole = ref('USER')
+const canParticipate = computed(() => ['VOLUNTEER', 'ADMIN'].includes(currentRole.value))
 
 function formatTime(value: string) {
   const date = new Date(value)
@@ -159,6 +129,8 @@ function goDetail(rescueId: string) {
 
 async function loadRecords() {
   try {
+    const profile = await getCurrentProfile()
+    currentRole.value = profile.role
     const [initiated, participated] = await Promise.all([
       listRescueCalls(),
       canParticipate.value ? listResponderTasks() : Promise.resolve(null)
@@ -194,23 +166,27 @@ onShow(loadRecords)
 
 .tab-bar {
   display: flex;
-  background: #FFFFFF;
-  padding: 0 32rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  gap: 4rpx;
+  margin: 18rpx 24rpx 0;
+  padding: 4rpx;
+  border-radius: 16rpx;
+  background: #E8E8ED;
   position: sticky;
-  top: 0;
+  top: 14rpx;
   z-index: 10;
 }
 .tab-item {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 28rpx 0 20rpx;
+  justify-content: center;
+  min-height: 58rpx;
+  border-radius: 12rpx;
   position: relative;
 }
+.tab-active { background: #FFFFFF; box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, .10); }
 .tab-text {
-  font-size: 30rpx;
+  font-size: 24rpx;
   color: #86909C;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -220,12 +196,7 @@ onShow(loadRecords)
   font-weight: 700;
 }
 .tab-indicator {
-  position: absolute;
-  bottom: 0;
-  width: 48rpx;
-  height: 6rpx;
-  border-radius: 3rpx;
-  background: #007AFF;
+  display: none;
 }
 
 .record-scroll {
@@ -243,7 +214,7 @@ onShow(loadRecords)
   border: 1rpx solid #E0E7EE;
   border-radius: 22rpx;
   background: #FFFFFF;
-  box-shadow: 0 12rpx 34rpx rgba(36, 58, 82, .06);
+  box-shadow: none;
 }
 .record-card {
   position: relative;
@@ -272,76 +243,26 @@ onShow(loadRecords)
   justify-content: space-between;
   margin-bottom: 16rpx;
 }
-.urgency-badge {
-  padding: 4rpx 16rpx;
-  border-radius: 8rpx;
-}
-.urgency-critical {
-  background: rgba(245, 63, 63, 0.1);
-}
-.urgency-high {
-  background: rgba(255, 154, 46, 0.1);
-}
-.urgency-medium {
-  background: rgba(43, 111, 240, 0.1);
-}
-.urgency-low {
-  background: rgba(0, 180, 42, 0.1);
-}
 .urgency-text {
   font-size: 22rpx;
-  font-weight: 600;
+  font-weight: 650;
 }
-.urgency-critical .urgency-text {
-  color: #C93D46;
-}
-.urgency-high .urgency-text {
-  color: #FF9A2E;
-}
-.urgency-medium .urgency-text {
-  color: #2E6DD1;
-}
-.urgency-low .urgency-text {
-  color: #23956A;
-}
-.status-badge {
-  padding: 4rpx 16rpx;
-  border-radius: 8rpx;
-}
-.status-completed {
-  background: rgba(0, 180, 42, 0.1);
-}
-.status-active {
-  background: rgba(43, 111, 240, 0.1);
-}
-.status-waiting {
-  background: rgba(255, 154, 46, 0.1);
-}
-.status-attention {
-  background: rgba(201, 61, 70, 0.09);
-}
-.status-ended {
-  background: rgba(134, 144, 156, 0.1);
-}
+.urgency-critical { color: #C93D46; }
+.urgency-high { color: #D17709; }
+.urgency-medium { color: #2E6DD1; }
+.urgency-low { color: #23956A; }
+.status-copy { display: flex; align-items: center; gap: 7rpx; }
+.status-dot { width: 9rpx; height: 9rpx; border-radius: 50%; background: currentColor; }
 .status-text {
   font-size: 22rpx;
-  font-weight: 600;
+  font-weight: 500;
 }
-.status-completed .status-text {
-  color: #23956A;
-}
-.status-active .status-text {
-  color: #2E6DD1;
-}
-.status-waiting .status-text {
-  color: #FF9A2E;
-}
-.status-attention .status-text {
-  color: #B52F3A;
-}
-.status-ended .status-text {
-  color: #86909C;
-}
+.status-completed { color: #23956A; }
+.status-active { color: #2E6DD1; }
+.status-waiting { color: #B66A10; }
+.status-attention { color: #B52F3A; }
+.status-ended { color: #86909C; }
+.record-chevron { margin-left: 2rpx; color: #C7C7CC; font-size: 32rpx; line-height: 1; }
 
 .record-body {
   display: flex;

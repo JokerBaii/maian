@@ -1,111 +1,321 @@
-/* Apple-platform baseline for every screen except the established home page. */
-.apple-page {
-  --ios-canvas: #F2F2F7;
-  --ios-group: #FFFFFF;
-  --ios-label: #1C1C1E;
-  --ios-secondary-label: #636366;
-  --ios-tertiary-label: #8E8E93;
-  --ios-separator: rgba(60, 60, 67, .16);
-  --ios-fill: rgba(118, 118, 128, .12);
-  --ios-blue: #007AFF;
-  --ios-green: #248A5A;
-  --ios-red: #C72C38;
-  --ios-orange: #C97818;
-  --ios-group-radius: 20rpx;
-  --ios-control-radius: 14rpx;
-  color: var(--ios-label);
+/* Native mobile baseline for every screen reached from the established home page. */
+.apple-page:not(.home-page) {
+  --care-canvas: #F2F2F7;
+  --care-paper: #FFFFFF;
+  --care-ink: #1C1C1E;
+  --care-secondary: #636366;
+  --care-tertiary: #8E8E93;
+  --care-separator: rgba(60, 60, 67, .16);
+  --care-fill: rgba(118, 118, 128, .10);
+  --care-action: #007AFF;
+  --care-life: #FF3B30;
+  --care-stable: #248A5A;
+  --care-caution: #C97818;
+  --care-group-radius: 20rpx;
+  --care-control-radius: 14rpx;
+  color: var(--care-ink);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
   font-feature-settings: 'kern';
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  letter-spacing: -.01em;
 }
 
-.apple-page:not(.emergency-page):not(.map-page) {
-  background-color: var(--ios-canvas) !important;
+.apple-page:not(.home-page):not(.emergency-page):not(.map-page) {
+  background-color: var(--care-canvas) !important;
 }
 
-/* Navigation is the translucent functional layer; content stays opaque. */
-.apple-page:not(.emergency-page) > .nav-bar {
-  border-bottom: 1rpx solid var(--ios-separator);
+/* Navigation is a quiet functional layer; content remains opaque. */
+.apple-page:not(.home-page):not(.emergency-page) > .nav-bar {
+  border-bottom: 1rpx solid var(--care-separator);
   background: rgba(249, 249, 251, .92) !important;
   box-shadow: none !important;
   backdrop-filter: saturate(160%) blur(24rpx);
   -webkit-backdrop-filter: saturate(160%) blur(24rpx);
 }
 
-.apple-page :is(
+.apple-page:not(.home-page) :is(
+  .page-title,
+  .console-title,
+  .mast-title,
+  .profile-name,
+  .risk-title
+) {
+  color: var(--care-ink);
+  letter-spacing: -.035em;
+}
+
+.apple-page:not(.home-page) :is(
+  .page-subtitle,
+  .console-subtitle,
+  .section-desc,
+  .field-hint,
+  .required-note
+) {
+  color: var(--care-tertiary);
+  font-weight: 400;
+}
+
+/* Grouped content reads as a mobile hierarchy instead of a dashboard grid. */
+.apple-page:not(.home-page) :is(
   .card,
+  .form-card,
   .report-card,
   .summary-card,
   .device-card,
   .content-card,
   .record-card,
-  .submission-card,
-  .review-card,
-  .menu-list,
+  .record-list,
+  .device-list,
   .contact-list,
-  .form-card,
-  .section-card
+  .settings-list,
+  .menu-list,
+  .section-card,
+  .review-card,
+  .submission-card,
+  .lesson-card,
+  .learning-note
 ) {
+  border-color: transparent !important;
+  background-color: var(--care-paper) !important;
   box-shadow: none !important;
 }
 
-.apple-page :is(input, textarea) {
-  color: var(--ios-label);
-  caret-color: var(--ios-blue);
-}
-
-.apple-page :is(input, textarea):focus {
-  outline: none;
-}
-
-.apple-page :is(
-  .primary-button,
-  .secondary-button,
-  .submit-button,
-  .state-button,
-  .popup-submit,
-  .empty-btn
+.apple-page:not(.home-page) :is(
+  .form-card,
+  .report-card,
+  .summary-card,
+  .record-list,
+  .device-list,
+  .contact-list,
+  .settings-list,
+  .menu-list,
+  .section-card,
+  .review-card,
+  .submission-card,
+  .lesson-card,
+  .learning-note
 ) {
-  min-height: 88rpx;
+  border-radius: var(--care-group-radius) !important;
+}
+
+.apple-page:not(.home-page) :is(
+  .menu-item,
+  .settings-item,
+  .record-item,
+  .device-item,
+  .contact-card,
+  .indicator-row,
+  .form-item
+) {
+  min-height: 92rpx;
   box-sizing: border-box;
 }
 
+.apple-page:not(.home-page) :is(input, textarea) {
+  color: var(--care-ink);
+  caret-color: var(--care-action);
+}
+
+.apple-page:not(.home-page) :is(input, textarea):focus {
+  outline: none;
+}
+
+/* Native fields are quiet inset surfaces. Login fields already sit inside one grouped surface. */
+.apple-page:not(.home-page):not(.login-page) :is(
+  .field-input,
+  .picker-value,
+  .mini-input,
+  .indicator-item .indicator-name,
+  .form-input,
+  .form-textarea,
+  .textarea,
+  .threshold-input
+) {
+  min-height: 82rpx;
+  box-sizing: border-box;
+  border: 1rpx solid transparent !important;
+  border-radius: var(--care-control-radius) !important;
+  background: var(--care-fill) !important;
+  color: var(--care-ink) !important;
+  box-shadow: none !important;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.apple-page:not(.home-page):not(.login-page) :is(
+  .field-input,
+  .mini-input,
+  .indicator-item .indicator-name,
+  .form-input,
+  .form-textarea,
+  .textarea,
+  .threshold-input
+):focus {
+  background: var(--care-paper) !important;
+  box-shadow: 0 0 0 3rpx rgba(0, 122, 255, .22) !important;
+}
+
+/* One action color; red, green and orange remain reserved for meaning. */
+.apple-page:not(.home-page) :is(
+  .primary-button,
+  .submit-button,
+  .submit-btn,
+  .state-button,
+  .popup-submit,
+  .empty-btn,
+  .quiz-start,
+  .quiz-button,
+  .next-btn,
+  .bind-btn:not(.bind-btn-bound),
+  .scan-btn
+) {
+  min-height: 88rpx;
+  box-sizing: border-box;
+  border: 0 !important;
+  border-radius: 16rpx !important;
+  background: var(--care-action) !important;
+  color: #FFFFFF !important;
+  box-shadow: none !important;
+  font-weight: 650 !important;
+}
+
+.apple-page:not(.home-page) :is(
+  .secondary-button,
+  .secondary-action,
+  .state-action,
+  .manage-action,
+  .recognize-button
+) {
+  border: 0 !important;
+  border-radius: var(--care-control-radius) !important;
+  background: var(--care-fill) !important;
+  color: var(--care-action) !important;
+  box-shadow: none !important;
+}
+
+.apple-page:not(.home-page) :is(
+  .primary-button,
+  .secondary-button,
+  .submit-button,
+  .submit-btn,
+  .state-button,
+  .popup-submit,
+  .empty-btn,
+  .quiz-start,
+  .quiz-button,
+  .next-btn,
+  .bind-btn,
+  .scan-btn,
+  .state-action,
+  .recognize-button
+) {
+  transition: transform 140ms cubic-bezier(.2, .72, .2, 1), opacity 140ms ease, background-color 180ms ease;
+}
+
+.apple-page:not(.home-page) :is(
+  .primary-button,
+  .secondary-button,
+  .submit-button,
+  .submit-btn,
+  .state-button,
+  .popup-submit,
+  .empty-btn,
+  .quiz-start,
+  .quiz-button,
+  .next-btn,
+  .bind-btn,
+  .scan-btn,
+  .state-action,
+  .recognize-button
+):active {
+  transform: scale(.985);
+  opacity: .62;
+}
+
+/* Segmented controls switch in place and retain spatial context. */
+.apple-page:not(.home-page) :is(.tab-bar, .tab-switcher, .range-switch, .mode-switch) {
+  border: 0 !important;
+  background: rgba(118, 118, 128, .12) !important;
+  box-shadow: none !important;
+}
+
+.apple-page:not(.home-page) :is(.tab-item, .range-option, .mode-item) {
+  transition: color 180ms ease, background-color 180ms ease, transform 140ms ease, box-shadow 180ms ease;
+}
+
+.apple-page:not(.home-page) :is(.tab-active, .range-option-active, .mode-active) {
+  background: var(--care-paper) !important;
+  color: var(--care-ink) !important;
+  box-shadow: 0 1rpx 5rpx rgba(0, 0, 0, .10) !important;
+}
+
+.apple-page:not(.home-page) :is(.status-chip, .online-chip, .device-state) {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
 /* Touch feedback should be immediate and quiet. */
-.apple-page :is(
+.apple-page:not(.home-page) :is(
   .menu-item,
   .record-card,
+  .record-item,
   .device-card,
+  .device-item,
   .contact-card,
   .content-card,
   .submission-card,
   .review-card
 ) {
-  transition: background-color 150ms ease, opacity 150ms ease;
+  transition: transform 140ms cubic-bezier(.2, .72, .2, 1), background-color 150ms ease, opacity 150ms ease;
 }
 
-.apple-page :is(
+.apple-page:not(.home-page) :is(
   .menu-item,
   .record-card,
+  .record-item,
   .device-card,
+  .device-item,
   .contact-card,
   .content-card,
   .submission-card,
   .review-card
 ):active {
-  background-color: #EDEDF2;
+  transform: scale(.992);
+  background-color: #EDEDF2 !important;
+  opacity: .72;
+}
+
+.apple-page:not(.home-page) :is(.bottom-actions, .submit-area, .current-action) {
+  padding-bottom: max(16rpx, env(safe-area-inset-bottom));
 }
 
 /* #ifdef H5 */
-.apple-page * {
+.apple-page:not(.home-page) * {
   -webkit-tap-highlight-color: transparent;
+}
+
+.apple-page:not(.home-page) :is(
+  .primary-button,
+  .secondary-button,
+  .submit-button,
+  .submit-btn,
+  .popup-submit,
+  .empty-btn,
+  .menu-item,
+  .settings-item,
+  .record-item,
+  .device-item,
+  .contact-card
+):focus-visible {
+  outline: 4rpx solid rgba(0, 122, 255, .28);
+  outline-offset: 3rpx;
 }
 /* #endif */
 
 @media (prefers-reduced-motion: reduce) {
-  .apple-page *,
-  .apple-page *::before,
-  .apple-page *::after {
+  .apple-page:not(.home-page) *,
+  .apple-page:not(.home-page) *::before,
+  .apple-page:not(.home-page) *::after {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;

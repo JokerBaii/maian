@@ -39,7 +39,7 @@ export interface ReportRecognitionResponse {
   rawLines: string[]
 }
 
-/** 上传原图后识别关键指标，返回结果需人工核对再保存。 */
+/** OCR 读取检查单后由健康信息服务整理为结构化结果。 */
 export function recognizeHealthReport(mediaId: string) {
   return request<ReportRecognitionResponse>('/api/v1/health-reports/recognition', {
     method: 'POST',

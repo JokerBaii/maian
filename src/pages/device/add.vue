@@ -327,29 +327,24 @@
 
     <!-- #ifdef H5 -->
     <view v-if="showLocationPicker" class="location-picker-overlay">
-      <view class="lp-header" :style="{ paddingTop: statusBarHeight + 'px' }">
-        <view class="lp-header-bar">
-          <view class="lp-back" @tap="cancelLocationPicker">
-            <app-icon class="lp-back-icon" name="back" :size="22" color="#1D2A3E" />
+      <view class="lp-header">
+        <view class="lp-toolbar">
+          <view class="lp-cancel" @tap="cancelLocationPicker">取消</view>
+          <view class="lp-search-bar">
+            <app-icon class="lp-search-icon" name="search" :size="18" color="#56627A" />
+            <input
+              class="lp-search-input"
+              v-model="poiSearchText"
+              placeholder="搜索地点名称或关键字"
+              placeholder-class="lp-search-placeholder"
+              confirm-type="search"
+              @confirm="searchPOI"
+            />
+            <view v-if="poiSearchText" class="lp-search-clear" @tap="clearPOISearch">
+              <app-icon class="lp-clear-icon" name="closeempty" :size="16" color="#6E7A90" />
+            </view>
           </view>
-          <text class="lp-title">选取位置</text>
-          <view class="lp-confirm" @tap="confirmLocationPicker">
-            <text class="lp-confirm-text">确定</text>
-          </view>
-        </view>
-        <view class="lp-search-bar">
-          <app-icon class="lp-search-icon" name="search" :size="18" color="#56627A" />
-          <input
-            class="lp-search-input"
-            v-model="poiSearchText"
-            placeholder="搜索地点名称或关键字"
-            placeholder-class="lp-search-placeholder"
-            confirm-type="search"
-            @confirm="searchPOI"
-          />
-          <view v-if="poiSearchText" class="lp-search-clear" @tap="clearPOISearch">
-            <app-icon class="lp-clear-icon" name="closeempty" :size="16" color="#6E7A90" />
-          </view>
+          <view class="lp-confirm" @tap="confirmLocationPicker">完成</view>
         </view>
       </view>
 
@@ -410,10 +405,6 @@ import {
   updateEmergencyDevice,
   type SaveEmergencyDeviceRequest
 } from '@/api/devices'
-
-const statusBarHeight = ref(0)
-const systemInfo = uni.getSystemInfoSync()
-statusBarHeight.value = systemInfo.statusBarHeight || 20
 
 const deviceType = ref<'fixed' | 'mobile'>('fixed')
 
@@ -506,6 +497,7 @@ async function persistImagePaths(paths: string[], purpose: 'DEVICE_IMAGE' | 'VEH
 
 function openLocationPicker() {
   // #ifdef H5
+  uni.setNavigationBarTitle({ title: '选取设备位置' })
   showLocationPicker.value = true
   poiResults.value = []
   selectedPoiIdx.value = -1
@@ -532,6 +524,7 @@ function openLocationPicker() {
 // #ifdef H5
 function cancelLocationPicker() {
   showLocationPicker.value = false
+  uni.setNavigationBarTitle({ title: editingId.value ? '编辑急救设备' : '添加急救设备' })
   if (pickerMapInstance) {
     pickerMapInstance.destroy()
     pickerMapInstance = null
@@ -1229,52 +1222,35 @@ async function handleSubmit() {
   flex-direction: column;
 }
 .lp-header {
-  background: #007AFF;
-  padding-bottom: 16rpx;
+  padding: 14rpx 18rpx;
+  border-bottom: 1rpx solid rgba(60, 60, 67, .12);
+  background: rgba(249, 249, 251, .94);
   z-index: 10;
+  backdrop-filter: saturate(160%) blur(24rpx);
+  -webkit-backdrop-filter: saturate(160%) blur(24rpx);
 }
-.lp-header-bar {
+.lp-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 24rpx;
+  gap: 14rpx;
 }
-.lp-back {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.lp-back-icon {
-  font-size: 40rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-.lp-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-}
+.lp-cancel,
 .lp-confirm {
-  padding: 12rpx 28rpx;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 28rpx;
-}
-.lp-confirm-text {
+  flex: none;
+  padding: 12rpx 6rpx;
+  color: #007AFF;
   font-size: 26rpx;
-  color: #FFFFFF;
-  font-weight: 600;
+  font-weight: 550;
 }
 .lp-search-bar {
   display: flex;
+  min-width: 0;
+  flex: 1;
   align-items: center;
-  margin: 0 24rpx;
-  height: 72rpx;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 36rpx;
-  padding: 0 24rpx;
+  height: 68rpx;
+  padding: 0 20rpx;
+  border-radius: 14rpx;
+  background: rgba(118, 118, 128, .12);
 }
 .lp-search-icon {
   font-size: 28rpx;
@@ -1282,31 +1258,31 @@ async function handleSubmit() {
 }
 .lp-search-input {
   flex: 1;
-  height: 72rpx;
+  height: 68rpx;
   font-size: 28rpx;
-  color: #FFFFFF;
+  color: #1C1C1E;
 }
 .lp-search-placeholder {
-  color: rgba(255, 255, 255, 0.6);
+  color: #8E8E93;
   font-size: 28rpx;
 }
 .lp-search-clear {
   width: 36rpx;
   height: 36rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(118, 118, 128, .18);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .lp-clear-icon {
   font-size: 18rpx;
-  color: #FFFFFF;
+  color: #636366;
 }
 
 .poi-results {
   position: absolute;
-  top: 200rpx;
+  top: 104rpx;
   left: 0;
   right: 0;
   max-height: 400rpx;

@@ -39,7 +39,7 @@ const pages = [
   ['user', USER_ID, 'pages/mine/contacts'],
   ['user', USER_ID, 'pages/mine/records'],
   ['user', USER_ID, 'pages/mine/settings'],
-  ['user', USER_ID, 'pages/mine/demo'],
+  ['user', USER_ID, 'pages/auth/login'],
   ['volunteer', VOLUNTEER_ID, 'pages/index/index'],
   ['volunteer', VOLUNTEER_ID, 'pages/mine/index'],
   ['volunteer', VOLUNTEER_ID, 'pages/device/manage'],
@@ -75,13 +75,17 @@ page.on('pageerror', error => pageErrors.push(error.message))
 const results = []
 for (const [role, userId, route] of pages) {
   await page.goto(identityPageUrl, { waitUntil: 'domcontentloaded' })
-  await page.evaluate(({ userId }) => {
+  await page.evaluate(({ userId, route }) => {
     localStorage.setItem('maian_demo_user_id', userId)
+    if (route === 'pages/auth/login') localStorage.removeItem('maian_demo_session_active')
+    else localStorage.setItem('maian_demo_session_active', true)
+    localStorage.removeItem('maian_access_token')
+    localStorage.removeItem('maian_access_token_expiry')
     localStorage.setItem('maian:privacy-consent:v1', new Date().toISOString())
     localStorage.removeItem('maian_demo_access_token')
     localStorage.removeItem('maian_demo_access_token_user')
     localStorage.removeItem('maian_demo_access_token_expiry')
-  }, { userId })
+  }, { userId, route })
   await page.goto('about:blank')
   await page.goto(`${baseUrl}?audit=${encodeURIComponent(`${role}-${route}-${Date.now()}`)}#/${route}`, { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(settleMs)

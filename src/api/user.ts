@@ -5,6 +5,7 @@ export interface UserProfileResponse {
   nickname: string
   phone: string
   role: string
+  avatarUrl?: string
   realName?: string
   idCard?: string
   verified: boolean

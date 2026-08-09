@@ -10,17 +10,7 @@
       <view class="hero-wash"></view>
 
       <view class="hero-nav">
-        <view class="brand-lockup">
-          <view class="brand-pulse" aria-hidden="true">
-            <view class="pulse-stem pulse-stem-short"></view>
-            <view class="pulse-stem pulse-stem-tall"></view>
-            <view class="pulse-stem pulse-stem-short"></view>
-          </view>
-          <view class="brand-copy">
-            <text class="brand-name">脉安驰援</text>
-            <text class="brand-caption">MAIAN RESPONSE</text>
-          </view>
-        </view>
+        <app-brand />
       </view>
 
       <view class="hero-copy">
@@ -179,16 +169,17 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
+import AppBrand from '@/components/AppBrand.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
 import { FIXED_LOCATION_SHORT_NAME, isDemoMode } from '@/utils/location'
-import { scienceArticles, officialFirstAidVideos } from '@/data/editorial'
+import { listScienceContent } from '@/api/science'
 
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 20)
 const waveform = [12, 18, 16, 24, 20, 30, 22, 18, 28, 42, 16, 58, 20, 36, 24, 18, 22, 30, 20, 16, 24, 18, 14]
 const { monitoring: healthMonitoring, loadMonitoring } = useHealthMonitoring()
-const homeArticles = scienceArticles.slice(0, 3)
-const homeVideos = officialFirstAidVideos.slice(0, 2)
+const homeArticles = ref<any[]>([])
+const homeVideos = ref<any[]>([])
 
 const deviceSnapshot = ref<EmergencyDeviceResponse[]>([])
 const devicesLoaded = ref(false)
@@ -218,6 +209,7 @@ const healthBars = computed(() => {
   const values = healthMonitoring.value.todayData
     .filter((_, index) => index % 2 === 0)
     .map(point => point.value)
+    .slice(-18)
   if (!values.length) return []
   const min = Math.min(...values)
   const range = Math.max(...values) - min || 1
@@ -225,8 +217,10 @@ const healthBars = computed(() => {
 })
 
 async function loadHomeData() {
-  const [devicesResult] = await Promise.allSettled([
+  const [devicesResult, articlesResult, videosResult] = await Promise.allSettled([
     listEmergencyDevices(),
+    listScienceContent('ARTICLE'),
+    listScienceContent('VIDEO'),
     loadMonitoring()
   ])
 
@@ -236,6 +230,22 @@ async function loadHomeData() {
   } else {
     devicesLoaded.value = false
     deviceSnapshot.value = []
+  }
+
+  if (articlesResult.status === 'fulfilled') {
+    homeArticles.value = articlesResult.value.slice(0, 3).map(item => ({
+      ...item,
+      cover: item.coverUrl || '/static/editorial/editorial-monitoring-light-v1.webp',
+      categoryLabel: ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[item.category || ''] || '科普内容'
+    }))
+  }
+  if (videosResult.status === 'fulfilled') {
+    homeVideos.value = videosResult.value.slice(0, 2).map(item => ({
+      ...item,
+      poster: item.coverUrl || '/static/editorial/editorial-aed-light-v1.webp',
+      duration: item.durationLabel || '视频课程',
+      source: item.sourceName || item.author
+    }))
   }
 }
 
@@ -328,54 +338,6 @@ onShow(loadHomeData)
   align-items: center;
   height: 92rpx;
   padding: 0 32rpx;
-}
-
-.brand-lockup {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-}
-
-.brand-pulse {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4rpx;
-  width: 52rpx;
-  height: 52rpx;
-  border: 1rpx solid rgba(46, 109, 209, 0.2);
-  border-radius: 13rpx;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(12px);
-}
-
-.pulse-stem {
-  width: 5rpx;
-  border-radius: 4rpx;
-  background: #2E6DD1;
-}
-
-.pulse-stem-short { height: 16rpx; }
-.pulse-stem-tall { height: 31rpx; background: #B52832; }
-
-.brand-copy {
-  display: flex;
-  flex-direction: column;
-}
-
-.brand-name {
-  color: #18334F;
-  font-size: 29rpx;
-  font-weight: 700;
-  letter-spacing: 2rpx;
-}
-
-.brand-caption {
-  margin-top: 2rpx;
-  color: #6A8198;
-  font-size: 15rpx;
-  font-weight: 600;
-  letter-spacing: 2rpx;
 }
 
 .hero-copy {
@@ -599,7 +561,10 @@ onShow(loadHomeData)
 .health-summary {
   display: flex;
   align-items: center;
+  width: 100%;
   min-height: 128rpx;
+  box-sizing: border-box;
+  overflow: hidden;
   padding: 20rpx 22rpx;
   border: 1rpx solid #DCE6EF;
   border-radius: 18rpx;
@@ -643,15 +608,20 @@ onShow(loadHomeData)
 
 .health-bars {
   display: flex;
+  min-width: 0;
+  max-width: 124rpx;
+  flex: 0 1 124rpx;
   align-items: flex-end;
-  gap: 4rpx;
-  width: 124rpx;
+  gap: 3rpx;
   height: 54rpx;
+  margin-left: 14rpx;
+  overflow: hidden;
 }
 
 .health-bar {
-  flex: 1;
-  min-width: 4rpx;
+  width: 0;
+  min-width: 0;
+  flex: 1 1 0;
   border-radius: 4rpx;
   background: #79AFE3;
 }

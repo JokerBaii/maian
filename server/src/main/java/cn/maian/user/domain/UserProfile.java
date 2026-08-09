@@ -28,6 +28,9 @@ public class UserProfile {
     @Column(length = 30, nullable = false)
     private String role;
 
+    @Column(length = 255)
+    private String avatarUrl;
+
     @Column(length = 60)
     private String realName;
 
@@ -74,6 +77,10 @@ public class UserProfile {
 
     public String getRole() {
         return role;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
     }
 
     public String getRealName() {

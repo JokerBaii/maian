@@ -22,7 +22,6 @@ export const FIXED_LOCATION_SHORT_NAME = '西湖区·黄龙体育馆'
 export const isDemoMode = String((import.meta as any).env?.VITE_DEMO_MODE || '').toLowerCase() === 'true'
 
 export function getCurrentGcj02Location(): Promise<AppLocation> {
-  if (isDemoMode) return Promise.resolve({ ...FIXED_LOCATION })
   return new Promise((resolve, reject) => {
     uni.getLocation({
       type: 'gcj02',
@@ -32,7 +31,9 @@ export function getCurrentGcj02Location(): Promise<AppLocation> {
         latitude: result.latitude,
         accuracy: result.accuracy
       }),
-      fail: reject
+      // 演示环境仍优先使用设备的真实位置；只有浏览器权限、HTTPS 或 GPS
+      // 不可用时才回退到演示坐标，保证关键救援页面不会卡死在定位阶段。
+      fail: error => isDemoMode ? resolve({ ...FIXED_LOCATION }) : reject(error)
     })
   })
 }

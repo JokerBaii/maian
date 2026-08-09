@@ -55,7 +55,7 @@ iOS App 资源位于 `dist/build/app`，需要使用 HBuilderX 云端打包或�
 - 在真机上验证定位、系统地图、相机/相册和 BLE 设备连接。
 
 - 在生产环境配置持久化的 `MEDIA_DIRECTORY`，并由 Nginx `X-Accel-Redirect` 传输私有媒体；
-- H5 底图默认使用高德栅格瓦片，与 App 内的 GCJ-02 坐标系一致，无需密钥；填写 `VITE_AMAP_KEY` 与 `VITE_AMAP_SECURITY_CODE` 后可启用高德 JS API 的 POI 搜索与选点。
+- H5 底图默认使用高德栅格瓦片，与 App 内的 GCJ-02 坐标系一致，无需密钥；填写 `VITE_AMAP_KEY` 与 `VITE_AMAP_SECURITY_CODE` 后可启用高德 JS API 的 POI 搜索、选点与救援道路路线规划。未配置路线服务时，救援地图只显示资源和现场位置，不绘制可能穿越建筑或水面的伪路线。
 
 Spring AI 默认关闭，没有模型密钥时健康分析使用本地规则。配置方式和接口示例见 [server/README.md](server/README.md)。
 
@@ -65,7 +65,7 @@ AED 调度 ETA 适用于校园、社区、场馆、园区和城市道路，不�
 
 ## 比赛演示闭环
 
-“我的 → 演示身份切换”提供三个比赛演示身份。每次切换都由仅在 Demo Profile 存在的登录接口签发短时 JWT，后端不再信任客户端传入的用户 ID。正式 Profile 禁止 Demo 登录，使用手机号、BCrypt 密码与 JWT。
+登录页提供手机号注册、密码登录和三个比赛演示入口。演示入口由仅在 Demo Profile 存在的接口签发短时 JWT，后端不信任客户端传入的用户 ID。正式 Profile 禁止 Demo 登录，使用手机号、BCrypt 密码与 JWT。
 
 推荐演示顺序：
 

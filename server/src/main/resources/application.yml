@@ -37,7 +37,7 @@ spring:
       api-key: ${OPENAI_API_KEY:disabled}
       chat:
         options:
-          model: ${OPENAI_MODEL:deepseek-v4-flash}
+          model: ${OPENAI_MODEL:deepseek-chat}
           temperature: 0.2
 
 app:

@@ -8,7 +8,7 @@
         <input
           class="search-input"
           v-model="searchText"
-          placeholder="搜索附近急救设备"
+          placeholder="搜索 AED、急救箱或地点"
           placeholder-class="search-placeholder"
           confirm-type="search"
           @confirm="handleSearch"
@@ -221,7 +221,7 @@
       </scroll-view>
     </view>
 
-    <view class="locate-btn" @tap="locateMe">
+    <view class="locate-btn" :class="{ 'locate-btn-drawer-expanded': drawerExpanded }" @tap="locateMe">
       <app-icon class="locate-icon" name="location-filled" :size="24" color="#1F63D5" />
     </view>
   </view>
@@ -272,15 +272,13 @@ let deviceById: Record<string, any> = {}
 let selfMarker: any = null
 /** 自身位置标记的内联结构。样式必须内联，原因见 buildLeafletIcon。 */
 const SELF_MARKER_HTML =
-  '<span style="position:relative;display:block;width:16px;height:16px;border-radius:50%;'
-  + 'background:rgba(47,115,232,0.22)">'
-  + '<i style="position:absolute;inset:4px;border-radius:50%;border:1.5px solid #FFFFFF;'
-  + 'background:#2F73E8;box-shadow:0 1px 4px rgba(47,115,232,0.5)"></i></span>'
+  '<span style="position:relative;display:block;width:28px;height:28px;border-radius:50%;'
+  + 'background:rgba(0,122,255,0.16);box-shadow:0 0 0 8px rgba(0,122,255,0.08)">'
+  + '<i style="position:absolute;inset:7px;border-radius:50%;border:3px solid #FFFFFF;'
+  + 'background:#007AFF;box-shadow:0 2px 7px rgba(0,72,176,0.42)"></i></span>'
 
 // 固定坐标只是 Demo Mode 的演示位置；正式模式在真实定位前不伪造用户位置。
-const myLocation = ref<number[] | null>(isDemoMode
-  ? [FIXED_LOCATION.longitude, FIXED_LOCATION.latitude]
-  : null)
+const myLocation = ref<number[] | null>(null)
 const remoteDevices = ref<any[] | null>(null)
 
 function calculateDistance(longitude: number, latitude: number) {
@@ -497,8 +495,8 @@ function updateSelfMarker() {
       icon: leafletApi.divIcon({
         className: 'rescue-self-marker',
         html: SELF_MARKER_HTML,
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
       }),
       zIndexOffset: 1000,
       interactive: false
@@ -519,7 +517,7 @@ function updateSelfMarker() {
   selfMarker = new AMap.Marker({
     position,
     content,
-    offset: new AMap.Pixel(-8, -8),
+    offset: new AMap.Pixel(-14, -14),
     zIndex: 200
   })
   mapInstance.add(selfMarker)
@@ -851,29 +849,28 @@ onUnmounted(() => {
   width: 100%;
   height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px));
   overflow: hidden;
-  background: #EDF5FB;
+  background: #EAF2F7;
 }
 
 .top-overlay {
   position: fixed;
   top: 0;
-  left: 0;
-  right: 0;
+  left: 18rpx;
+  right: 18rpx;
   z-index: 100;
-  padding-bottom: 18rpx;
-  border-bottom: 1rpx solid rgba(143, 169, 191, 0.18);
-  background: rgba(247, 251, 254, 0.9);
-  backdrop-filter: blur(16px);
+  padding-bottom: 0;
+  background: transparent;
 }
 .search-bar {
   display: flex;
   align-items: center;
-  margin: 0 24rpx;
-  height: 80rpx;
-  border: 1rpx solid #D7E4EF;
-  border-radius: 16rpx;
-  background: #FFFFFF;
-  padding: 0 24rpx;
+  height: 92rpx;
+  margin: 0;
+  padding: 0 26rpx;
+  border: 0;
+  border-radius: 30rpx 30rpx 0 0;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 14rpx 34rpx rgba(39,64,86,.11);
 }
 .search-icon-wrap {
   margin-right: 12rpx;
@@ -883,9 +880,9 @@ onUnmounted(() => {
 }
 .search-input {
   flex: 1;
-  height: 80rpx;
-  font-size: 28rpx;
-  color: #20364D;
+  height: 92rpx;
+  color: #151B22;
+  font-size: 29rpx;
 }
 .search-placeholder {
   color: #C9CDD4;
@@ -902,29 +899,35 @@ onUnmounted(() => {
 }
 .filter-tabs {
   display: flex;
-  padding: 16rpx 24rpx 0;
-  gap: 8rpx;
+  gap: 10rpx;
+  padding: 4rpx 18rpx 18rpx;
+  border-radius: 0 0 30rpx 30rpx;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 14rpx 34rpx rgba(39,64,86,.11);
 }
 .filter-tab {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
   position: relative;
-  padding: 12rpx 32rpx;
-  border: 1rpx solid #D9E5EF;
-  border-radius: 12rpx;
-  background: rgba(255,255,255,0.72);
+  padding: 13rpx 12rpx;
+  border: 0;
+  border-radius: 18rpx;
+  background: transparent;
   transition: background 150ms ease, border-color 150ms ease;
 }
 .filter-tab-active {
-  border-color: #2E6DD1;
-  background: #E8F1FD;
+  background: #EAF2FF;
 }
 .filter-tab-text {
-  font-size: 26rpx;
-  color: #4E5969;
-  font-weight: 500;
+  color: #515C68;
+  font-size: 24rpx;
+  font-weight: 560;
 }
 .filter-tab-active .filter-tab-text {
-  color: #245FAF;
-  font-weight: 600;
+  color: #1F63D5;
+  font-weight: 720;
 }
 .filter-tab-indicator {
   display: none;
@@ -1127,14 +1130,16 @@ onUnmounted(() => {
 
 .device-popup {
   position: fixed;
-  bottom: 460rpx;
+  bottom: 448rpx;
   left: 24rpx;
   right: 24rpx;
   z-index: 200;
-  background: #FFFFFF;
-  border-radius: 24rpx;
-  padding: 28rpx;
-  box-shadow: 0 8rpx 40rpx rgba(0,0,0,0.12);
+  padding: 26rpx;
+  border: 1rpx solid rgba(255,255,255,.8);
+  border-radius: 30rpx;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 16rpx 42rpx rgba(36,57,78,.15);
+  backdrop-filter: blur(18px);
   transform: translateY(100rpx);
   opacity: 0;
   transition: all 0.3s ease;
@@ -1193,9 +1198,9 @@ onUnmounted(() => {
   margin-bottom: 24rpx;
 }
 .popup-name {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: #20364D;
+  color: #151B22;
+  font-size: 32rpx;
+  font-weight: 760;
   display: block;
   line-height: 1.4;
 }
@@ -1267,8 +1272,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8rpx;
-  height: 76rpx;
-  border-radius: 38rpx;
+  height: 80rpx;
+  border-radius: 20rpx;
   transition: all 0.3s ease;
 }
 .popup-btn:active {
@@ -1278,8 +1283,8 @@ onUnmounted(() => {
   background: #F2F3F5;
 }
 .popup-btn-nav {
-  background: #007AFF;
-  box-shadow: 0 6rpx 24rpx rgba(43, 111, 240, 0.3);
+  background: #2474EE;
+  box-shadow: none;
 }
 .popup-btn-icon {
   font-size: 28rpx;
@@ -1304,11 +1309,10 @@ onUnmounted(() => {
   height: 72vh;
   max-height: 1160rpx;
   overflow: hidden;
+  border: 0;
+  border-radius: 38rpx 38rpx 0 0;
   background: #FFFFFF;
-  border: 1rpx solid rgba(146, 169, 191, 0.22);
-  border-bottom: 0;
-  border-radius: 30rpx 30rpx 0 0;
-  box-shadow: 0 -10rpx 36rpx rgba(34, 68, 101, 0.12);
+  box-shadow: 0 -14rpx 40rpx rgba(39,62,82,.12);
   display: flex;
   flex-direction: column;
   transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -1326,11 +1330,11 @@ onUnmounted(() => {
 .drawer-handle {
   display: flex;
   justify-content: center;
-  padding: 13rpx 0 7rpx;
+  padding: 15rpx 0 9rpx;
 }
 .drawer-handle-bar {
-  width: 58rpx;
-  height: 7rpx;
+  width: 68rpx;
+  height: 6rpx;
   border-radius: 4rpx;
   background: #C9D5E0;
 }
@@ -1339,7 +1343,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 20rpx;
-  padding: 5rpx 28rpx 22rpx;
+  padding: 7rpx 30rpx 24rpx;
 }
 .drawer-heading {
   min-width: 0;
@@ -1351,14 +1355,18 @@ onUnmounted(() => {
 }
 .drawer-title {
   color: var(--network-ink);
-  font-size: 32rpx;
-  font-weight: 720;
-  letter-spacing: 1rpx;
+  color: #141A21;
+  font-size: 36rpx;
+  font-weight: 780;
+  letter-spacing: 0;
 }
 .drawer-count {
   color: var(--network-action);
-  font-size: 21rpx;
-  font-weight: 600;
+  padding: 4rpx 10rpx;
+  border-radius: 999rpx;
+  background: #EAF2FF;
+  font-size: 20rpx;
+  font-weight: 700;
 }
 .drawer-summary {
   display: flex;
@@ -1392,7 +1400,7 @@ onUnmounted(() => {
   min-height: 0;
   height: 0;
   box-sizing: border-box;
-  padding: 0 24rpx;
+  padding: 0 28rpx;
   background: #FFFFFF;
 }
 
@@ -1400,8 +1408,8 @@ onUnmounted(() => {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 148rpx;
-  padding: 21rpx 8rpx 21rpx 17rpx;
+  min-height: 154rpx;
+  padding: 23rpx 4rpx;
   border-bottom: 1rpx solid var(--network-line);
   box-sizing: border-box;
 }
@@ -1413,12 +1421,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 60rpx;
-  width: 60rpx;
-  height: 60rpx;
-  margin-right: 16rpx;
-  border-radius: 16rpx;
-  background: rgba(46, 109, 209, 0.08);
+  flex: 0 0 62rpx;
+  width: 62rpx;
+  height: 62rpx;
+  margin-right: 18rpx;
+  border-radius: 19rpx;
+  background: #EDF4FF;
 }
 .device-icon-offline {
   background: rgba(201, 205, 212, 0.22);
@@ -1441,8 +1449,9 @@ onUnmounted(() => {
 }
 .device-card-name {
   color: var(--network-ink);
-  font-size: 27rpx;
-  font-weight: 650;
+  color: #171D24;
+  font-size: 28rpx;
+  font-weight: 720;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1541,9 +1550,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rpx;
-  color: var(--network-action);
-  font-size: 21rpx;
+  min-height: 46rpx;
+  gap: 2rpx;
+  padding: 0 13rpx;
+  border-radius: 14rpx;
+  background: #EAF2FF;
+  color: #1F63D5;
+  font-size: 20rpx;
+  font-weight: 700;
   transition: opacity 150ms ease;
 }
 .nav-btn:active {
@@ -1571,20 +1585,25 @@ onUnmounted(() => {
 .locate-btn {
   position: fixed;
   right: 24rpx;
-  bottom: 500rpx;
-  z-index: 100;
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 50%;
+  bottom: 760rpx;
+  z-index: 170;
+  width: 82rpx;
+  height: 82rpx;
+  border-radius: 22rpx;
   background: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.12);
-  transition: all 0.3s ease;
+  box-shadow: 0 10rpx 28rpx rgba(35,56,76,.14);
+  transition: transform 180ms ease, opacity 180ms ease;
 }
 .locate-btn:active {
   transform: scale(0.92);
+}
+.locate-btn-drawer-expanded {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20rpx);
 }
 .locate-icon {
   font-size: 36rpx;
@@ -1593,5 +1612,6 @@ onUnmounted(() => {
 .drawer-bottom-safe {
   height: calc(36rpx + env(safe-area-inset-bottom));
 }
+
 
 </style>

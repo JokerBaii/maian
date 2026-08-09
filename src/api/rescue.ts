@@ -20,6 +20,7 @@ export interface RescueParticipant {
   userId: string
   displayName: string
   phone: string
+  avatarUrl?: string
   verified: boolean
 }
 
@@ -94,6 +95,7 @@ export interface ResponderTaskResponse {
   arrivedAtAedAt?: string
   completionSubmittedAt?: string
   confirmationDeadlineAt?: string
+  completedAt?: string
   eventSequence: number
   createdAt: string
   updatedAt: string

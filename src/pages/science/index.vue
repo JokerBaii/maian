@@ -1,16 +1,6 @@
 <template>
-  <view class="page apple-page motion-page-list">
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <view class="nav-back" @tap="goBack">
-          <app-icon class="back-icon" name="back" :size="22" color="#20364D" />
-        </view>
-        <text class="nav-title">急救与健康科普</text>
-        <view class="nav-right" @tap="goContribute">
-          <app-icon class="nav-action" name="compose" :size="21" color="#2E6DD1" />
-        </view>
-      </view>
-    </view>
+  <view class="page apple-page motion-page-list" :style="{ paddingTop: (statusBarHeight + 44) + 'px' }">
+    <app-nav-bar title="急救与健康科普" back action-icon="compose" @back="goBack" @action="goContribute" />
 
     <view class="search-section">
       <view class="search-bar">
@@ -98,7 +88,7 @@
         <text class="section-title">急救视频课</text>
         <text class="section-desc">权威课程，按急救流程逐步学习</text>
       </view>
-      <view v-for="video in officialFirstAidVideos" :key="video.id" class="video-card" @tap="playVideo(video.id)">
+      <view v-for="video in videos" :key="video.id" class="video-card" @tap="playVideo(video.id)">
         <view class="video-poster">
           <image :src="video.poster" mode="aspectFill" />
           <view class="play-button"><app-icon name="videocam-filled" :size="20" color="#FFFFFF" /></view>
@@ -137,9 +127,10 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
+import AppNavBar from '@/components/AppNavBar.vue'
 import { resolveApiUrl } from '@/api/http'
-import { scienceArticles, scienceCategories, officialFirstAidVideos } from '@/data/editorial'
-import { listApprovedScienceSubmissions } from '@/api/science'
+import { scienceCategories } from '@/data/editorial'
+import { listScienceContent } from '@/api/science'
 
 const statusBarHeight = ref(0)
 const systemInfo = uni.getSystemInfoSync()
@@ -155,38 +146,33 @@ const contentModes = [
   { key: 'quiz', label: '急救自测', icon: 'science-update' }
 ] as const
 
-/** 已审核通过的投稿，与官方文章合并展示，形成"投稿→审核→上架"闭环。 */
-const approvedSubmissions = ref<any[]>([])
+const articles = ref<any[]>([])
+const videos = ref<any[]>([])
 
 onShow(async () => {
   try {
-    const page = await listApprovedScienceSubmissions()
-    approvedSubmissions.value = page.content.map(submission => ({
-      id: 'submission-' + submission.id,
-      isSubmission: true,
-      submissionId: submission.id,
-      title: submission.title,
-      category: submission.category,
-      categoryLabel: ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[submission.category] || '科普投稿',
-      cover: submission.coverImageUrl || '',
-      author: '用户投稿',
-      summary: submission.content,
-      content: submission.content,
-      viewCount: 0,
-      likeCount: 0,
-      collectCount: 0,
-      publishTime: (submission.submittedAt || '').slice(0, 10),
-      isLiked: false,
-      isCollected: false,
-      media: { type: 'image', url: '', poster: '', images: [] }
+    const [articleRows, videoRows] = await Promise.all([
+      listScienceContent('ARTICLE'),
+      listScienceContent('VIDEO')
+    ])
+    articles.value = articleRows.map(item => ({
+      ...item,
+      categoryLabel: ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[item.category || ''] || '科普内容',
+      cover: item.coverUrl || '/static/editorial/editorial-monitoring-light-v1.webp'
+    }))
+    videos.value = videoRows.map(item => ({
+      ...item,
+      poster: item.coverUrl || '/static/editorial/editorial-aed-light-v1.webp',
+      duration: item.durationLabel || '视频课程',
+      source: item.sourceName || item.author
     }))
   } catch {
-    // 投稿接口异常不影响官方内容展示
+    uni.showToast({ title: '科普内容加载失败', icon: 'none' })
   }
 })
 
 const filteredContents = computed(() => {
-  let list = [...scienceArticles, ...approvedSubmissions.value]
+  let list = [...articles.value]
   if (activeCategory.value !== 'all') {
     list = list.filter(c => c.category === activeCategory.value)
   }
@@ -231,51 +217,6 @@ function goContribute() {
 .page {
   min-height: 100vh;
   background: #F3F7FA;
-}
-
-.nav-bar {
-  background: rgba(248, 250, 252, .94);
-  border-bottom: 1rpx solid rgba(32, 54, 77, .08);
-  backdrop-filter: blur(24rpx);
-}
-
-.nav-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 24rpx;
-}
-
-.nav-back {
-  width: 60rpx;
-  height: 60rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.back-icon {
-  font-size: 36rpx;
-  color: #fff;
-}
-
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 600;
-  color: #20364D;
-}
-
-.nav-right {
-  width: 60rpx;
-  height: 60rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.nav-action {
-  font-size: 32rpx;
 }
 
 .search-section {

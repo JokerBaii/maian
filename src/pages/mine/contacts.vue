@@ -85,6 +85,13 @@
         </view>
       </view>
     </view>
+    <app-action-sheet
+      v-model:visible="actionSheetVisible"
+      :title="selectedContact?.name || ''"
+      :message="selectedContact?.phone || ''"
+      :actions="contactActions"
+      @select="handleContactAction"
+    />
   </view>
 </template>
 
@@ -93,6 +100,7 @@ import { ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
+import AppActionSheet, { type AppActionSheetItem } from '@/components/AppActionSheet.vue'
 import {
   createEmergencyContact,
   deleteEmergencyContact,
@@ -105,6 +113,14 @@ import { userFacingError } from '@/utils/presentation'
 const contacts = ref<EmergencyContactResponse[]>([])
 
 const popupVisible = ref(false)
+const actionSheetVisible = ref(false)
+const selectedContactIndex = ref(-1)
+const selectedContact = ref<EmergencyContactResponse | null>(null)
+const contactActions: AppActionSheetItem[] = [
+  { label: '拨打电话' },
+  { label: '编辑联系人' },
+  { label: '删除联系人', destructive: true }
+]
 const isEditing = ref(false)
 const editingIndex = ref(-1)
 
@@ -136,15 +152,18 @@ function editContact(idx: number) {
 }
 
 function openContactActions(idx: number) {
-  const contact = contacts.value[idx]
-  uni.showActionSheet({
-    itemList: ['拨打电话', '编辑联系人', '删除联系人'],
-    success: ({ tapIndex }) => {
-      if (tapIndex === 0) return uni.makePhoneCall({ phoneNumber: contact.phone })
-      if (tapIndex === 1) return editContact(idx)
-      deleteContact(idx)
-    }
-  })
+  selectedContactIndex.value = idx
+  selectedContact.value = contacts.value[idx]
+  actionSheetVisible.value = true
+}
+
+function handleContactAction(index: number) {
+  const contact = selectedContact.value
+  const contactIndex = selectedContactIndex.value
+  if (!contact || contactIndex < 0) return
+  if (index === 0) return uni.makePhoneCall({ phoneNumber: contact.phone })
+  if (index === 1) return editContact(contactIndex)
+  deleteContact(contactIndex)
 }
 
 function deleteContact(idx: number) {

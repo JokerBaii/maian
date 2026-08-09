@@ -9,33 +9,21 @@
               <app-icon-tile class="settings-icon" name="rescue-notice" tone="coral" />
               <text class="settings-label">呼救推送</text>
             </view>
-            <view class="toggle-wrap" @tap="settings.rescuePush = !settings.rescuePush">
-              <view class="toggle-track" :class="{ 'toggle-on': settings.rescuePush }">
-                <view class="toggle-thumb"></view>
-              </view>
-            </view>
+            <app-switch v-model="settings.rescuePush" />
           </view>
           <view class="settings-item">
             <view class="settings-item-left">
               <app-icon-tile class="settings-icon" name="health-alert" tone="coral" />
               <text class="settings-label">健康预警</text>
             </view>
-            <view class="toggle-wrap" @tap="settings.healthAlert = !settings.healthAlert">
-              <view class="toggle-track" :class="{ 'toggle-on': settings.healthAlert }">
-                <view class="toggle-thumb"></view>
-              </view>
-            </view>
+            <app-switch v-model="settings.healthAlert" />
           </view>
           <view class="settings-item settings-item-last">
             <view class="settings-item-left">
               <app-icon-tile class="settings-icon" name="science-update" tone="cyan" />
               <text class="settings-label">科普更新</text>
             </view>
-            <view class="toggle-wrap" @tap="settings.scienceUpdate = !settings.scienceUpdate">
-              <view class="toggle-track" :class="{ 'toggle-on': settings.scienceUpdate }">
-                <view class="toggle-thumb"></view>
-              </view>
-            </view>
+            <app-switch v-model="settings.scienceUpdate" />
           </view>
         </view>
       </view>
@@ -48,22 +36,14 @@
               <app-icon-tile class="settings-icon" name="location-filled" tone="blue" />
               <text class="settings-label">位置共享</text>
             </view>
-            <view class="toggle-wrap" @tap="settings.locationShare = !settings.locationShare">
-              <view class="toggle-track" :class="{ 'toggle-on': settings.locationShare }">
-                <view class="toggle-thumb"></view>
-              </view>
-            </view>
+            <app-switch v-model="settings.locationShare" />
           </view>
           <view class="settings-item settings-item-last">
             <view class="settings-item-left">
               <app-icon-tile class="settings-icon" name="bars" tone="cyan" />
               <text class="settings-label">健康数据共享</text>
             </view>
-            <view class="toggle-wrap" @tap="settings.healthDataShare = !settings.healthDataShare">
-              <view class="toggle-track" :class="{ 'toggle-on': settings.healthDataShare }">
-                <view class="toggle-thumb"></view>
-              </view>
-            </view>
+            <app-switch v-model="settings.healthDataShare" />
           </view>
         </view>
       </view>
@@ -141,6 +121,8 @@
         <text class="version-text">脉安驰援 v1.0.0</text>
       </view>
 
+      <view class="logout-action app-motion-control" @tap="logout">退出登录</view>
+
       <view class="bottom-safe"></view>
     </view>
 
@@ -174,8 +156,11 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
+import AppSwitch from '@/components/AppSwitch.vue'
 import { getUserSettings, updateUserSettings } from '@/api/user'
 import { userFacingError } from '@/utils/presentation'
+import { clearAccountSession } from '@/utils/authSession'
+import { clearDemoSession } from '@/utils/demoSession'
 
 const SETTINGS_STORAGE_KEY = 'maian:user-settings'
 const settings = reactive({
@@ -232,8 +217,7 @@ watch(settings, (value) => {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(async () => {
     try {
-      const remote = await updateUserSettings({ ...settings })
-      applySettings(remote)
+      await updateUserSettings({ ...settings })
     } catch (error: any) {
       uni.showToast({ title: userFacingError(error, '设置保存失败，请稍后重试'), icon: 'none' })
     }
@@ -279,7 +263,7 @@ function clearCache() {
     success: (res) => {
       if (res.confirm) {
         try {
-          uni.clearStorageSync()
+          uni.removeStorageSync(SETTINGS_STORAGE_KEY)
           cacheSizeKb.value = 0
           uni.showToast({ title: '缓存已清除', icon: 'success' })
         } catch {
@@ -301,6 +285,21 @@ function goAbout() {
 
 function goLegal(type: 'privacy' | 'terms' | 'medical') {
   uni.navigateTo({ url: `/pages/legal/index?type=${type}` })
+}
+
+function logout() {
+  uni.showModal({
+    title: '退出登录？',
+    content: '退出后，本机上的账户登录状态将被移除。',
+    confirmText: '退出',
+    confirmColor: '#FF3B30',
+    success: result => {
+      if (!result.confirm) return
+      clearAccountSession()
+      clearDemoSession()
+      uni.reLaunch({ url: '/pages/auth/login' })
+    }
+  })
 }
 </script>
 
@@ -358,35 +357,6 @@ function goLegal(type: 'privacy' | 'terms' | 'medical') {
   font-weight: 500;
 }
 
-.toggle-wrap {
-  flex-shrink: 0;
-}
-.toggle-track {
-  width: 88rpx;
-  height: 48rpx;
-  border-radius: 24rpx;
-  background: #E5E6EB;
-  position: relative;
-  transition: background 0.3s ease;
-  padding: 4rpx;
-  box-sizing: border-box;
-}
-.toggle-on {
-  background: #2E6DD1;
-}
-.toggle-thumb {
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  background: #FFFFFF;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
-  transition: transform 0.3s ease;
-  transform: translateX(0);
-}
-.toggle-on .toggle-thumb {
-  transform: translateX(40rpx);
-}
-
 .threshold-wrap {
   display: flex;
   align-items: center;
@@ -416,6 +386,19 @@ function goLegal(type: 'privacy' | 'terms' | 'medical') {
   font-size: 24rpx;
   color: #C9CDD4;
 }
+.logout-action {
+  display: flex;
+  min-height: 92rpx;
+  align-items: center;
+  justify-content: center;
+  margin: 24rpx 32rpx 0;
+  border-radius: 18rpx;
+  background: #FFFFFF;
+  color: #FF3B30;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.logout-action:active { background: rgba(118,118,128,.08); }
 
 .bottom-safe {
   height: 80rpx;
@@ -430,14 +413,14 @@ function goLegal(type: 'privacy' | 'terms' | 'medical') {
   background: rgba(0, 0, 0, 0.5);
   z-index: 999;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
 }
 .popup-content {
-  width: 600rpx;
+  width: 100%;
   background: #FFFFFF;
-  border-radius: 24rpx;
-  padding: 36rpx 32rpx;
+  border-radius: 30rpx 30rpx 0 0;
+  padding: 28rpx 32rpx calc(28rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 .popup-header {
@@ -487,10 +470,10 @@ function goLegal(type: 'privacy' | 'terms' | 'medical') {
 }
 .popup-submit {
   background: #007AFF;
-  border-radius: 48rpx;
+  border-radius: 16rpx;
   padding: 24rpx 0;
   text-align: center;
-  box-shadow: 0 8rpx 32rpx rgba(43, 111, 240, 0.3);
+  box-shadow: none;
 }
 .popup-submit:active {
   opacity: 0.85;
@@ -500,4 +483,5 @@ function goLegal(type: 'privacy' | 'terms' | 'medical') {
   color: #FFFFFF;
   font-weight: 700;
 }
+
 </style>

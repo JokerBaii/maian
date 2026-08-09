@@ -22,6 +22,47 @@ export interface ScienceArticleInteractionResponse {
   updatedAt?: string
 }
 
+export interface ScienceContentResponse {
+  id: string
+  kind: 'ARTICLE' | 'VIDEO'
+  category?: string
+  title: string
+  summary: string
+  body?: string
+  author: string
+  coverPath?: string
+  coverMediaId?: string
+  coverUrl?: string
+  mediaUrl?: string
+  sourceName?: string
+  sourcePage?: string
+  durationLabel?: string
+  viewCount: number
+  likeCount: number
+  collectCount: number
+  publishedAt: string
+}
+
+async function normalizeContent(item: Omit<ScienceContentResponse, 'coverUrl'>) {
+  const coverUrl = item.coverMediaId
+    ? (await issueMediaDownload(item.coverMediaId)).url
+    : item.coverPath
+  return { ...item, coverUrl }
+}
+
+export async function listScienceContent(kind: 'ARTICLE' | 'VIDEO') {
+  const content = await request<Array<Omit<ScienceContentResponse, 'coverUrl'>>>(
+    `/api/v1/science-content?kind=${kind}`
+  )
+  return Promise.all(content.map(normalizeContent))
+}
+
+export async function getScienceContent(id: string) {
+  return normalizeContent(await request<Omit<ScienceContentResponse, 'coverUrl'>>(
+    `/api/v1/science-content/${encodeURIComponent(id)}`
+  ))
+}
+
 export function getScienceArticleInteraction(articleId: string) {
   return request<ScienceArticleInteractionResponse>(
     `/api/v1/science-articles/${encodeURIComponent(articleId)}/interaction`

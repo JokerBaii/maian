@@ -30,7 +30,7 @@ public class ScienceArticleInteraction {
     @Column(length = 36, nullable = false)
     private UUID userId;
 
-    @Column(length = 40, nullable = false)
+    @Column(length = 80, nullable = false)
     private String articleId;
 
     @Column(nullable = false)

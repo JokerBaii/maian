@@ -1,6 +1,13 @@
 {
   "pages": [
     {
+      "path": "pages/auth/login",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "登录"
+      }
+    },
+    {
       "path": "pages/index/index",
       "style": {
         "navigationStyle": "custom",
@@ -44,13 +51,13 @@
     {
       "path": "pages/device/add",
       "style": {
-        "navigationBarTitleText": "设备录入"
+        "navigationBarTitleText": "添加急救设备"
       }
     },
     {
       "path": "pages/device/manage",
       "style": {
-        "navigationBarTitleText": "设备管理"
+        "navigationBarTitleText": "我的急救设备"
       }
     },
     {
@@ -74,13 +81,13 @@
     {
       "path": "pages/checkup/upload",
       "style": {
-        "navigationBarTitleText": "体检报告上传"
+        "navigationBarTitleText": "录入体检报告"
       }
     },
     {
       "path": "pages/checkup/report",
       "style": {
-        "navigationBarTitleText": "健康分析报告"
+        "navigationBarTitleText": "体检报告"
       }
     },
     {
@@ -129,7 +136,7 @@
     {
       "path": "pages/mine/auth",
       "style": {
-        "navigationBarTitleText": "身份信息校验"
+        "navigationBarTitleText": "身份认证"
       }
     },
     {
@@ -151,15 +158,9 @@
       }
     },
     {
-      "path": "pages/mine/demo",
-      "style": {
-        "navigationBarTitleText": "演示身份切换"
-      }
-    },
-    {
       "path": "pages/device/review",
       "style": {
-        "navigationBarTitleText": "设备审核"
+        "navigationBarTitleText": "待审核设备"
       }
     },
     {
@@ -177,14 +178,14 @@
     {
       "path": "pages/science/review",
       "style": {
-        "navigationBarTitleText": "投稿审核"
+        "navigationBarTitleText": "待审核内容"
       }
     }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "脉安驰援",
-    "navigationBarBackgroundColor": "#F9F9FB",
+    "navigationBarBackgroundColor": "#FFFFFF",
     "backgroundColor": "#F2F2F7",
     "app-plus": {
       "animationType": "fade-in",

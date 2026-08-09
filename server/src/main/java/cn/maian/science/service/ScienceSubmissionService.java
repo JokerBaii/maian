@@ -7,6 +7,8 @@ import cn.maian.science.dto.ScienceSubmissionResponse;
 import cn.maian.science.dto.ReviewScienceSubmissionRequest;
 import cn.maian.science.domain.SubmissionStatus;
 import cn.maian.science.repository.ScienceSubmissionRepository;
+import cn.maian.science.repository.ScienceContentRepository;
+import cn.maian.science.domain.ScienceContent;
 import cn.maian.common.exception.ResourceNotFoundException;
 import cn.maian.user.service.CurrentUserService;
 import org.springframework.data.domain.Page;
@@ -24,15 +26,18 @@ public class ScienceSubmissionService {
     private final ScienceSubmissionRepository scienceSubmissionRepository;
     private final CurrentUserService currentUserService;
     private final MediaStorageService mediaStorageService;
+    private final ScienceContentRepository scienceContentRepository;
 
     public ScienceSubmissionService(
         ScienceSubmissionRepository scienceSubmissionRepository,
         CurrentUserService currentUserService,
-        MediaStorageService mediaStorageService
+        MediaStorageService mediaStorageService,
+        ScienceContentRepository scienceContentRepository
     ) {
         this.scienceSubmissionRepository = scienceSubmissionRepository;
         this.currentUserService = currentUserService;
         this.mediaStorageService = mediaStorageService;
+        this.scienceContentRepository = scienceContentRepository;
     }
 
     @Transactional
@@ -99,12 +104,17 @@ public class ScienceSubmissionService {
             throw new cn.maian.common.exception.InvalidStateTransitionException(exception.getMessage());
         }
         mediaStorageService.setReferencePublic("SCIENCE_SUBMISSION", id, request.approved());
+        if (request.approved()) {
+            scienceContentRepository.save(ScienceContent.fromApprovedSubmission(submission));
+        }
         return ScienceSubmissionResponse.from(submission);
     }
 
     @Transactional
     public void delete(UUID id) {
-        scienceSubmissionRepository.delete(findOwned(id));
+        var submission = findOwned(id);
+        scienceContentRepository.deleteBySourceSubmissionId(id);
+        scienceSubmissionRepository.delete(submission);
         mediaStorageService.detachReference("SCIENCE_SUBMISSION", id);
     }
 

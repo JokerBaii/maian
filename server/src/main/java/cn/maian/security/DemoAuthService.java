@@ -2,12 +2,14 @@ package cn.maian.security;
 
 import cn.maian.config.DemoProperties;
 import cn.maian.security.dto.AuthTokenResponse;
+import cn.maian.security.dto.DemoAccountResponse;
 import cn.maian.user.repository.UserProfileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.UUID;
+import java.util.List;
 
 @Service
 @ConditionalOnProperty(name = "app.demo.enabled", havingValue = "true")
@@ -36,5 +38,25 @@ public class DemoAuthService {
             .orElseThrow(() -> new IllegalArgumentException("演示账号不存在"));
         var token = jwtService.issue(profile.getId(), profile.getRole());
         return new AuthTokenResponse(token.accessToken(), token.expiresAt());
+    }
+
+    @Transactional(readOnly = true)
+    public List<DemoAccountResponse> listAccounts() {
+        if (!properties.enabled()) {
+            throw new IllegalArgumentException("演示登录未启用");
+        }
+        return userProfileRepository.findAllById(DemoAccounts.IDS).stream()
+            .sorted((left, right) -> Integer.compare(roleOrder(left.getRole()), roleOrder(right.getRole())))
+            .map(DemoAccountResponse::from)
+            .toList();
+    }
+
+    private int roleOrder(String role) {
+        return switch (role) {
+            case "USER" -> 0;
+            case "VOLUNTEER" -> 1;
+            case "ADMIN" -> 2;
+            default -> 9;
+        };
     }
 }

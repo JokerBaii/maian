@@ -12,6 +12,7 @@ const context = await browser.newContext({
 await context.addInitScript(userId => {
   localStorage.setItem('maian:privacy-consent:v1', 'content-audit')
   localStorage.setItem('maian_demo_user_id', userId)
+  localStorage.setItem('maian_demo_session_active', true)
   localStorage.removeItem('maian_demo_access_token')
   localStorage.removeItem('maian_demo_access_token_user')
   localStorage.removeItem('maian_demo_access_token_expiry')

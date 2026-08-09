@@ -2,18 +2,13 @@
   <view class="page apple-page">
     <view class="health-mast" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="mast-content">
-        <view class="mast-signal" aria-hidden="true">
-          <view class="mast-beat mast-beat-short"></view>
-          <view class="mast-beat mast-beat-tall"></view>
-          <view class="mast-beat mast-beat-short"></view>
-        </view>
         <view class="mast-copy">
-          <text class="mast-title">健康监测</text>
-          <text class="mast-caption">HEALTH SIGNAL</text>
+          <text class="mast-title">健康</text>
+          <text class="mast-caption">今日生命体征</text>
         </view>
-        <view class="mast-state" :class="{ 'mast-state-live': isDeviceConnected }">
-          <view class="mast-state-dot"></view>
-          <text>{{ isDeviceConnected ? '实时守护中' : '等待设备' }}</text>
+        <view class="mast-device-action" aria-label="查看健康设备" @tap="goBind">
+          <text>设备</text>
+          <app-icon name="right" :size="14" color="#007AFF" />
         </view>
       </view>
     </view>
@@ -22,12 +17,8 @@
       <view class="signal-panel">
         <view class="signal-header">
           <view>
-            <text class="signal-kicker">HEALTH SIGNAL</text>
-            <text class="signal-title">心率概览</text>
-          </view>
-          <view class="signal-status" :class="{ 'signal-status-live': isDeviceConnected }">
-            <view class="signal-status-dot"></view>
-            <text>{{ statusLabel }}</text>
+            <text class="signal-kicker">生命线</text>
+            <text class="signal-title">心率</text>
           </view>
         </view>
 
@@ -57,7 +48,7 @@
             </view>
           </view>
           <view class="chart-detail" @tap="goDetail">
-            <text>查看详情</text>
+              <text>完整记录</text>
             <app-icon name="right" :size="13" color="#46627D" />
           </view>
         </view>
@@ -109,7 +100,6 @@
       <view class="resource-section">
         <view class="section-head">
           <text class="section-title">健康资料</text>
-          <text class="section-note">设备与档案</text>
         </view>
 
         <view class="device-card" @tap="goBind">
@@ -137,27 +127,31 @@
           </view>
         </view>
 
-        <view class="resource-grid">
-          <view class="resource-card" @tap="goCheckup">
-            <view class="resource-card-head">
-              <app-icon-tile name="list" tone="violet" />
-              <app-icon name="right" :size="14" color="#8291A4" />
+        <view class="resource-list">
+          <view class="resource-row" @tap="goCheckup">
+            <app-icon-tile name="list" tone="violet" />
+            <view class="resource-copy">
+              <text class="resource-title">体检报告</text>
+              <text class="resource-desc">
+                {{ latestReport ? `${latestAbnormalCount} 项需关注` : '录入后查看健康分析' }}
+              </text>
             </view>
-            <text class="resource-title">体检报告</text>
-            <text class="resource-value">{{ latestReport ? latestReport.checkupDate : '待录入' }}</text>
-            <text class="resource-desc">
-              {{ latestReport ? `${latestAbnormalCount}项指标需关注` : '录入后生成分析' }}
-            </text>
+            <view class="resource-trailing">
+              <text class="resource-value">{{ latestReport ? latestReport.checkupDate : '录入' }}</text>
+              <app-icon name="right" :size="14" color="#C7C7CC" />
+            </view>
           </view>
 
-          <view class="resource-card" @tap="goArchive">
-            <view class="resource-card-head">
-              <app-icon-tile name="folder-add-filled" tone="blue" />
-              <app-icon name="right" :size="14" color="#8291A4" />
+          <view class="resource-row" @tap="goArchive">
+            <app-icon-tile name="folder-add-filled" tone="blue" />
+            <view class="resource-copy">
+              <text class="resource-title">健康档案</text>
+              <text class="resource-desc">按时间查看历次体检记录</text>
             </view>
-            <text class="resource-title">健康档案</text>
-            <text class="resource-value">{{ healthReports.length }}<text class="resource-unit">份</text></text>
-            <text class="resource-desc">按时间归档体检记录</text>
+            <view class="resource-trailing">
+              <text class="resource-value">{{ healthReports.length }} 份</text>
+              <app-icon name="right" :size="14" color="#C7C7CC" />
+            </view>
           </view>
         </view>
       </view>
@@ -192,7 +186,6 @@ const displayHeartRate = computed(() =>
     ? heartRateData.value.current
     : '--'
 )
-const statusLabel = computed(() => isDeviceConnected.value ? '设备在线' : '设备未连接')
 const sceneLabel = computed(() => {
   if (!isDeviceConnected.value) return '连接设备后显示实时心率'
   const labels: Record<string, string> = {
@@ -223,18 +216,24 @@ const activeMetrics = computed(() => {
   }
 })
 const hasActiveTrend = computed(() => activeTrendData.value.length >= 2)
+let chartRenderVersion = 0
 
 async function drawTrendChart() {
-  const data = activeTrendData.value
-  if (data.length < 2) return
+  const renderVersion = ++chartRenderVersion
+  const data = [...activeTrendData.value]
   const rect = await new Promise<any>(resolve => {
     uni.createSelectorQuery().select('#healthTrendCanvas').boundingClientRect(resolve).exec()
   })
-  if (!rect?.width || !rect?.height) return
+  if (renderVersion !== chartRenderVersion || !rect?.width || !rect?.height) return
 
   const canvas = uni.createCanvasContext('healthTrendCanvas')
   const width = rect.width
   const height = rect.height
+  canvas.clearRect(0, 0, width, height)
+  if (data.length < 2) {
+    canvas.draw()
+    return
+  }
   const top = 8
   const bottom = 8
   const chartHeight = height - top - bottom
@@ -353,45 +352,22 @@ function goArchive() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #F3F7FC;
-  color: #192B3D;
+  background: #F2F4F7;
+  color: #111820;
 }
 
 .health-mast {
   flex: none;
-  border-bottom: 1rpx solid #DEE8F1;
-  background: #F9FCFF;
+  background: #FFFFFF;
 }
 
 .mast-content {
   display: flex;
   align-items: center;
-  height: 88rpx;
-  padding: 0 28rpx;
+  height: 126rpx;
+  padding: 0 36rpx;
+  gap: 20rpx;
 }
-
-.mast-signal {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  gap: 4rpx;
-  width: 52rpx;
-  height: 52rpx;
-  margin-right: 14rpx;
-  border: 1rpx solid #D5E4F2;
-  border-radius: 13rpx;
-  background: #FFFFFF;
-}
-
-.mast-beat {
-  width: 5rpx;
-  border-radius: 4rpx;
-  background: #2E6DD1;
-}
-
-.mast-beat-short { height: 15rpx; }
-.mast-beat-tall { height: 30rpx; background: #B52832; }
 
 .mast-copy {
   display: flex;
@@ -401,39 +377,34 @@ function goArchive() {
 }
 
 .mast-title {
-  color: #18334F;
-  font-size: 29rpx;
-  font-weight: 720;
-  line-height: 1.25;
+  color: #10151B;
+  font-size: 52rpx;
+  font-weight: 760;
+  line-height: 1.08;
+  letter-spacing: -2rpx;
 }
 
 .mast-caption {
-  margin-top: 2rpx;
-  color: #71869B;
-  font-size: 14rpx;
-  font-weight: 650;
-  letter-spacing: 2rpx;
+  margin-top: 7rpx;
+  color: #8A949F;
+  font-size: 18rpx;
+  font-weight: 520;
 }
 
-.mast-state {
+.mast-device-action {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 7rpx;
-  color: #718295;
-  font-size: 18rpx;
+  gap: 6rpx;
+  min-height: 64rpx;
+  padding: 0 2rpx 0 14rpx;
+  color: #007AFF;
+  font-size: 24rpx;
   font-weight: 600;
+  transition: opacity 150ms ease;
 }
 
-.mast-state-dot {
-  width: 9rpx;
-  height: 9rpx;
-  border-radius: 50%;
-  background: #A6B1BC;
-}
-
-.mast-state-live { color: #287858; }
-.mast-state-live .mast-state-dot { background: #23956A; }
+.mast-device-action:active { opacity: .48; }
 
 .page-scroll {
   min-height: 0;
@@ -443,11 +414,11 @@ function goArchive() {
 }
 
 .signal-panel {
-  margin: 18rpx 24rpx 0;
-  padding: 30rpx 28rpx 26rpx;
-  border: 1rpx solid #DCE7F0;
-  border-radius: 20rpx;
-  background: #F9FCFF;
+  margin: 0;
+  padding: 24rpx 32rpx 30rpx;
+  border: 0;
+  border-radius: 0 0 38rpx 38rpx;
+  background: #FFFFFF;
 }
 
 .signal-header,
@@ -485,62 +456,42 @@ function goArchive() {
 }
 
 .signal-kicker {
-  color: #6E8294;
+  color: #2E6DD1;
   font-size: 18rpx;
   font-weight: 800;
-  letter-spacing: 2rpx;
+  letter-spacing: 1rpx;
 }
 
 .signal-title {
   margin-top: 4rpx;
-  font-size: 32rpx;
-  font-weight: 750;
-}
-
-.signal-status {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 8rpx 14rpx;
-  border-radius: 18rpx;
-  background: #EEF2F5;
-  color: #6F7F8E;
-  font-size: 20rpx;
-  font-weight: 650;
-}
-
-.signal-status-dot {
-  width: 10rpx;
-  height: 10rpx;
-  border-radius: 50%;
-  background: #A8B2BC;
-}
-
-.signal-status-live {
-  background: #EAF7F1;
-  color: #237254;
-}
-
-.signal-status-live .signal-status-dot {
-  background: #24966B;
+  font-size: 38rpx;
+  font-weight: 780;
 }
 
 .reading-row {
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-top: 28rpx;
+  position: relative;
+  min-height: 184rpx;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  margin-top: 20rpx;
+  padding: 30rpx 32rpx;
+  border-radius: 24rpx;
+  background: #F2F2F7;
 }
 
 .reading-main {
   display: flex;
   align-items: center;
+  z-index: 1;
   gap: 10rpx;
 }
 
 .reading-value {
-  color: #172C40;
-  font-size: 72rpx;
-  font-weight: 760;
+  color: #111820;
+  font-size: 82rpx;
+  font-weight: 790;
   line-height: 0.95;
   font-variant-numeric: tabular-nums;
   letter-spacing: -2rpx;
@@ -553,17 +504,17 @@ function goArchive() {
 }
 
 .reading-context {
-  max-width: 260rpx;
-  color: #718598;
-  text-align: right;
+  margin-top: 12rpx;
+  color: #66727E;
+  text-align: left;
   font-size: 20rpx;
   line-height: 1.45;
 }
 
 .chart-header {
-  margin-top: 36rpx;
-  padding-top: 24rpx;
-  border-top: 1rpx solid #E6EDF2;
+  margin-top: 30rpx;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .chart-title {
@@ -642,8 +593,8 @@ function goArchive() {
 }
 
 .metric-row {
-  margin-top: 22rpx;
-  padding-top: 20rpx;
+  margin-top: 18rpx;
+  padding: 22rpx 4rpx 0;
   border-top: 1rpx solid #E6EDF2;
 }
 
@@ -674,11 +625,11 @@ function goArchive() {
 }
 
 .alert-strip {
-  margin: 18rpx 24rpx 0;
-  padding: 22rpx 24rpx;
-  border: 1rpx solid #ECD9DC;
-  border-radius: 18rpx;
-  background: #FFF9F9;
+  margin: 22rpx 24rpx 0;
+  padding: 24rpx 26rpx;
+  border: 0;
+  border-radius: 24rpx;
+  background: #FFF1F2;
 }
 
 .alert-signal {
@@ -725,7 +676,7 @@ function goArchive() {
 }
 
 .resource-section {
-  margin: 28rpx 24rpx 0;
+  margin: 34rpx 24rpx 0;
 }
 
 .section-head {
@@ -733,8 +684,9 @@ function goArchive() {
 }
 
 .section-title {
-  font-size: 28rpx;
-  font-weight: 750;
+  color: #111820;
+  font-size: 34rpx;
+  font-weight: 780;
 }
 
 .section-note {
@@ -745,15 +697,16 @@ function goArchive() {
 .device-card {
   display: flex;
   align-items: center;
-  min-height: 112rpx;
-  padding: 22rpx 22rpx;
-  border: 1rpx solid #DCE7F0;
-  border-radius: 18rpx;
-  background: #F9FCFF;
+  min-height: 128rpx;
+  padding: 24rpx;
+  border: 0;
+  border: 0;
+  border-radius: 26rpx;
+  background: #FFFFFF;
 }
 
 .device-card:active,
-.resource-card:active {
+.resource-row:active {
   background: #F0F6FC;
 }
 
@@ -813,46 +766,56 @@ function goArchive() {
   font-weight: 650;
 }
 
-.resource-grid {
-  display: flex;
-  gap: 14rpx;
-  margin-top: 14rpx;
-}
-
-.resource-card {
-  min-width: 0;
-  flex: 1;
-  padding: 20rpx 20rpx 22rpx;
-  border: 1rpx solid #DCE7F0;
-  border-radius: 18rpx;
+.resource-list {
+  margin-top: 16rpx;
+  overflow: hidden;
+  border-radius: 26rpx;
   background: #FFFFFF;
 }
 
-.resource-card-head {
+.resource-row {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18rpx;
+  min-height: 116rpx;
+  box-sizing: border-box;
+  gap: 18rpx;
+  padding: 20rpx 22rpx;
+  background: #FFFFFF;
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+
+.resource-row + .resource-row::before {
+  position: absolute;
+  top: 0;
+  right: 22rpx;
+  left: 86rpx;
+  height: 1rpx;
+  background: rgba(60, 60, 67, .14);
+  content: '';
+}
+
+.resource-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.resource-trailing {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6rpx;
 }
 
 .resource-value {
-  display: block;
-  margin-top: 12rpx;
-  color: #213B54;
-  font-size: 28rpx;
-  font-weight: 740;
+  color: #8E8E93;
+  font-size: 20rpx;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-}
-
-.resource-unit {
-  margin-left: 3rpx;
-  color: #708397;
-  font-size: 18rpx;
-  font-weight: 600;
 }
 
 .bottom-safe {
   height: calc(72rpx + env(safe-area-inset-bottom));
 }
+
 </style>

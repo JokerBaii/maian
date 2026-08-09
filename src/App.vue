@@ -4,8 +4,19 @@ import { onLaunch } from '@dcloudio/uni-app'
 defineOptions({ name: 'MaianApp' })
 
 const PRIVACY_CONSENT_KEY = 'maian:privacy-consent:v1'
+const platformShowModal = uni.showModal.bind(uni)
+
+function configureSharedDialogs() {
+  uni.showModal = ((options: UniApp.ShowModalOptions) => platformShowModal({
+    cancelText: '取消',
+    confirmText: '确定',
+    ...options
+  })) as typeof uni.showModal
+}
 
 onLaunch(() => {
+  if (uni.getLocale() !== 'zh-Hans') uni.setLocale('zh-Hans')
+  configureSharedDialogs()
   if (uni.getStorageSync(PRIVACY_CONSENT_KEY)) return
   setTimeout(() => {
     uni.showModal({
@@ -126,20 +137,8 @@ uni-app { display: block; min-height: 100vh; overflow: visible; background: #F3F
     width: 430px !important;
   }
 
-  /* Transforming a page root makes fixed descendants page-relative. Keep the
-     desktop phone preview fixed, but retain a transform-free entrance. */
-  .motion-page-focus,
-  .motion-page-sheet,
-  .motion-page-list {
-    transform: none !important;
-    animation-name: pageDesktopReveal !important;
-  }
-
-  .motion-page-focus { animation-duration: 340ms !important; }
-  .motion-page-sheet { animation-duration: 400ms !important; }
-  .motion-page-list { animation-duration: 280ms !important; }
-
   :is(
+    .app-nav,
     .nav-bar,
     .matching-layer,
     .top-overlay,
@@ -170,14 +169,42 @@ uni-app { display: block; min-height: 100vh; overflow: visible; background: #F3F
     right: calc(50vw - 203px) !important;
   }
 
-  .fab-btn {
-    right: calc(50vw - 199px) !important;
-  }
-
   .add-btn {
     right: calc(50vw - 178px) !important;
     left: calc(50vw - 178px) !important;
   }
+}
+/* #endif */
+
+/* H5 keeps the platform API, but presents it with the same iOS alert grammar. */
+/* #ifdef H5 */
+uni-modal .uni-mask { background: rgba(0, 0, 0, .28) !important; }
+uni-modal .uni-modal {
+  width: 540rpx !important;
+  overflow: hidden;
+  border-radius: 28rpx !important;
+  background: rgba(250, 250, 250, .96) !important;
+  box-shadow: 0 18rpx 64rpx rgba(0, 0, 0, .18) !important;
+  backdrop-filter: saturate(180%) blur(30rpx);
+  -webkit-backdrop-filter: saturate(180%) blur(30rpx);
+}
+uni-modal .uni-modal__hd { padding: 30rpx 30rpx 6rpx !important; }
+uni-modal .uni-modal__title { color: #1C1C1E !important; font-size: 31rpx !important; font-weight: 650 !important; }
+uni-modal .uni-modal__bd { padding: 12rpx 30rpx 28rpx !important; color: #3A3A3C !important; font-size: 24rpx !important; line-height: 1.5 !important; }
+uni-modal .uni-modal__ft { border-top: 1rpx solid rgba(60, 60, 67, .22) !important; }
+uni-modal .uni-modal__btn { min-height: 88rpx; color: #007AFF !important; font-size: 29rpx !important; line-height: 88rpx !important; }
+uni-modal .uni-modal__btn + .uni-modal__btn { border-left: 1rpx solid rgba(60, 60, 67, .22) !important; }
+
+.apple-page:not(.home-page) .popup-mask { animation: sharedMaskReveal 180ms ease-out both; }
+.apple-page:not(.home-page) .popup-content { animation: sharedPanelReveal 220ms cubic-bezier(.32, .72, .2, 1) both; }
+
+@keyframes sharedMaskReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sharedPanelReveal {
+  from { opacity: .84; transform: translate3d(0, 100%, 0); }
+  to { opacity: 1; transform: none; }
 }
 /* #endif */
 </style>

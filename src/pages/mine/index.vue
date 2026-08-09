@@ -1,15 +1,6 @@
 <template>
   <view class="page apple-page">
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-bar-content">
-        <text class="nav-title">我的</text>
-        <view class="nav-right">
-          <view class="nav-icon-btn" @tap="goSettings">
-            <app-icon class="nav-icon-text" name="settings-filled" :size="21" color="#2C2C2E" />
-          </view>
-        </view>
-      </view>
-    </view>
+    <app-nav-bar title="我的" action-icon="settings-filled" @action="goSettings" />
 
     <scroll-view
       class="scroll-content"
@@ -22,9 +13,7 @@
         <view class="profile-card">
           <view class="profile-avatar-wrap">
             <view class="avatar-ring">
-              <view class="avatar-placeholder">
-                <text class="avatar-text">{{ user.nickname.charAt(0) }}</text>
-              </view>
+              <app-avatar :src="profileAvatar" :name="user.nickname" :size="52" />
             </view>
           </view>
           <view class="profile-info">
@@ -120,12 +109,6 @@
       <view class="menu-section">
         <text class="menu-section-title">其他</text>
         <view class="menu-list">
-          <view class="menu-item" @tap="goDemoMode">
-            <app-icon-tile class="menu-icon" name="user-filled" tone="blue" />
-            <text class="menu-label">演示身份切换</text>
-            <view class="menu-extra"><text class="menu-extra-text">比赛演示</text></view>
-            <app-icon class="menu-arrow" name="right" :size="14" color="#A7B0C0" />
-          </view>
           <view class="menu-item" @tap="goAuth">
             <app-icon-tile class="menu-icon" name="auth-filled" tone="green" />
             <text class="menu-label">身份信息</text>
@@ -152,10 +135,13 @@ import { computed, ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
+import AppAvatar from '@/components/AppAvatar.vue'
+import AppNavBar from '@/components/AppNavBar.vue'
 import { listMyEmergencyDevices } from '@/api/devices'
 import { listRescueCalls } from '@/api/rescue'
 import { getCurrentProfile } from '@/api/user'
 import { getScienceSubmissionCount } from '@/api/science'
+const profileAvatar = ref('')
 
 const user = reactive({
   nickname: '用户',
@@ -194,9 +180,6 @@ function goAuth() {
 function goSettings() {
   uni.navigateTo({ url: '/pages/mine/settings' })
 }
-function goDemoMode() {
-  uni.navigateTo({ url: '/pages/mine/demo' })
-}
 function goRescueTasks() {
   uni.navigateTo({ url: '/pages/rescue/tasks' })
 }
@@ -226,6 +209,7 @@ async function loadStats() {
     user.phone = profile.value.phone
     user.role = profile.value.role
     user.isVerified = profile.value.verified
+    profileAvatar.value = profile.value.avatarUrl || ''
   }
   if (submissions.status === 'fulfilled') contributionCount.value = submissions.value.count
 }
@@ -238,46 +222,6 @@ onShow(loadStats)
   height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px));
   overflow: hidden;
   background: #F2F2F7;
-}
-
-.nav-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  border-bottom: 1rpx solid rgba(60, 60, 67, .12);
-  background: rgba(249, 249, 251, .94);
-  backdrop-filter: blur(24rpx);
-}
-.nav-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 88rpx;
-  padding: 0 32rpx;
-}
-.nav-title {
-  font-size: 34rpx;
-  font-weight: 650;
-  color: #1C1C1E;
-}
-.nav-right {
-  display: flex;
-  align-items: center;
-}
-.nav-icon-btn {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 18rpx;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.nav-icon-text {
-  font-size: 36rpx;
-  color: #FFFFFF;
 }
 
 .scroll-content {
@@ -311,21 +255,9 @@ onShow(loadStats)
   height: 104rpx;
   border-radius: 50%;
   padding: 0;
-  background: #E8F1FD;
-}
-.avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: #E8F1FD;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.avatar-text {
-  font-size: 44rpx;
-  font-weight: 800;
-  color: #2E6DD1;
 }
 .profile-info {
   flex: 1;

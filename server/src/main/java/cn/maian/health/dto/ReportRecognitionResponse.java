@@ -15,5 +15,5 @@ public record ReportRecognitionResponse(
     List<HealthIndicator> indicators,
     List<String> rawLines
 ) {
-    public static final String REVIEW_NOTICE = "已识别以下指标，请逐项核对后保存。";
+    public static final String REVIEW_NOTICE = "已根据检查单自动整理报告内容。";
 }

@@ -47,4 +47,16 @@ describe('page interaction contracts', () => {
     expect(bindingCount).toBeGreaterThanOrEqual(150)
     expect([...new Set(missingHandlers)]).toEqual([])
   })
+
+  it('keeps shared action menus on the single app action-sheet implementation', () => {
+    const sources = Object.values(pageModules)
+    expect(sources.some(source => source.includes('uni.showActionSheet'))).toBe(false)
+    expect(sources.filter(source => source.includes('AppActionSheet.vue')).length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('reuses the shared list row for device and content queues', () => {
+    const sharedRowConsumers = Object.values(pageModules)
+      .filter(source => source.includes('AppListRow.vue'))
+    expect(sharedRowConsumers.length).toBeGreaterThanOrEqual(3)
+  })
 })

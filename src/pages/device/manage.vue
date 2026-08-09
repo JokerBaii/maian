@@ -7,8 +7,8 @@
           <text class="summary-label">台设备已登记</text>
         </view>
         <view class="page-add-action" @tap="goAdd">
-          <app-icon name="plus" :size="18" color="#FFFFFF" />
-          <text>录入设备</text>
+          <app-icon name="plus" :size="18" color="#007AFF" />
+          <text>添加</text>
         </view>
       </view>
       <view class="tab-bar">
@@ -32,69 +32,32 @@
 
       <view class="device-list">
         <view v-if="currentDevices.length > 0">
-          <view
+          <app-list-row
             v-for="device in currentDevices"
             :key="device.id"
             class="device-card"
             :class="'device-card-' + statusTone(device)"
-            @tap="viewDetail(device)"
+            :icon="device.type === 'FIXED' ? 'fixed-device' : 'mobile-device'"
+            :tone="device.type === 'FIXED' ? 'blue' : 'green'"
+            :title="device.name"
+            :summary="device.address"
+            :meta="`${device.category} · ${device.serviceTime || '服务时段未设置'}`"
+            :show-chevron="false"
+            @tap="openDeviceActions(device)"
           >
-            <view class="card-header">
-              <view class="card-header-info">
-                <text class="card-name">{{ device.name }}</text>
-                <view class="card-meta-row">
-                  <text class="category-tag-text">{{ device.category }}</text>
-                  <text class="card-meta-separator">·</text>
-                  <text class="type-tag-text">{{ device.type === 'FIXED' ? '固定设备' : '移动设备' }}</text>
+            <template #accessory>
+              <view class="card-trailing">
+                <view v-if="canToggleDevice(device)" class="switch-wrap" @tap.stop>
+                  <text class="switch-label" :class="{ 'switch-label-online': device.online }">{{ deviceStatusLabel(device) }}</text>
+                  <app-switch :model-value="device.online" @update:model-value="toggleCurrentStatus(device)" />
                 </view>
-              </view>
-              <view
-                v-if="canToggleDevice(device)"
-                class="card-status-action"
-                :class="{ 'card-status-action-online': device.online }"
-                @tap.stop="toggleCurrentStatus(device)"
-              >
-                <view class="status-dot"></view>
-                <text class="status-action-label">{{ deviceStatusLabel(device) }}</text>
-              </view>
-              <view v-else class="review-status" :class="'review-' + device.status.toLowerCase()">
-                {{ deviceStatusLabel(device) }}
-              </view>
-            </view>
-
-            <view class="card-body">
-              <view class="card-info-item">
-                <app-icon class="info-icon" name="location-filled" :size="16" color="#8994A8" />
-                <text class="info-text">{{ device.address }}</text>
-              </view>
-              <view class="card-facts">
-                <view v-if="device.type === 'FIXED'" class="card-fact">
-                  <app-icon name="calendar" :size="14" color="#718197" />
-                  <text>{{ device.expireDate ? `有效至 ${device.expireDate}` : '有效期未登记' }}</text>
+                <view v-else class="review-status" :class="'review-' + device.status.toLowerCase()">
+                  {{ deviceStatusLabel(device) }}
                 </view>
-                <view v-if="device.type === 'FIXED'" class="card-fact">
-                  <app-icon name="shop-filled" :size="14" color="#718197" />
-                  <text>{{ device.owner || '所有方未登记' }}</text>
-                </view>
-                <view v-if="device.type === 'MOBILE'" class="card-fact">
-                  <app-icon name="navigate-filled" :size="14" color="#718197" />
-                  <text>{{ device.vehicleInfo || '携带信息未填写' }}</text>
-                </view>
-                <view v-if="device.type === 'MOBILE'" class="card-fact">
-                  <app-icon name="map-pin-ellipse" :size="14" color="#718197" />
-                  <text>{{ device.serviceRange ? `${device.serviceRange}km 服务范围` : '范围未设置' }}</text>
-                </view>
+                <app-icon name="right" :size="15" color="#C7C7CC" />
               </view>
-            </view>
-
-            <view class="card-footer">
-              <text class="footer-service">{{ device.serviceTime || '服务时段未设置' }}</text>
-              <view class="manage-action" @tap.stop="openDeviceActions(device)">
-                <text>管理</text>
-                <app-icon name="right" :size="14" color="#2E6DD1" />
-              </view>
-            </view>
-          </view>
+            </template>
+          </app-list-row>
         </view>
 
         <view v-else class="empty-state">
@@ -105,15 +68,22 @@
             size="large"
           />
           <text class="empty-title">{{ activeTab === 'fixed' ? '暂无固定设备' : '暂无移动设备' }}</text>
-          <text class="empty-desc">还没有录入这类急救设备</text>
+          <text class="empty-desc">还没有添加这类急救设备</text>
           <view class="empty-btn" @tap="goAdd">
-            <text class="empty-btn-text">录入设备</text>
+            <text class="empty-btn-text">添加设备</text>
           </view>
         </view>
       </view>
 
       <view class="bottom-safe"></view>
     </view>
+    <app-action-sheet
+      v-model:visible="sheetVisible"
+      :title="selectedDevice?.name || ''"
+      :message="selectedDevice ? `${selectedDevice.address} · ${selectedDevice.serviceTime || '服务时段未设置'}` : ''"
+      :actions="deviceActions"
+      @select="handleDeviceAction"
+    />
   </view>
 </template>
 
@@ -122,6 +92,9 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
+import AppSwitch from '@/components/AppSwitch.vue'
+import AppActionSheet, { type AppActionSheetItem } from '@/components/AppActionSheet.vue'
+import AppListRow from '@/components/AppListRow.vue'
 import { getCurrentGcj02Location } from '@/utils/location'
 import { deviceStatusLabel as presentDeviceStatus, userFacingError } from '@/utils/presentation'
 import {
@@ -134,6 +107,8 @@ import {
 } from '@/api/devices'
 
 const activeTab = ref<'fixed' | 'mobile'>('fixed')
+const sheetVisible = ref(false)
+const selectedDevice = ref<DeviceView | null>(null)
 
 type DeviceView = EmergencyDeviceResponse & {
   online: boolean
@@ -145,6 +120,14 @@ const currentDevices = computed(() => (
   activeTab.value === 'fixed' ? fixedDevices.value : mobileDevices.value
 ))
 let syncingLocation = false
+const deviceActions = computed<AppActionSheetItem[]>(() => {
+  if (!selectedDevice.value) return []
+  const actions: AppActionSheetItem[] = []
+  if (selectedDevice.value.type === 'MOBILE') actions.push({ label: '更新当前位置' })
+  actions.push({ label: '编辑设备' })
+  actions.push({ label: '删除设备', destructive: true })
+  return actions
+})
 
 function toView(device: EmergencyDeviceResponse): DeviceView {
   return {
@@ -258,15 +241,6 @@ async function reportMobileLocation(device: DeviceView) {
   }
 }
 
-function viewDetail(device: DeviceView) {
-  uni.showModal({
-    title: device.name,
-    content: `${device.address}\n服务时间：${device.serviceTime || '未设置'}\n联系电话：${device.ownerPhone || '未设置'}`,
-    showCancel: false,
-    confirmText: '知道了'
-  })
-}
-
 function editDevice(device: DeviceView) {
   uni.navigateTo({
     url: '/pages/device/add?id=' + device.id
@@ -274,19 +248,20 @@ function editDevice(device: DeviceView) {
 }
 
 function openDeviceActions(device: DeviceView) {
-  const itemList = device.type === 'MOBILE'
-    ? ['查看设备信息', '更新当前位置', '编辑设备', '删除设备']
-    : ['查看设备信息', '编辑设备', '删除设备']
-  uni.showActionSheet({
-    itemList,
-    success: ({ tapIndex }) => {
-      if (tapIndex === 0) return viewDetail(device)
-      if (device.type === 'MOBILE' && tapIndex === 1) return reportMobileLocation(device)
-      const editIndex = device.type === 'MOBILE' ? 2 : 1
-      if (tapIndex === editIndex) return editDevice(device)
-      confirmDelete(device)
-    }
-  })
+  selectedDevice.value = device
+  sheetVisible.value = true
+}
+
+function handleDeviceAction(index: number) {
+  const device = selectedDevice.value
+  if (!device) return
+  if (device.type === 'MOBILE') {
+    if (index === 0) return reportMobileLocation(device)
+    if (index === 1) return editDevice(device)
+  } else if (index === 0) {
+    return editDevice(device)
+  }
+  confirmDelete(device)
 }
 
 function goAdd() {
@@ -324,12 +299,9 @@ onShow(loadDevices)
 }
 
 .review-status {
-  padding: 8rpx 14rpx;
-  border-radius: 10rpx;
   color: #B66A10;
-  background: #FFF4E5;
-  font-size: 22rpx;
-  font-weight: 600;
+  font-size: 21rpx;
+  font-weight: 500;
 }
 .scroll-content {
   min-height: 100vh;
@@ -348,8 +320,8 @@ onShow(loadDevices)
   gap: 8rpx;
 }
 .summary-number {
-  color: #173A67;
-  font-size: 38rpx;
+  color: #1C1C1E;
+  font-size: 34rpx;
   font-weight: 750;
   line-height: 1;
 }
@@ -360,15 +332,14 @@ onShow(loadDevices)
 .page-add-action {
   display: inline-flex;
   align-items: center;
-  gap: 10rpx;
+  gap: 7rpx;
   min-height: 62rpx;
-  padding: 0 22rpx;
-  border-radius: 12rpx;
-  background: #2E6DD1;
+  padding: 0 4rpx 0 18rpx;
   font-size: 24rpx;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #007AFF;
 }
+.page-add-action:active { opacity: .45; }
 
 .tab-bar {
   display: flex;
@@ -424,161 +395,23 @@ onShow(loadDevices)
 
 .device-card {
   position: relative;
-  margin: 0;
-  overflow: hidden;
-  padding: 23rpx 22rpx 19rpx;
+  margin-left: 20rpx;
+  overflow: visible;
+  padding: 20rpx 22rpx 20rpx 0;
   border: 0;
   border-radius: 0;
   background: #FFFFFF;
 }
-.device-card::after { content: ''; position: absolute; right: 22rpx; bottom: 0; left: 22rpx; height: 1rpx; background: #E8EDF2; }
-.device-card:last-child { border-bottom: 0; }
-.device-card:last-child::after { display: none; }
 .device-card:active { background: #F8FAFC; }
-
-.card-header-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-.card-name {
-  font-size: 29rpx;
-  font-weight: 700;
-  color: #20364D;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.card-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-top: 8rpx;
-}
-.category-tag-text {
-  font-size: 21rpx;
-  color: #607187;
-}
-.card-meta-separator {
-  color: #B5C0CD;
-  font-size: 20rpx;
-}
-.type-tag-text {
-  font-size: 21rpx;
-  color: #607187;
-}
-
-.card-status-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 9rpx;
-  margin-left: 16rpx;
-  padding: 10rpx 15rpx;
-  border: 1rpx solid #DCE3EB;
-  border-radius: 10rpx;
-  background: #F3F5F7;
-}
-.status-dot {
-  width: 11rpx;
-  height: 11rpx;
-  border-radius: 50%;
-  background: #9AA6B5;
-}
-.status-action-label {
-  color: #68788C;
-  font-size: 21rpx;
-  font-weight: 600;
-  line-height: 1;
-}
-.card-status-action-online {
-  border-color: #CBE9DD;
-  background: #EAF7F1;
-}
-.card-status-action-online .status-dot {
-  background: #24986B;
-}
-.card-status-action-online .status-action-label {
-  color: #1D7B58;
-}
-
-.card-body {
-  padding: 11rpx 0 0;
-  margin-top: 4rpx;
-}
-.card-info-item {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  margin-bottom: 10rpx;
-}
-.card-info-item:last-child {
-  margin-bottom: 0;
-}
-.info-icon {
-  font-size: 24rpx;
-  flex-shrink: 0;
-}
-.info-text {
-  font-size: 23rpx;
-  color: #4E5969;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-.card-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5rpx 18rpx;
-}
-.card-fact {
-  display: flex;
-  align-items: center;
-  gap: 7rpx;
-  max-width: 100%;
-  padding: 2rpx 0;
-  border-radius: 0;
-  background: transparent;
-  color: #607187;
-  font-size: 21rpx;
-}
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 9rpx;
-  padding-top: 5rpx;
-}
-.footer-service {
-  min-width: 0;
-  overflow: hidden;
-  color: #7B899C;
-  font-size: 21rpx;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.manage-action {
+.card-trailing {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 3rpx;
-  min-height: 48rpx;
-  margin-left: 18rpx;
-  padding: 0 4rpx 0 14rpx;
-  color: #2E6DD1;
-  font-size: 22rpx;
-  font-weight: 650;
+  gap: 12rpx;
 }
-.manage-action:active {
-  opacity: 0.5;
-}
+.switch-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 7rpx; }
+.switch-label { color: #8E8E93; font-size: 19rpx; }
+.switch-label-online { color: #24865F; }
 
 .empty-state {
   display: flex;

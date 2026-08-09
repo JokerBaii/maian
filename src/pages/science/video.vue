@@ -46,14 +46,34 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { officialFirstAidVideos } from '@/data/editorial'
+import { getScienceContent } from '@/api/science'
 import { openExternalUrl } from '@/utils/external'
 
-const lesson = ref<(typeof officialFirstAidVideos)[number] | null>(null)
+const lesson = ref<{
+  title: string
+  summary: string
+  url: string
+  poster: string
+  source: string
+  sourcePage: string
+} | null>(null)
 const videoFailed = ref(false)
 
-onLoad((query) => {
-  lesson.value = officialFirstAidVideos.find(item => item.id === query?.id) || null
+onLoad(async (query) => {
+  if (!query?.id) return
+  try {
+    const content = await getScienceContent(query.id)
+    lesson.value = {
+      title: content.title,
+      summary: content.summary,
+      url: content.mediaUrl || '',
+      poster: content.coverUrl || '/static/editorial/editorial-aed-light-v1.webp',
+      source: content.sourceName || content.author,
+      sourcePage: content.sourcePage || ''
+    }
+  } catch {
+    uni.showToast({ title: '视频课程加载失败', icon: 'none' })
+  }
 })
 
 function openSource() {

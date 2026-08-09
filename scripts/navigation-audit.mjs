@@ -21,23 +21,21 @@ const scenarios = [
   ['user', 'pages/index/index', '.quiz-shortcut', 0, 'pages/science/quiz'],
   ['user', 'pages/health/index', '.chart-detail', 0, 'pages/health/detail'],
   ['user', 'pages/health/index', '.device-card', 0, 'pages/health/bind'],
-  ['user', 'pages/health/index', '.resource-card', 0, 'pages/checkup/report'],
-  ['user', 'pages/health/index', '.resource-card', 1, 'pages/checkup/archive'],
-  ['user', 'pages/mine/index', '.nav-icon-btn', 0, 'pages/mine/settings'],
+  ['user', 'pages/health/index', '.resource-row', 0, 'pages/checkup/report|pages/checkup/upload'],
+  ['user', 'pages/health/index', '.resource-row', 1, 'pages/checkup/archive'],
+  ['user', 'pages/mine/index', '.app-nav-trailing', 0, 'pages/mine/settings'],
   ['user', 'pages/mine/index', '.stat-item', 0, 'pages/mine/records'],
   ['user', 'pages/mine/index', '.stat-item', 1, 'pages/device/manage'],
   ['user', 'pages/mine/index', '.stat-item', 2, 'pages/science/submissions'],
   ['user', 'pages/mine/index', '.menu-item', 2, 'pages/mine/contacts'],
-  ['user', 'pages/mine/index', '.menu-item', 5, 'pages/mine/demo'],
-  ['user', 'pages/mine/index', '.menu-item', 6, 'pages/mine/auth'],
-  ['volunteer', 'pages/mine/index', '.menu-item', 2, 'pages/rescue/tasks'],
-  ['volunteer', 'pages/rescue/tasks', '.secondary-action', 0, 'pages/rescue/detail'],
-  ['admin', 'pages/mine/index', '.menu-item', 2, 'pages/device/review'],
-  ['admin', 'pages/mine/index', '.menu-item', 3, 'pages/science/review'],
+  ['user', 'pages/mine/index', '.menu-item', 5, 'pages/mine/auth'],
+  ['volunteer', 'pages/mine/index', '.menu-item:has-text("救援任务")', 0, 'pages/rescue/tasks'],
+  ['admin', 'pages/mine/index', '.menu-item:has-text("设备审核")', 0, 'pages/device/review'],
+  ['admin', 'pages/mine/index', '.menu-item:has-text("投稿审核")', 0, 'pages/science/review'],
   ['user', 'pages/device/manage', '.page-add-action', 0, 'pages/device/add'],
-  ['user', 'pages/science/index', '.nav-right', 0, 'pages/science/contribute'],
+  ['user', 'pages/science/index', '.app-nav-trailing', 0, 'pages/science/contribute'],
   ['user', 'pages/science/index', '.content-card', 0, 'pages/science/detail'],
-  ['user', 'pages/checkup/archive', '.fab-btn', 0, 'pages/checkup/upload'],
+  ['user', 'pages/checkup/archive', '.add-button', 0, 'pages/checkup/upload'],
   ['user', 'pages/science/video?id=V001', '.quiz-button', 0, 'pages/science/quiz']
 ]
 
@@ -62,6 +60,7 @@ for (const [role, start, selector, index, expected] of scenarios) {
   await page.goto(identityPageUrl, { waitUntil: 'domcontentloaded' })
   await page.evaluate(userId => {
     localStorage.setItem('maian_demo_user_id', userId)
+    localStorage.setItem('maian_demo_session_active', true)
     localStorage.removeItem('maian_demo_access_token')
     localStorage.removeItem('maian_demo_access_token_user')
     localStorage.removeItem('maian_demo_access_token_expiry')
@@ -74,10 +73,10 @@ for (const [role, start, selector, index, expected] of scenarios) {
   let error = ''
   try {
     const target = page.locator(selector).nth(index)
-    if (!(await target.isVisible())) throw new Error(`control not visible: ${selector}[${index}]`)
+    await target.waitFor({ state: 'visible', timeout: 3000 })
     await target.evaluate(element => element.click())
     await page.waitForTimeout(260)
-    passed = page.url().includes(`#/${expected}`)
+    passed = expected.split('|').some(route => page.url().includes(`#/${route}`))
     if (!passed) error = `expected ${expected}, received ${page.url()}`
   } catch (cause) {
     error = cause instanceof Error ? cause.message : String(cause)

@@ -78,7 +78,7 @@
             />
           </view>
           <text class="action-label" :class="{ 'action-label-active': isLiked }">
-            {{ isLiked ? article.likeCount + 1 : article.likeCount }}
+            {{ article.likeCount }}
           </text>
         </view>
         <view class="action-item" @tap="toggleCollect">
@@ -91,7 +91,7 @@
             />
           </view>
           <text class="action-label" :class="{ 'action-label-active': isCollected }">
-            {{ isCollected ? article.collectCount + 1 : article.collectCount }}
+            {{ article.collectCount }}
           </text>
         </view>
         <view class="action-item" @tap="handleShare">
@@ -107,13 +107,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { scienceArticles } from '@/data/editorial'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { resolveApiUrl } from '@/api/http'
 import {
+  getScienceContent,
   getScienceArticleInteraction,
-  listApprovedScienceSubmissions,
   updateScienceArticleInteraction
 } from '@/api/science'
 
@@ -124,35 +123,25 @@ if (currentPage?.options?.id) {
   articleId.value = currentPage.options.id
 }
 
-/** 投稿类文章（用户投稿审核通过后上架，id 形如 submission-{uuid}）。 */
-const submissionArticle = ref<{
-  title: string
-  categoryLabel: string
-  cover: string
-  author: string
-  publishTime: string
-  viewCount: number
-  likeCount: number
-  collectCount: number
-  content: string
-  summary: string
-  isLiked: boolean
-  isCollected: boolean
-  media: { type: string; url: string; poster: string; images: string[] }
-} | null>(null)
-
-const article = computed(() => {
-  if (submissionArticle.value) return submissionArticle.value
-  const found = scienceArticles.find(c => c.id === articleId.value)
-  return found || scienceArticles[0]
+const article = ref({
+  title: '正在加载',
+  categoryLabel: '科普内容',
+  cover: '/static/editorial/editorial-monitoring-light-v1.webp',
+  author: '平台官方',
+  publishTime: '',
+  viewCount: 0,
+  likeCount: 0,
+  collectCount: 0,
+  content: '',
+  summary: '',
+  media: { type: 'image', url: '', poster: '', images: [] as string[] }
 })
 
-const isLiked = ref(article.value.isLiked)
-const isCollected = ref(article.value.isCollected)
+const isLiked = ref(false)
+const isCollected = ref(false)
 const interactionSaving = ref(false)
 
 async function loadInteraction() {
-  if (articleId.value.startsWith('submission-')) return
   try {
     const interaction = await getScienceArticleInteraction(articleId.value)
     isLiked.value = interaction.liked
@@ -171,6 +160,14 @@ async function saveInteraction(previousLiked: boolean, previousCollected: boolea
     })
     isLiked.value = interaction.liked
     isCollected.value = interaction.collected
+    article.value.likeCount = Math.max(
+      0,
+      article.value.likeCount + Number(interaction.liked) - Number(previousLiked)
+    )
+    article.value.collectCount = Math.max(
+      0,
+      article.value.collectCount + Number(interaction.collected) - Number(previousCollected)
+    )
     return true
   } catch {
     isLiked.value = previousLiked
@@ -239,33 +236,25 @@ function previewImage(idx: number) {
 }
 
 onMounted(async () => {
-  if (articleId.value.startsWith('submission-')) {
-    try {
-      const page = await listApprovedScienceSubmissions()
-      const found = page.content.find(item => 'submission-' + item.id === articleId.value)
-      if (found) {
-        submissionArticle.value = {
-          title: found.title,
-          categoryLabel: ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[found.category] || '科普投稿',
-          cover: found.coverImageUrl || '',
-          author: '用户投稿',
-          publishTime: (found.submittedAt || '').slice(0, 10),
-          summary: found.content,
-          isLiked: false,
-          isCollected: false,
-          viewCount: 0,
-          likeCount: 0,
-          collectCount: 0,
-          content: found.content,
-          media: { type: 'image', url: '', poster: '', images: [] }
-        }
-      }
-    } catch {
-      uni.showToast({ title: '投稿加载失败', icon: 'none' })
+  try {
+    const content = await getScienceContent(articleId.value)
+    article.value = {
+      title: content.title,
+      categoryLabel: ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[content.category || ''] || '科普内容',
+      cover: content.coverUrl || '/static/editorial/editorial-monitoring-light-v1.webp',
+      author: content.author,
+      publishTime: content.publishedAt.slice(0, 10),
+      summary: content.summary,
+      viewCount: content.viewCount,
+      likeCount: content.likeCount,
+      collectCount: content.collectCount,
+      content: content.body || '',
+      media: { type: 'image', url: '', poster: '', images: [] }
     }
-    return
+    await loadInteraction()
+  } catch {
+    uni.showToast({ title: '文章加载失败', icon: 'none' })
   }
-  loadInteraction()
 })
 
 </script>

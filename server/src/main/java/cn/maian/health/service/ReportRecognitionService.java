@@ -4,6 +4,7 @@ import cn.maian.common.exception.ExternalRecognitionUnavailableException;
 import cn.maian.common.exception.ForbiddenOperationException;
 import cn.maian.config.OcrProperties;
 import cn.maian.health.dto.HealthIndicator;
+import cn.maian.health.dto.ReportInterpretation;
 import cn.maian.health.dto.ReportRecognitionResponse;
 import cn.maian.media.domain.MediaPurpose;
 import cn.maian.media.service.MediaStorageService;
@@ -11,6 +12,9 @@ import cn.maian.user.service.UserSettingsService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
@@ -55,6 +59,9 @@ public class ReportRecognitionService {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final ChatClient chatClient;
+    private final Resource structuringPrompt;
+    private final boolean aiEnabled;
     private volatile AccessToken cachedToken;
 
     public ReportRecognitionService(
@@ -63,7 +70,10 @@ public class ReportRecognitionService {
         UserSettingsService userSettingsService,
         RestClient.Builder restClientBuilder,
         ObjectMapper objectMapper,
-        Clock clock
+        Clock clock,
+        ChatClient.Builder chatClientBuilder,
+        @Value("classpath:prompts/structure-health-report.st") Resource structuringPrompt,
+        @Value("${app.ai.enabled:false}") boolean aiEnabled
     ) {
         this.properties = properties;
         this.mediaStorageService = mediaStorageService;
@@ -71,25 +81,57 @@ public class ReportRecognitionService {
         this.restClient = restClientBuilder.build();
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.chatClient = chatClientBuilder.build();
+        this.structuringPrompt = structuringPrompt;
+        this.aiEnabled = aiEnabled;
     }
 
     public ReportRecognitionResponse recognize(UUID mediaId) {
         requireConsentAndConfiguration();
         byte[] image = mediaStorageService.readOwned(mediaId, MediaPurpose.HEALTH_REPORT);
         List<String> lines = callBaidu(image);
-        List<HealthIndicator> indicators = parseIndicators(lines);
+        ReportInterpretation interpretation = structureWithAi(lines);
+        List<HealthIndicator> indicators = interpretation == null
+            ? parseIndicators(lines)
+            : interpretation.indicators();
         if (indicators.isEmpty()) {
             throw new ExternalRecognitionUnavailableException(
-                "OCR 已返回文字，但未识别出可结构化的健康指标，请手动核对录入"
+                "检查单文字已读取，但没有找到可确认的检查结果，请重新拍摄完整报告"
             );
         }
         return new ReportRecognitionResponse(
             ReportRecognitionResponse.REVIEW_NOTICE,
-            findHospital(lines),
-            findDate(lines),
+            interpretation == null ? findHospital(lines) : interpretation.hospital(),
+            interpretation == null ? findDate(lines) : interpretation.checkupDate(),
             indicators,
             lines
         );
+    }
+
+    private ReportInterpretation structureWithAi(List<String> lines) {
+        if (!aiEnabled) return null;
+        try {
+            ReportInterpretation result = chatClient.prompt()
+                .user(user -> user.text(structuringPrompt).param("ocrText", String.join("\n", lines)))
+                .call()
+                .entity(ReportInterpretation.class);
+            if (result == null || result.indicators() == null) return null;
+            List<HealthIndicator> indicators = result.indicators().stream()
+                .filter(item -> item != null && !blank(item.name()) && !blank(item.value()))
+                .limit(50)
+                .map(item -> new HealthIndicator(
+                    item.name().trim(), item.value().trim(), trimToNull(item.unit()),
+                    trimToNull(item.referenceRange()), item.abnormal()
+                ))
+                .toList();
+            if (indicators.isEmpty()) return null;
+            String hospital = blank(result.hospital()) ? findHospital(lines) : result.hospital().trim();
+            LocalDate checkupDate = result.checkupDate() == null ? findDate(lines) : result.checkupDate();
+            return new ReportInterpretation(hospital, checkupDate, indicators);
+        } catch (Exception ignored) {
+            // 模型超时、限流或结构化失败时回退到可复核的本地提取，不阻断报告处理。
+            return null;
+        }
     }
 
     private void requireConsentAndConfiguration() {
@@ -98,7 +140,7 @@ public class ReportRecognitionService {
         }
         if (!properties.enabled() || blank(properties.apiKey()) || blank(properties.secretKey())) {
             throw new ExternalRecognitionUnavailableException(
-                "百度智能云 OCR 未配置，请手动录入体检指标"
+                "体检报告识别服务尚未配置，请联系管理员"
             );
         }
     }
@@ -132,7 +174,7 @@ public class ReportRecognitionService {
             throw exception;
         } catch (Exception exception) {
             throw new ExternalRecognitionUnavailableException(
-                "百度智能云 OCR 暂时不可用，请手动录入或稍后重试", exception
+                "体检报告识别服务暂时不可用，请稍后重试", exception
             );
         }
     }
@@ -226,6 +268,10 @@ public class ReportRecognitionService {
 
     private boolean blank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String trimToNull(String value) {
+        return blank(value) ? null : value.trim();
     }
 
     private record IndicatorSpec(String name, List<String> aliases, String unit) {

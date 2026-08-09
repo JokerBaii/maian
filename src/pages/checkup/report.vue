@@ -19,36 +19,20 @@
               <text class="risk-kicker">健康评估</text>
               <text class="risk-title">{{ riskLabel }}</text>
             </view>
-            <view class="source-chip">
-              <view class="source-dot"></view>
-              <text>{{ report.analysisSource === 'SPRING_AI' ? '智能分析' : '基础分析' }}</text>
-            </view>
           </view>
           <text class="risk-summary">{{ report.summary }}</text>
-          <view class="risk-stats">
-            <view class="risk-stat">
-              <text class="stat-value">{{ abnormalIndicators.length }}</text>
-              <text class="stat-label">异常指标</text>
-            </view>
-            <view class="stat-line"></view>
-            <view class="risk-stat">
-              <text class="stat-value">{{ report.indicators.length }}</text>
-              <text class="stat-label">检测项目</text>
-            </view>
-            <view class="stat-line"></view>
-            <view class="risk-stat">
-              <text class="stat-value">{{ normalCount }}</text>
-              <text class="stat-label">正常项目</text>
-            </view>
+          <view class="risk-overview">
+            <text>{{ report.indicators.length }} 项指标</text>
+            <view class="overview-dot"></view>
+            <text :class="{ 'overview-alert': abnormalIndicators.length > 0 }">
+              {{ abnormalIndicators.length > 0 ? `${abnormalIndicators.length} 项需关注` : '未发现异常' }}
+            </text>
           </view>
         </view>
 
-        <view class="report-card">
+        <view class="report-section">
           <view class="section-head">
-            <view>
-              <text class="section-kicker">体检记录</text>
-              <text class="section-title">报告信息</text>
-            </view>
+            <text class="section-title">报告信息</text>
             <text class="report-date">{{ report.checkupDate }}</text>
           </view>
           <view class="hospital-row">
@@ -64,17 +48,14 @@
           />
         </view>
 
-        <view class="report-card">
+        <view class="report-section">
           <view class="section-head">
-            <view>
-              <text class="section-kicker">数据概览</text>
-              <text class="section-title">体检指标</text>
-            </view>
+            <text class="section-title">体检指标</text>
             <text class="section-meta">{{ report.indicators.length }} 项</text>
           </view>
-          <view class="indicator-list">
+          <view class="indicator-list" :class="{ 'indicator-list-expanded': indicatorsExpanded }">
             <view
-              v-for="indicator in report.indicators"
+              v-for="indicator in visibleIndicators"
               :key="`${indicator.name}-${indicator.value}`"
               class="indicator-row"
               :class="{ abnormal: indicator.abnormal }"
@@ -99,14 +80,23 @@
               </view>
             </view>
           </view>
+          <view
+            v-if="report.indicators.length > indicatorPreviewLimit"
+            class="indicator-expand"
+            @tap="toggleIndicators"
+          >
+            <text>{{ indicatorsExpanded ? '收起全部指标' : `查看全部 ${report.indicators.length} 项` }}</text>
+            <app-icon
+              :name="indicatorsExpanded ? 'top' : 'bottom'"
+              :size="14"
+              color="#007AFF"
+            />
+          </view>
         </view>
 
-        <view class="report-card">
+        <view class="report-section">
           <view class="section-head">
-            <view>
-              <text class="section-kicker">行动建议</text>
-              <text class="section-title">健康建议</text>
-            </view>
+            <text class="section-title">建议</text>
           </view>
           <view class="recommendation-list">
             <view
@@ -126,8 +116,8 @@
         </view>
 
         <view class="bottom-actions">
-          <view class="secondary-button" @tap="handleShare">复制摘要</view>
-          <view class="primary-button" @tap="goArchive">查看健康档案</view>
+          <view class="report-action report-action-secondary" @tap="handleShare">复制摘要</view>
+          <view class="report-action report-action-primary" @tap="goArchive">查看健康档案</view>
         </view>
         <view class="bottom-space"></view>
       </template>
@@ -153,9 +143,28 @@ const report = ref<HealthReportResponse | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
 const sourceImageUrl = ref('')
+const indicatorsExpanded = ref(false)
+const indicatorPreviewLimit = 5
 
 const abnormalIndicators = computed(() => report.value?.indicators.filter(item => item.abnormal) || [])
-const normalCount = computed(() => (report.value?.indicators.length || 0) - abnormalIndicators.value.length)
+const priorityIndicators = computed(() => {
+  const indicators = report.value?.indicators || []
+  const preferredNames = ['血压', '空腹血糖', '总胆固醇', '低密度脂蛋白', '血红蛋白', '体重指数']
+  return [...indicators]
+    .sort((left, right) => {
+      if (left.abnormal !== right.abnormal) return left.abnormal ? -1 : 1
+      const leftPriority = preferredNames.indexOf(left.name)
+      const rightPriority = preferredNames.indexOf(right.name)
+      if (leftPriority === -1 && rightPriority === -1) return 0
+      if (leftPriority === -1) return 1
+      if (rightPriority === -1) return -1
+      return leftPriority - rightPriority
+    })
+    .slice(0, indicatorPreviewLimit)
+})
+const visibleIndicators = computed(() =>
+  indicatorsExpanded.value ? (report.value?.indicators || []) : priorityIndicators.value
+)
 const riskLabel = computed(() => {
   const labels = { LOW: '低风险', MEDIUM: '中风险', HIGH: '高风险' }
   return labels[report.value?.riskLevel || 'LOW']
@@ -201,13 +210,17 @@ function goArchive() {
 function goUpload() {
   uni.redirectTo({ url: '/pages/checkup/upload' })
 }
+
+function toggleIndicators() {
+  indicatorsExpanded.value = !indicatorsExpanded.value
+}
 </script>
 
 <style lang="scss" scoped>
 .page {
   min-height: 100vh;
-  background: #F1F5FA;
-  color: #18253A;
+  background: #FFFFFF;
+  color: #1C1C1E;
 }
 
 .page-scroll {
@@ -263,31 +276,24 @@ function goUpload() {
 }
 
 .risk-card,
-.report-card,
+.report-section,
 .disclaimer-card {
-  margin: 24rpx 24rpx 0;
-  border-radius: 26rpx;
+  margin: 0;
+  border-radius: 0;
 }
 
 .risk-card {
-  padding: 32rpx 30rpx 28rpx;
-  overflow: hidden;
-  border: 1rpx solid rgba(60, 60, 67, .14);
-  border-left: 8rpx solid #248A5A;
+  padding: 38rpx 28rpx 34rpx;
+  border: 0;
+  border-bottom: 16rpx solid #F2F2F7;
   background: #FFFFFF;
   color: #1C1C1E;
   box-shadow: none;
 }
 
-.risk-medium {
-  border-left-color: #C97818;
-  box-shadow: none;
-}
-
-.risk-high {
-  border-left-color: #C72C38;
-  box-shadow: none;
-}
+.risk-low .risk-title { color: #248A5A; }
+.risk-medium .risk-title { color: #B7670B; }
+.risk-high .risk-title { color: #C72C38; }
 
 .risk-top,
 .section-head,
@@ -319,27 +325,8 @@ function goUpload() {
 .risk-title {
   display: block;
   margin-top: 6rpx;
-  font-size: 40rpx;
+  font-size: 44rpx;
   font-weight: 850;
-}
-
-.source-chip {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 9rpx 14rpx;
-  border: 0;
-  border-radius: 999rpx;
-  background: #F2F2F7;
-  color: #636366;
-  font-size: 20rpx;
-}
-
-.source-dot {
-  width: 10rpx;
-  height: 10rpx;
-  border-radius: 50%;
-  background: #248A5A;
 }
 
 .risk-summary {
@@ -350,46 +337,31 @@ function goUpload() {
   line-height: 1.65;
 }
 
-.risk-stats {
+.risk-overview {
   display: flex;
   align-items: center;
-  margin-top: 27rpx;
-  padding: 19rpx 0;
-  border-radius: 18rpx;
-  background: #F2F2F7;
+  gap: 12rpx;
+  margin-top: 22rpx;
+  color: #636366;
+  font-size: 21rpx;
 }
 
-.risk-stat {
-  flex: 1;
-  text-align: center;
+.overview-dot {
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 50%;
+  background: #AEAEB2;
 }
 
-.stat-value,
-.stat-label {
-  display: block;
-}
+.overview-alert { color: #C72C38; font-weight: 650; }
 
-.stat-value {
-  font-size: 31rpx;
-  font-weight: 850;
-}
-
-.stat-label {
-  margin-top: 5rpx;
-  color: #8E8E93;
-  font-size: 19rpx;
-}
-
-.stat-line {
-  width: 1rpx;
-  height: 42rpx;
-  background: rgba(60, 60, 67, .16);
-}
-
-.report-card {
-  padding: 28rpx;
+.report-section {
+  padding: 30rpx 28rpx;
+  border: 0;
+  border-bottom: 16rpx solid #F2F2F7;
   background: #FFFFFF;
-  box-shadow: 0 8rpx 26rpx rgba(38, 63, 103, 0.06);
+  box-shadow: none;
+  border-radius: 0 !important;
 }
 
 .section-kicker {
@@ -398,9 +370,8 @@ function goUpload() {
 
 .section-title {
   display: block;
-  margin-top: 5rpx;
-  font-size: 31rpx;
-  font-weight: 800;
+  font-size: 30rpx;
+  font-weight: 720;
 }
 
 .section-meta,
@@ -426,6 +397,15 @@ function goUpload() {
 
 .indicator-list {
   margin-top: 18rpx;
+}
+
+.indicator-list-expanded {
+  animation: indicatorListReveal 220ms cubic-bezier(.2, .72, .2, 1) both;
+}
+
+@keyframes indicatorListReveal {
+  from { opacity: .72; transform: translateY(-6rpx); }
+  to { opacity: 1; transform: none; }
 }
 
 .indicator-row {
@@ -480,34 +460,46 @@ function goUpload() {
   display: flex;
   align-items: center;
   gap: 7rpx;
-  padding: 5rpx 10rpx 5rpx 6rpx;
-  border-radius: 10rpx;
-  background: #EAF8F2;
   color: #19845A;
   font-size: 19rpx;
   font-weight: 700;
 }
 
 .indicator-status.abnormal {
-  background: #FFF0F1;
   color: #CF3F4A;
 }
 
+.indicator-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  min-height: 76rpx;
+  margin-top: 4rpx;
+  border-top: 1rpx solid rgba(60, 60, 67, .12);
+  color: #007AFF;
+  font-size: 23rpx;
+  font-weight: 600;
+  transition: opacity 150ms ease;
+}
+
+.indicator-expand:active { opacity: .48; }
+
 .recommendation-list {
-  margin-top: 22rpx;
+  margin-top: 14rpx;
 }
 
 .recommendation {
   align-items: flex-start;
   gap: 16rpx;
-  padding: 18rpx;
-  border-radius: 16rpx;
-  background: #F5F8FD;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #E8EDF4;
 }
 
 .recommendation + .recommendation {
-  margin-top: 13rpx;
+  margin-top: 0;
 }
+.recommendation:last-child { border-bottom: 0; }
 
 .recommendation-index {
   flex: none;
@@ -516,9 +508,9 @@ function goUpload() {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 13rpx;
-  background: #DFEAFC;
-  color: #1F63D5;
+  border-radius: 50%;
+  background: #EAF2FF;
+  color: #1768D5;
   font-size: 20rpx;
   font-weight: 800;
 }
@@ -533,42 +525,53 @@ function goUpload() {
   display: flex;
   align-items: flex-start;
   gap: 14rpx;
-  padding: 22rpx;
-  border: 1rpx solid #D9E5F7;
-  background: #EEF5FF;
+  margin: 0;
+  padding: 24rpx 28rpx;
+  border: 0;
+  border-bottom: 16rpx solid #F2F2F7;
+  background: #F5F9FF;
   color: #65758D;
   font-size: 21rpx;
   line-height: 1.6;
 }
 
 .bottom-actions {
-  gap: 16rpx;
-  margin: 28rpx 24rpx 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0 28rpx;
+  background: #FFFFFF;
 }
 
-.secondary-button,
-.primary-button {
-  height: 86rpx;
+.report-action {
+  width: 100%;
+  height: 90rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 20rpx;
-  font-size: 25rpx;
-  font-weight: 800;
-}
-
-.secondary-button {
-  width: 220rpx;
-  border: 1rpx solid #C9D5E6;
+  border-radius: 0;
   background: #FFFFFF;
-  color: #47617F;
+  color: #007AFF;
+  font-size: 25rpx;
+  font-weight: 600;
 }
 
-.primary-button {
-  flex: 1;
-  background: #007AFF;
-  color: #FFFFFF;
-  box-shadow: 0 10rpx 25rpx rgba(37, 101, 207, 0.22);
+.report-action-secondary {
+  order: 2;
+  border: 0;
+  border-top: 1rpx solid rgba(60, 60, 67, .14);
+  background: #FFFFFF !important;
+  color: #007AFF !important;
+  border-radius: 0 !important;
+}
+
+.report-action-primary {
+  flex: none;
+  background: #FFFFFF !important;
+  color: #007AFF !important;
+  border-radius: 0 !important;
+  box-shadow: none;
 }
 
 .bottom-space {

@@ -31,6 +31,7 @@ public record ResponderTaskResponse(
     Instant arrivedAtAedAt,
     Instant completionSubmittedAt,
     Instant confirmationDeadlineAt,
+    Instant completedAt,
     long eventSequence,
     Instant createdAt,
     Instant updatedAt
@@ -40,7 +41,7 @@ public record ResponderTaskResponse(
             call.getId(), call.getUrgency(), call.getStatus(), false, null, distanceMeters,
             null, null, null, null, Set.of(), List.of(), null,
             call.getMatchedDevice() == null ? null : call.getMatchedDevice().getType(),
-            call.getAedCustodyStatus(), null, null, null, null,
+            call.getAedCustodyStatus(), null, null, null, null, null,
             call.getEventSequence(), call.getCreatedAt(), call.getUpdatedAt()
         );
     }
@@ -60,7 +61,8 @@ public record ResponderTaskResponse(
             call.getMatchedDevice() == null ? null : call.getMatchedDevice().getType(),
             call.getAedCustodyStatus(), call.getAcceptedAt(), call.getArrivedAtAedAt(),
             call.getCompletionSubmittedAt(),
-            call.getConfirmationDeadlineAt(), call.getEventSequence(), call.getCreatedAt(), call.getUpdatedAt()
+            call.getConfirmationDeadlineAt(), call.getCompletedAt(), call.getEventSequence(),
+            call.getCreatedAt(), call.getUpdatedAt()
         );
     }
 }

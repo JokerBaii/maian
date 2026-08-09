@@ -2,8 +2,10 @@ import {
   clearDemoAccessToken,
   getDemoAccessToken,
   getDemoUserId,
-  saveDemoAccessToken
+  saveDemoAccessToken,
+  isDemoSessionActive
 } from '@/utils/demoSession'
+import { clearAccountSession, getAccountAccessToken } from '@/utils/authSession'
 
 export interface ApiError {
   code: string
@@ -90,7 +92,8 @@ async function authenticatedRequest<T>(
         }
 
         if (response.statusCode === 401 && allowRefresh) {
-          clearDemoAccessToken()
+          if (getAccountAccessToken()) clearAccountSession()
+          else clearDemoAccessToken()
           try {
             resolve(await authenticatedRequest<T>(path, options, false))
           } catch (error) {
@@ -114,6 +117,13 @@ async function authenticatedRequest<T>(
 }
 
 export async function ensureAccessToken(): Promise<string> {
+  const accountToken = getAccountAccessToken()
+  if (accountToken) return accountToken
+
+  if (!isDemoSessionActive()) {
+    redirectToLogin()
+    throw new ApiRequestError('请先登录', 'AUTH_REQUIRED', [], 401)
+  }
   const existing = getDemoAccessToken()
   if (existing) return existing
 
@@ -138,4 +148,16 @@ export async function ensureAccessToken(): Promise<string> {
   }
   saveDemoAccessToken(body.data.accessToken, body.data.expiresAt)
   return body.data.accessToken
+}
+
+let redirectingToLogin = false
+function redirectToLogin() {
+  if (redirectingToLogin) return
+  redirectingToLogin = true
+  setTimeout(() => {
+    uni.reLaunch({
+      url: '/pages/auth/login',
+      complete: () => { redirectingToLogin = false }
+    })
+  }, 0)
 }
