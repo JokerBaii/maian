@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.List;
 import java.util.stream.Stream;
 
 @Service
@@ -34,6 +35,44 @@ public class AedDispatchService {
 
     public Optional<DispatchResult> matchFastest(RescueCall rescueCall) {
         Instant now = Instant.now();
+        var rankedCandidates = rankedCandidates(rescueCall, now);
+        for (RankedCandidate candidate : rankedCandidates) {
+            var lockedDevice = emergencyDeviceRepository.findDispatchCandidateForUpdateById(
+                candidate.device().getId()
+            ).orElse(null);
+            Instant lockedAt = Instant.now();
+            if (lockedDevice != null && isAvailableForDispatch(lockedDevice, lockedAt)
+                && lockedDevice.getStatus() == cn.maian.device.domain.DeviceStatus.AVAILABLE
+                && lockedDevice.getReservedForCallId() == null) {
+                var score = toCandidate(rescueCall, lockedDevice, lockedAt).score();
+                if (!score.eligible() || score.distanceMeters() > properties.searchRadiusKm() * 1_000) continue;
+                lockedDevice.markReserved(rescueCall.getId(), lockedAt);
+                return Optional.of(new DispatchResult(lockedDevice, score, lockedAt));
+            }
+        }
+        return Optional.empty();
+    }
+
+    public boolean isAvailableForDispatch(EmergencyDevice device, Instant now) {
+        return "AED".equals(device.getCategory())
+            && (device.getStatus() == cn.maian.device.domain.DeviceStatus.AVAILABLE
+                || device.getStatus() == cn.maian.device.domain.DeviceStatus.RESERVED)
+            && AedDispatchScorer.isServiceAvailable(device, now)
+            && (device.getType() == DeviceType.FIXED
+                || device.mobilePresenceAt(now, properties.mobileLocationMaxAgeSeconds())
+                    == cn.maian.device.domain.MobilePresenceStatus.ONLINE);
+    }
+
+    public List<CandidatePreview> previewAlternatives(RescueCall call, java.util.UUID excludedId) {
+        return rankedCandidates(call, Instant.now()).stream()
+            .filter(candidate -> !candidate.device().getId().equals(excludedId))
+            .limit(3)
+            .map(candidate -> new CandidatePreview(candidate.device().getName(),
+                candidate.score().estimatedArrivalSeconds(), candidate.score().strategy()))
+            .toList();
+    }
+
+    private List<RankedCandidate> rankedCandidates(RescueCall rescueCall, Instant now) {
         double latitudeRadius = properties.searchRadiusKm() / LATITUDE_KM_PER_DEGREE;
         double longitudeScale = Math.max(
             0.05,
@@ -67,7 +106,7 @@ public class AedDispatchService {
                 PageRequest.of(0, properties.candidateLimitPerType())
             );
 
-        var rankedCandidates = Stream.concat(fixedCandidates.stream(), mobileCandidates.stream())
+        return Stream.concat(fixedCandidates.stream(), mobileCandidates.stream())
             .map(device -> toCandidate(rescueCall, device, now))
             .filter(candidate -> candidate.score().eligible())
             .filter(candidate -> candidate.score().distanceMeters()
@@ -82,19 +121,9 @@ public class AedDispatchService {
                 .thenComparingInt(candidate -> candidate.score().distanceMeters()))
             .toList();
 
-        for (RankedCandidate candidate : rankedCandidates) {
-            var lockedDevice = emergencyDeviceRepository.findDispatchCandidateForUpdateById(
-                candidate.device().getId()
-            ).orElse(null);
-            if (lockedDevice != null
-                && lockedDevice.getStatus() == cn.maian.device.domain.DeviceStatus.AVAILABLE
-                && lockedDevice.getReservedForCallId() == null) {
-                lockedDevice.markReserved(rescueCall.getId(), now);
-                return Optional.of(new DispatchResult(lockedDevice, candidate.score(), now));
-            }
-        }
-        return Optional.empty();
     }
+
+    public record CandidatePreview(String name, int estimatedArrivalSeconds, String strategy) {}
 
     private RankedCandidate toCandidate(RescueCall rescueCall, EmergencyDevice device, Instant now) {
         return new RankedCandidate(

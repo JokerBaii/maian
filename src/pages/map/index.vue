@@ -422,6 +422,7 @@ function deviceStatusLabel(device: any) {
 }
 
 async function initMap() {
+  // #ifdef H5
   const loaded = await loadAMap()
   if (!loaded) {
     await initLeafletMap()
@@ -441,9 +442,11 @@ async function initMap() {
 
   updateSelfMarker()
   addMarkers()
+  // #endif
 }
 
 async function initLeafletMap() {
+  // #ifdef H5
   try {
     const module = await import('leaflet')
     leafletApi = module.default || module
@@ -467,6 +470,7 @@ async function initLeafletMap() {
     mapUnavailable.value = true
     uni.showToast({ title: '地图底图加载失败', icon: 'none', duration: 2000 })
   }
+  // #endif
 }
 
 

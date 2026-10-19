@@ -89,6 +89,7 @@ class AedDispatchServiceTest {
             serviceRange, null, List.of(), List.of()
         );
         device.review(true, "测试审核通过");
+        if (type == DeviceType.MOBILE) device.updateLocation(120.1500, latitude, "测试位置", Instant.now());
         return device;
     }
 }

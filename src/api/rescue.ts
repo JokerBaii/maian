@@ -50,6 +50,7 @@ export interface RescueCallResponse {
     strategy: string
     matchedAt: string
     custodyStatus?: string
+    deviceStatus?: 'AVAILABLE' | 'RESERVED' | 'DISABLED' | 'PENDING_REVIEW' | 'REJECTED' | 'EXPIRED'
   }
   responderUserId?: string
   responder?: RescueParticipant

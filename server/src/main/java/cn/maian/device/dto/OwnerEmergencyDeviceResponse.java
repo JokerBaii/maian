@@ -33,7 +33,8 @@ public record OwnerEmergencyDeviceResponse(
     String reviewNote,
     Instant reviewedAt,
     Instant createdAt,
-    MobilePresenceStatus mobilePresenceStatus
+    MobilePresenceStatus mobilePresenceStatus,
+    boolean hasActiveReservation
 ) {
     public static OwnerEmergencyDeviceResponse from(EmergencyDevice device, Instant now, long freshSeconds) {
         return new OwnerEmergencyDeviceResponse(
@@ -44,7 +45,7 @@ public record OwnerEmergencyDeviceResponse(
             device.getOwner(), device.getVehicleInfo(), device.getServiceRange(),
             device.getInstructions(), device.getImageMediaIds(), device.getVehicleImageMediaIds(),
             device.getLastLocationAt(), device.getReviewNote(), device.getReviewedAt(),
-            device.getCreatedAt(), device.mobilePresenceAt(now, freshSeconds)
+            device.getCreatedAt(), device.mobilePresenceAt(now, freshSeconds), device.getReservedForCallId() != null
         );
     }
 }

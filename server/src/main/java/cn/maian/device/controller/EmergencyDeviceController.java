@@ -94,6 +94,11 @@ public class EmergencyDeviceController {
         return ApiResponse.ok(emergencyDeviceService.disable(id));
     }
 
+    @PostMapping("/{id}/fault")
+    public ApiResponse<OwnerEmergencyDeviceResponse> reportFault(@PathVariable UUID id) {
+        return ApiResponse.ok(emergencyDeviceService.reportFault(id));
+    }
+
     @PatchMapping("/{id}/location")
     public ApiResponse<OwnerEmergencyDeviceResponse> updateLocation(
         @PathVariable UUID id,

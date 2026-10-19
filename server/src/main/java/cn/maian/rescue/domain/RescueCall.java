@@ -193,6 +193,10 @@ public class RescueCall {
         if (responderUserId != null || matchedDevice == null) {
             throw invalid("该任务已有人响应或尚未匹配 AED");
         }
+        if (matchedDevice.getStatus() != cn.maian.device.domain.DeviceStatus.RESERVED
+            || !id.equals(matchedDevice.getReservedForCallId())) {
+            throw invalid("设备状态已变化，正在重新检查资源");
+        }
         responderUserId = responderId;
         acceptedAt = now;
         if (matchedDevice.getType() == DeviceType.FIXED) {
@@ -216,6 +220,9 @@ public class RescueCall {
 
     public void pickUpAed(Instant now) {
         requireStatus(RescueStatus.EN_ROUTE_TO_AED);
+        if (matchedDevice.getStatus() == cn.maian.device.domain.DeviceStatus.DISABLED) {
+            throw invalid("设备已报告故障，请联系设备管理方核实后再取用");
+        }
         if (arrivedAtAedAt == null) {
             throw invalid("请先确认到达 AED 取用点");
         }
@@ -329,6 +336,24 @@ public class RescueCall {
             throw invalid("只能操作自己接取的救援任务");
         }
     }
+
+    public void clearUnavailableDevice(Instant now) {
+        requireStatus(RescueStatus.MATCHING);
+        if (responderUserId != null) throw invalid("已有志愿者响应，需要人工核实取用安排");
+        if (matchedDevice != null) matchedDevice.releaseReservation(id);
+        matchedDevice = null;
+        matchedAt = null;
+        matchedDistanceMeters = null;
+        estimatedArrivalSeconds = null;
+        matchedSnapshotLatitude = null;
+        matchedSnapshotLongitude = null;
+        matchedSnapshotAddress = null;
+        matchStrategy = null;
+        aedCustodyStatus = null;
+        touch(now);
+    }
+
+    public void recordResourceRecheck(Instant now) { touch(now); }
 
     private void requireStatus(RescueStatus expected) {
         if (status != expected) {

@@ -18,6 +18,17 @@ import java.util.UUID;
 
 public interface RescueCallRepository extends JpaRepository<RescueCall, UUID> {
 
+    @Query("""
+        select call.id from RescueCall call
+        where call.status = cn.maian.rescue.domain.RescueStatus.MATCHING
+          and call.matchedDevice is null and call.matchDeadlineAt > :now
+          and call.latitude between :minLatitude and :maxLatitude
+          and call.longitude between :minLongitude and :maxLongitude
+        order by call.createdAt
+        """)
+    List<UUID> findWaitingNear(double minLatitude, double maxLatitude,
+        double minLongitude, double maxLongitude, Instant now, Pageable pageable);
+
     @EntityGraph(attributePaths = "matchedDevice")
     @Query("select call from RescueCall call where call.id = :id and call.requestedByUserId = :userId")
     Optional<RescueCall> findOwnedDetailedById(UUID id, UUID userId);

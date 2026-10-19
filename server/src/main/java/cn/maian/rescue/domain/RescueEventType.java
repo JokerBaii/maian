@@ -4,6 +4,7 @@ public enum RescueEventType {
     CREATED,
     MATCHING_STARTED,
     AED_ASSIGNED,
+    RESOURCE_RECHECK,
     ACCEPTED,
     ARRIVED_AT_AED,
     AED_PICKED_UP,

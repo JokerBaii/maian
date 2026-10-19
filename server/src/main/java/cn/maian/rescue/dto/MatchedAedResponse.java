@@ -23,7 +23,8 @@ public record MatchedAedResponse(
     int estimatedArrivalSeconds,
     String strategy,
     Instant matchedAt,
-    AedCustodyStatus custodyStatus
+    AedCustodyStatus custodyStatus,
+    cn.maian.device.domain.DeviceStatus deviceStatus
 ) {
     public static MatchedAedResponse from(RescueCall rescueCall) {
         return from(rescueCall, false);
@@ -49,7 +50,8 @@ public record MatchedAedResponse(
             rescueCall.getEstimatedArrivalSeconds(),
             rescueCall.getMatchStrategy(),
             rescueCall.getMatchedAt(),
-            rescueCall.getAedCustodyStatus()
+            rescueCall.getAedCustodyStatus(),
+            device.getStatus()
         );
     }
 

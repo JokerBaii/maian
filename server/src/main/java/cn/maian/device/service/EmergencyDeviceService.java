@@ -31,19 +31,22 @@ public class EmergencyDeviceService {
     private final MediaStorageService mediaStorageService;
     private final DispatchProperties dispatchProperties;
     private final Clock clock;
+    private final cn.maian.agent.service.CoordinationQueue coordinationQueue;
 
     public EmergencyDeviceService(
         EmergencyDeviceRepository emergencyDeviceRepository,
         CurrentUserService currentUserService,
         MediaStorageService mediaStorageService,
         DispatchProperties dispatchProperties,
-        Clock clock
+        Clock clock,
+        cn.maian.agent.service.CoordinationQueue coordinationQueue
     ) {
         this.emergencyDeviceRepository = emergencyDeviceRepository;
         this.currentUserService = currentUserService;
         this.mediaStorageService = mediaStorageService;
         this.dispatchProperties = dispatchProperties;
         this.clock = clock;
+        this.coordinationQueue = coordinationQueue;
     }
 
     @Transactional(readOnly = true)
@@ -122,6 +125,7 @@ public class EmergencyDeviceService {
             request.instructions(), request.imageMediaIds(), request.vehicleImageMediaIds()
         );
         syncMedia(device);
+        coordinationQueue.enqueue(device, "UPDATED");
         return toOwnerResponse(device);
     }
 
@@ -129,6 +133,7 @@ public class EmergencyDeviceService {
     public OwnerEmergencyDeviceResponse enable(UUID id) {
         var device = findEntityForUpdate(id);
         device.enable();
+        coordinationQueue.enqueue(device, "ENABLED");
         return toOwnerResponse(device);
     }
 
@@ -136,6 +141,15 @@ public class EmergencyDeviceService {
     public OwnerEmergencyDeviceResponse disable(UUID id) {
         var device = findEntityForUpdate(id);
         device.disable();
+        coordinationQueue.enqueue(device, "DISABLED");
+        return toOwnerResponse(device);
+    }
+
+    @Transactional
+    public OwnerEmergencyDeviceResponse reportFault(UUID id) {
+        var device = findEntityForUpdate(id);
+        device.reportFault();
+        coordinationQueue.enqueue(device, "FAULT_REPORTED");
         return toOwnerResponse(device);
     }
 
@@ -145,6 +159,7 @@ public class EmergencyDeviceService {
         var device = emergencyDeviceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("急救设备不存在"));
         device.review(request.approved(), request.reviewNote());
+        if (request.approved()) coordinationQueue.enqueue(device, "APPROVED");
         mediaStorageService.setReferencePublic("EMERGENCY_DEVICE", id, request.approved());
         return toAdminResponse(device);
     }
@@ -155,12 +170,17 @@ public class EmergencyDeviceService {
         if (device.getType() != DeviceType.MOBILE) {
             throw new IllegalArgumentException("只有移动设备可以更新实时位置");
         }
+        boolean wasOnline = device.mobilePresenceAt(clock.instant(), dispatchProperties.mobileLocationMaxAgeSeconds())
+            == cn.maian.device.domain.MobilePresenceStatus.ONLINE;
         device.updateLocation(
             request.longitude(),
             request.latitude(),
             request.address(),
-            Instant.now()
+            clock.instant()
         );
+        if (!wasOnline && device.getStatus() == cn.maian.device.domain.DeviceStatus.AVAILABLE) {
+            coordinationQueue.enqueue(device, "LOCATION_RESTORED");
+        }
         return toOwnerResponse(device);
     }
 
@@ -168,6 +188,7 @@ public class EmergencyDeviceService {
     public void delete(UUID id) {
         var device = findEntityForUpdate(id);
         ensureNotReserved(device);
+        coordinationQueue.enqueue(device, "DELETED");
         emergencyDeviceRepository.delete(device);
         mediaStorageService.detachReference("EMERGENCY_DEVICE", id);
     }
@@ -203,7 +224,7 @@ public class EmergencyDeviceService {
     }
 
     private void ensureNotReserved(cn.maian.device.domain.EmergencyDevice device) {
-        if (device.getStatus() == cn.maian.device.domain.DeviceStatus.RESERVED) {
+        if (device.getReservedForCallId() != null) {
             throw new cn.maian.common.exception.InvalidStateTransitionException(
                 "设备正在执行救援，暂时不能修改或删除"
             );

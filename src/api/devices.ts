@@ -35,6 +35,7 @@ export interface EmergencyDeviceResponse {
   mobilePresenceStatus?: 'ONLINE' | 'STALE' | 'OFFLINE'
   reviewNote?: string
   reviewedAt?: string
+  hasActiveReservation?: boolean
   createdAt: string
 }
 
@@ -152,6 +153,12 @@ export async function enableEmergencyDevice(id: string) {
 
 export async function disableEmergencyDevice(id: string) {
   return normalizeDevice(await request<EmergencyDeviceWireResponse>(`/api/v1/emergency-devices/${id}/disable`, {
+    method: 'POST'
+  }))
+}
+
+export async function reportEmergencyDeviceFault(id: string) {
+  return normalizeDevice(await request<EmergencyDeviceWireResponse>(`/api/v1/emergency-devices/${id}/fault`, {
     method: 'POST'
   }))
 }

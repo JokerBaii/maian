@@ -11,6 +11,10 @@
           <text>添加</text>
         </view>
       </view>
+      <view class="coordination-entry" @tap="openCoordination">
+        <view><text class="coordination-entry-title">资源协同</text><text class="coordination-entry-description">查看设备变化后的检查与处理结果</text></view>
+        <app-icon name="right" :size="16" color="#007AFF" />
+      </view>
       <view class="tab-bar">
         <view
           class="tab-item"
@@ -102,6 +106,7 @@ import {
   deleteEmergencyDevice,
   enableEmergencyDevice,
   disableEmergencyDevice,
+  reportEmergencyDeviceFault,
   updateEmergencyDeviceLocation,
   type EmergencyDeviceResponse
 } from '@/api/devices'
@@ -124,8 +129,13 @@ const deviceActions = computed<AppActionSheetItem[]>(() => {
   if (!selectedDevice.value) return []
   const actions: AppActionSheetItem[] = []
   if (selectedDevice.value.type === 'MOBILE') actions.push({ label: '更新当前位置' })
-  actions.push({ label: '编辑设备' })
-  actions.push({ label: '删除设备', destructive: true })
+  actions.push({ label: '查看协同记录' })
+  if (['AVAILABLE', 'RESERVED'].includes(selectedDevice.value.status)) actions.push({ label: '报告设备故障', destructive: true })
+  if (selectedDevice.value.status === 'DISABLED' && selectedDevice.value.hasActiveReservation) actions.push({ label: '确认修复并恢复' })
+  if (!selectedDevice.value.hasActiveReservation) {
+    actions.push({ label: '编辑设备' })
+    actions.push({ label: '删除设备', destructive: true })
+  }
   return actions
 })
 
@@ -139,7 +149,7 @@ function toView(device: EmergencyDeviceResponse): DeviceView {
 }
 
 function canToggleDevice(device: DeviceView) {
-  return ['AVAILABLE', 'DISABLED'].includes(device.status)
+  return !device.hasActiveReservation && ['AVAILABLE', 'DISABLED'].includes(device.status)
 }
 
 function deviceStatusLabel(device: DeviceView) {
@@ -250,13 +260,46 @@ function openDeviceActions(device: DeviceView) {
 function handleDeviceAction(index: number) {
   const device = selectedDevice.value
   if (!device) return
-  if (device.type === 'MOBILE') {
-    if (index === 0) return reportMobileLocation(device)
-    if (index === 1) return editDevice(device)
-  } else if (index === 0) {
-    return editDevice(device)
-  }
-  confirmDelete(device)
+  const action = deviceActions.value[index]?.label
+  if (action === '更新当前位置') return reportMobileLocation(device)
+  if (action === '查看协同记录') return openCoordination()
+  if (action === '报告设备故障') return confirmFault(device)
+  if (action === '确认修复并恢复') return confirmRestore(device)
+  if (action === '编辑设备') return editDevice(device)
+  if (action === '删除设备') confirmDelete(device)
+}
+
+function openCoordination() { uni.navigateTo({ url: '/pages/agent/index' }) }
+
+function confirmFault(device: DeviceView) {
+  uni.showModal({
+    title: '报告设备故障',
+    content: `确认“${device.name}”无法正常使用？系统将停用设备并检查关联救援；已有志愿者响应的任务需人工核实。`,
+    confirmText: '确认上报',
+    success: async result => {
+      if (!result.confirm) return
+      try {
+        Object.assign(device, toView(await reportEmergencyDeviceFault(device.id)))
+        uni.showToast({ title: '已上报，正在检查关联任务', icon: 'none' })
+        openCoordination()
+      } catch (error) { uni.showToast({ title: userFacingError(error, '故障上报失败'), icon: 'none' }) }
+    }
+  })
+}
+
+function confirmRestore(device: DeviceView) {
+  uni.showModal({
+    title: '确认设备已修复',
+    content: '请与相关志愿者核实设备已可正常取用。恢复后保留原救援的设备预留与保管关系。',
+    confirmText: '确认恢复',
+    success: async result => {
+      if (!result.confirm) return
+      try {
+        Object.assign(device, toView(await enableEmergencyDevice(device.id)))
+        uni.showToast({ title: '已恢复原救援设备安排', icon: 'none' })
+      } catch (error) { uni.showToast({ title: userFacingError(error, '恢复失败'), icon: 'none' }) }
+    }
+  })
 }
 
 function goAdd() {
@@ -288,6 +331,9 @@ onShow(loadDevices)
 </script>
 
 <style lang="scss" scoped>
+.coordination-entry { margin: 8rpx 28rpx 24rpx; padding: 24rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; border-radius: 20rpx; background: #edf4ff; }
+.coordination-entry-title { display: block; font-size: 28rpx; font-weight: 600; color: #2865b6; }
+.coordination-entry-description { display: block; margin-top: 8rpx; color: #636366; font-size: 23rpx; }
 .page {
   min-height: 100vh;
   background: #F2F2F7;

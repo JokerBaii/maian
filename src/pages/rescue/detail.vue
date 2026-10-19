@@ -40,6 +40,12 @@
           </view>
         </view>
 
+        <view v-if="rescueCall.matchedAed?.deviceStatus === 'DISABLED'" class="resource-warning">
+          <text class="resource-warning-title">关联设备已报告故障</text>
+          <text>{{ isResponder ? '请联系设备管理方核实取用与保管安排，设备恢复前无法确认取用。' : '系统正在检查资源安排，请保持与志愿者联系。' }}</text>
+          <text v-if="isResponder && rescueCall.matchedAed.contactPhone" class="resource-contact" @tap="callDeviceOwner">联系设备管理方</text>
+        </view>
+
         <view v-if="isAwaitingMatch" class="matching-board motion-enter motion-enter-delay-1">
           <view class="matching-signal" aria-hidden="true"><view></view><view></view><view></view></view>
           <text class="matching-board-title">呼救已送达</text>
@@ -186,6 +192,11 @@
           </view>
         </view>
 
+        <view v-if="coordinationTasks.length" class="resource-coordination">
+          <text class="resource-coordination-title">资源协同进展</text>
+          <coordination-task-card v-for="task in coordinationTasks" :key="task.id" :task="task" />
+        </view>
+
         <view class="panel detail-card">
           <view class="panel-head">
             <text class="panel-title">现场信息</text>
@@ -287,6 +298,8 @@ import 'leaflet/dist/leaflet.css'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import AppAvatar from '@/components/AppAvatar.vue'
+import CoordinationTaskCard from '@/components/CoordinationTaskCard.vue'
+import { listRescueCoordinationTasks, type CoordinationTask } from '@/api/agent'
 import { addBaseTileLayer } from '@/common/mapTiles'
 import { planAmapRoute } from '@/common/amapRoute'
 import { resolveApiUrl } from '@/api/http'
@@ -309,6 +322,21 @@ import { getCurrentGcj02Location, openMapNavigation } from '@/utils/location'
 import { rescueStatusPresentation, userFacingError } from '@/utils/presentation'
 
 const rescueId = ref('')
+const coordinationTasks = ref<CoordinationTask[]>([])
+let coordinationLoading = false
+
+async function loadCoordination() {
+  if (coordinationLoading || !rescueId.value) return
+  coordinationLoading = true
+  try { coordinationTasks.value = await listRescueCoordinationTasks(rescueId.value) }
+  catch { /* Keep the rescue controls available when the supplemental timeline cannot load. */ }
+  finally { coordinationLoading = false }
+}
+
+function callDeviceOwner() {
+  const phone = rescueCall.value?.matchedAed?.contactPhone
+  if (phone) uni.makePhoneCall({ phoneNumber: phone })
+}
 const rescueCall = ref<RescueCallResponse | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
@@ -584,6 +612,7 @@ async function loadDetail(showLoading = true) {
       ? await loadResponderDetail()
       : await getRescueCall(rescueId.value)
     rescueCall.value = latest
+    void loadCoordination()
     if (isResponder.value) void syncResponderLocation()
     await refreshAttachmentUrls(latest.attachmentMediaIds)
     loading.value = false
@@ -630,6 +659,7 @@ async function refreshAttachmentUrls(mediaIds: string[]) {
 }
 
 async function initMap() {
+  // #ifdef H5
   if (!rescueCall.value) return
   try {
     const module = await import('leaflet')
@@ -738,6 +768,7 @@ async function initMap() {
   } catch {
     mapUnavailable.value = true
   }
+  // #endif
 }
 
 function destroyMap() {
@@ -795,6 +826,10 @@ function callCounterpart() {
 async function performDetailAction() {
   const next = responderNextAction.value
   if (!next || responderActionBusy.value || !rescueId.value) return
+  if (next.action === 'aed-pickup' && rescueCall.value?.matchedAed?.deviceStatus === 'DISABLED') {
+    uni.showToast({ title: '设备已报告故障，请先联系管理方核实', icon: 'none' })
+    return
+  }
   if (next.action === 'completion-submission') {
     uni.showModal({
       title: '确认完成救援？',
@@ -962,6 +997,12 @@ onUnmounted(() => {
 </style>
 
 <style lang="scss" scoped>
+.resource-warning { margin: 22rpx 28rpx; padding: 26rpx; border: 1rpx solid #e8c8a1; border-radius: 22rpx; background: #fff6e9; color: #83561c; font-size: 25rpx; line-height: 1.7; }
+.resource-warning text { display: block; }
+.resource-warning-title { font-weight: 650; margin-bottom: 8rpx; }
+.resource-contact { margin-top: 12rpx; color: #2865b6; }
+.resource-coordination { margin: 28rpx; }
+.resource-coordination-title { display: block; margin-bottom: 18rpx; font-size: 28rpx; font-weight: 650; }
 .page { min-height: 100vh; background: #F5F5F7; color: #1C1C1E; }
 .page-scroll { min-height: 100vh; padding: 0 24rpx; box-sizing: border-box; }
 

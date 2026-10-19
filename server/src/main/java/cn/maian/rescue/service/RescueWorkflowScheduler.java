@@ -26,6 +26,7 @@ public class RescueWorkflowScheduler {
     private final AedDispatchService aedDispatchService;
     private final Clock clock;
     private final RescueRealtimeHub rescueRealtimeHub;
+    private final cn.maian.agent.service.CoordinationQueue coordinationQueue;
 
     public RescueWorkflowScheduler(
         RescueCallRepository rescueCallRepository,
@@ -33,7 +34,8 @@ public class RescueWorkflowScheduler {
         RescueEventRepository rescueEventRepository,
         AedDispatchService aedDispatchService,
         Clock clock,
-        RescueRealtimeHub rescueRealtimeHub
+        RescueRealtimeHub rescueRealtimeHub,
+        cn.maian.agent.service.CoordinationQueue coordinationQueue
     ) {
         this.rescueCallRepository = rescueCallRepository;
         this.activeRescueLockRepository = activeRescueLockRepository;
@@ -41,6 +43,7 @@ public class RescueWorkflowScheduler {
         this.aedDispatchService = aedDispatchService;
         this.clock = clock;
         this.rescueRealtimeHub = rescueRealtimeHub;
+        this.coordinationQueue = coordinationQueue;
     }
 
     @Scheduled(initialDelayString = "${app.dispatch.scheduler-initial-delay-ms:5000}", fixedDelayString = "${app.dispatch.scheduler-interval-ms:5000}")
@@ -51,6 +54,13 @@ public class RescueWorkflowScheduler {
             now.minusSeconds(REMATCH_INTERVAL_SECONDS), PageRequest.of(0, BATCH_SIZE)
         );
         for (var call : calls) {
+            if (call.getMatchedDevice() != null
+                && !aedDispatchService.isAvailableForDispatch(call.getMatchedDevice(), now)) {
+                var device = call.getMatchedDevice();
+                coordinationQueue.enqueue(device, "UNAVAILABLE", "unavailable:" + call.getId() + ":" + device.getId());
+                call.clearUnavailableDevice(now);
+                append(call, RescueEventType.RESOURCE_RECHECK, now);
+            }
             if (call.getMatchDeadlineAt() != null && !call.getMatchDeadlineAt().isAfter(now)) {
                 RescueStatus terminal = call.getMatchedDevice() == null
                     ? RescueStatus.NO_RESOURCE
@@ -95,6 +105,7 @@ public class RescueWorkflowScheduler {
     private String summary(RescueEventType type) {
         return switch (type) {
             case AED_ASSIGNED -> "系统已重新匹配 AED";
+            case RESOURCE_RECHECK -> "原设备已不满足调度条件，正在重新匹配";
             case NO_RESOURCE -> "匹配时限内未找到可用资源";
             case EXPIRED -> "救援任务等待响应超时";
             case COMPLETION_AUTO_CONFIRMED -> "求救者未在时限内操作，系统自动确认完成";

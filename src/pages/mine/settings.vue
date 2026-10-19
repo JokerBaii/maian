@@ -1,7 +1,7 @@
 <template>
   <view class="page apple-page">
     <view class="settings-scroll">
-      <view class="settings-section">
+      <view id="settings-notifications" class="settings-section" :class="{ 'assistant-highlight': assistantSection === 'notifications' }">
         <text class="section-title">通知设置</text>
         <view class="settings-list">
           <view class="settings-item">
@@ -28,7 +28,7 @@
         </view>
       </view>
 
-      <view class="settings-section">
+      <view id="settings-privacy" class="settings-section" :class="{ 'assistant-highlight': assistantSection === 'privacy' }">
         <text class="section-title">隐私设置</text>
         <view class="settings-list">
           <view class="settings-item">
@@ -48,7 +48,7 @@
         </view>
       </view>
 
-      <view class="settings-section">
+      <view id="settings-thresholds" class="settings-section" :class="{ 'assistant-highlight': assistantSection === 'thresholds' }">
         <text class="section-title">心率预警阈值</text>
         <view class="settings-list">
           <view class="settings-item">
@@ -154,6 +154,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { onLoad, onReady } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
@@ -162,6 +163,14 @@ import { userFacingError } from '@/utils/presentation'
 import { clearAccountSession } from '@/utils/authSession'
 
 const SETTINGS_STORAGE_KEY = 'maian:user-settings'
+const assistantSection = ref('')
+onLoad(query => {
+  const section = typeof query?.section === 'string' ? query.section : ''
+  if (['notifications', 'privacy', 'thresholds'].includes(section)) assistantSection.value = section
+})
+onReady(() => {
+  if (assistantSection.value) uni.pageScrollTo({ selector: `#settings-${assistantSection.value}`, duration: 240 })
+})
 const settings = reactive({
   rescuePush: true,
   healthAlert: true,
@@ -302,6 +311,8 @@ function logout() {
 </script>
 
 <style lang="scss" scoped>
+.assistant-highlight .settings-list { border-color: #86b6ed; box-shadow: 0 0 0 4rpx rgba(40,101,182,.08); }
+.assistant-highlight .section-title { color: #2865b6; }
 .page {
   min-height: 100vh;
   background: #F3F7FA;

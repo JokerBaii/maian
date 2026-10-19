@@ -15,6 +15,14 @@
       }
     },
     {
+      "path": "pages/agent/index",
+      "style": { "navigationBarTitleText": "资源协同" }
+    },
+    {
+      "path": "pages/assistant/index",
+      "style": { "navigationBarTitleText": "脉安助手" }
+    },
+    {
       "path": "pages/map/index",
       "style": {
         "navigationStyle": "custom",

@@ -215,7 +215,15 @@ public class EmergencyDevice {
         if (reviewedAt == null) {
             throw invalid("设备通过审核后才能启用");
         }
-        status = DeviceStatus.AVAILABLE;
+        status = reservedForCallId == null ? DeviceStatus.AVAILABLE : DeviceStatus.RESERVED;
+    }
+
+    public void reportFault() {
+        if (status != DeviceStatus.AVAILABLE && status != DeviceStatus.RESERVED) {
+            throw invalid("只有可用或救援中的设备可以上报故障");
+        }
+        // Retain physical custody and reservation until the rescue workflow releases it.
+        status = DeviceStatus.DISABLED;
     }
 
     public void disable() {
@@ -252,7 +260,7 @@ public class EmergencyDevice {
         if (!rescueCallId.equals(this.reservedForCallId)) {
             return;
         }
-        this.status = DeviceStatus.AVAILABLE;
+        if (this.status == DeviceStatus.RESERVED) this.status = DeviceStatus.AVAILABLE;
         this.reservedForCallId = null;
         this.reservedAt = null;
     }
