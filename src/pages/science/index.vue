@@ -120,10 +120,12 @@
       </view>
       <text class="quiz-note">自测用于知识巩固，不能替代线下急救培训。</text>
     </view>
+    <assistant-companion context="science" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'

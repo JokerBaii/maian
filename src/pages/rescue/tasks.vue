@@ -117,10 +117,12 @@
 
     <view class="bottom-safe"></view>
     </view>
+    <assistant-companion context="mine" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { computed, ref } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'

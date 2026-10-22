@@ -384,10 +384,12 @@
       </view>
     </view>
     <!-- #endif -->
+    <assistant-companion context="devices" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'

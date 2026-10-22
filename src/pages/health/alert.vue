@@ -1,7 +1,7 @@
 <template>
   <view class="page apple-page motion-page-focus">
     <view class="scroll-content">
-      <view class="summary-card">
+      <view v-if="alertList.length" class="summary-card">
         <view class="summary-bg"></view>
         <view class="summary-content">
           <view class="summary-main">
@@ -12,15 +12,6 @@
             <view class="summary-info">
               <text class="summary-label">本月预警次数</text>
               <text class="summary-date">{{ currentMonth }}</text>
-            </view>
-          </view>
-          <view class="summary-divider"></view>
-          <view class="summary-latest">
-            <app-icon-tile name="notification-filled" tone="coral" />
-            <view class="latest-info">
-              <text class="latest-label">最近预警</text>
-              <text class="latest-msg">{{ latestAlert.message }}</text>
-              <text class="latest-time">{{ latestAlert.time }}</text>
             </view>
           </view>
         </view>
@@ -88,10 +79,12 @@
 
       <view class="bottom-safe"></view>
     </view>
+    <assistant-companion context="health" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { computed, onMounted } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
@@ -106,13 +99,6 @@ const rangeText = computed(() => {
   if (!minHeartRate || !maxHeartRate) return '-- BPM'
   return `${minHeartRate}-${maxHeartRate} BPM`
 })
-const latestAlert = computed(() => {
-  if (heartRateData.value.alerts.length > 0) {
-    return heartRateData.value.alerts[0]
-  }
-  return { message: '暂无预警', time: '--' }
-})
-
 const currentMonth = computed(() => {
   const now = new Date()
   return `${now.getFullYear()}年${now.getMonth() + 1}月`
@@ -197,36 +183,6 @@ onMounted(async () => {
   font-weight: 500;
 }
 .summary-date {
-  font-size: 22rpx;
-  color: #C9CDD4;
-}
-.summary-divider {
-  height: 1rpx;
-  background: #F2F3F5;
-  margin: 24rpx 0;
-}
-.summary-latest {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-.latest-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-  flex: 1;
-}
-.latest-label {
-  font-size: 24rpx;
-  color: #86909C;
-  font-weight: 500;
-}
-.latest-msg {
-  font-size: 28rpx;
-  color: #20364D;
-  font-weight: 600;
-}
-.latest-time {
   font-size: 22rpx;
   color: #C9CDD4;
 }

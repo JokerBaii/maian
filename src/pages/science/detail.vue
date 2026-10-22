@@ -102,10 +102,13 @@
         </view>
       </view>
     </view>
+    <assistant-companion context="science" :subject="{ articleId }" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
 import { ref, computed, onMounted } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
@@ -141,9 +144,14 @@ const isLiked = ref(false)
 const isCollected = ref(false)
 const interactionSaving = ref(false)
 
-async function loadInteraction() {
+useAssistantRefresh(() => loadInteraction(true))
+async function loadInteraction(refresh = false) {
   try {
     const interaction = await getScienceArticleInteraction(articleId.value)
+    if (refresh) {
+      article.value.likeCount = Math.max(0,article.value.likeCount + Number(interaction.liked) - Number(isLiked.value))
+      article.value.collectCount = Math.max(0,article.value.collectCount + Number(interaction.collected) - Number(isCollected.value))
+    }
     isLiked.value = interaction.liked
     isCollected.value = interaction.collected
   } catch {

@@ -32,10 +32,13 @@
       @select="handleReviewAction"
     />
     <view class="bottom-safe"></view>
+    <assistant-companion context="science" :subject="{ submissionId: selectedSubmission?.id }" :hidden="sheetVisible" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppActionSheet, { type AppActionSheetItem } from '@/components/AppActionSheet.vue'
@@ -114,6 +117,7 @@ async function review(item: ScienceSubmissionResponse, approved: boolean) {
 }
 
 onShow(loadSubmissions)
+useAssistantRefresh(loadSubmissions)
 </script>
 
 <style lang="scss" scoped>

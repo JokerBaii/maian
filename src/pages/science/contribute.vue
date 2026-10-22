@@ -1,11 +1,7 @@
 <template>
   <view class="page apple-page motion-page-sheet">
     <view class="scroll-content">
-      <view class="tips-card">
-        <view class="tips-header">
-          <app-icon-tile name="science-update" tone="cyan" />
-          <text class="tips-title">投稿须知</text>
-        </view>
+      <app-disclosure class="contribution-guide" title="投稿须知">
         <view class="tips-list">
           <view class="tips-item">
             <view class="tips-dot"></view>
@@ -24,18 +20,17 @@
             <text class="tips-text">投稿审核通过后将在科普频道展示</text>
           </view>
         </view>
-      </view>
+      </app-disclosure>
 
       <view class="form-card">
         <view class="form-section">
           <view class="form-label-row">
-            <view class="form-label-bar"></view>
             <text class="form-label">标题</text>
             <text class="form-required">*</text>
           </view>
           <view class="input-wrap">
             <input
-              class="form-input"
+              class="contribution-input"
               v-model="formData.title"
               placeholder="请输入文章标题"
               placeholder-class="input-placeholder"
@@ -47,7 +42,6 @@
 
         <view class="form-section">
           <view class="form-label-row">
-            <view class="form-label-bar"></view>
             <text class="form-label">分类</text>
             <text class="form-required">*</text>
           </view>
@@ -66,13 +60,12 @@
 
         <view class="form-section">
           <view class="form-label-row">
-            <view class="form-label-bar"></view>
             <text class="form-label">内容</text>
             <text class="form-required">*</text>
           </view>
           <view class="textarea-wrap">
             <textarea
-              class="form-textarea"
+              class="contribution-textarea"
               v-model="formData.content"
               placeholder="请输入文章内容，支持分段描述..."
               placeholder-class="input-placeholder"
@@ -87,7 +80,6 @@
 
         <view class="form-section">
           <view class="form-label-row">
-            <view class="form-label-bar"></view>
             <text class="form-label">封面图</text>
           </view>
           <view class="upload-area">
@@ -120,13 +112,15 @@
 
       <view class="bottom-safe"></view>
     </view>
+    <assistant-companion context="science" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref, computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
-import AppIconTile from '@/components/AppIconTile.vue'
+import AppDisclosure from '@/components/AppDisclosure.vue'
 import { createScienceSubmission } from '@/api/science'
 import { uploadImage } from '@/api/files'
 import { userFacingError } from '@/utils/presentation'
@@ -221,24 +215,7 @@ async function handleSubmit() {
   box-sizing: border-box;
 }
 
-.tips-card {
-  margin: 24rpx 24rpx 0;
-  background: #EDF4FC;
-  border-radius: 24rpx;
-  padding: 28rpx 24rpx;
-  box-shadow: 0 4rpx 24rpx rgba(43, 111, 240, 0.08);
-}
-.tips-header {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  margin-bottom: 20rpx;
-}
-.tips-title {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #2E6DD1;
-}
+.contribution-guide { margin: 24rpx 24rpx 0; padding: 24rpx; border-radius: var(--care-group-radius, 20rpx); background: #FFF; }
 .tips-list {
   display: flex;
   flex-direction: column;
@@ -283,13 +260,6 @@ async function handleSubmit() {
   align-items: center;
   margin-bottom: 16rpx;
 }
-.form-label-bar {
-  width: 6rpx;
-  height: 24rpx;
-  border-radius: 3rpx;
-  background: #2E6DD1;
-  margin-right: 10rpx;
-}
 .form-label {
   font-size: 28rpx;
   font-weight: 600;
@@ -316,7 +286,7 @@ async function handleSubmit() {
   background: #FFFFFF;
   box-shadow: 0 0 0 4rpx rgba(43, 111, 240, 0.08);
 }
-.form-input {
+.contribution-input {
   flex: 1;
   font-size: 28rpx;
   color: #20364D;
@@ -376,7 +346,7 @@ async function handleSubmit() {
   background: #FFFFFF;
   box-shadow: 0 0 0 4rpx rgba(43, 111, 240, 0.08);
 }
-.form-textarea {
+.contribution-textarea {
   width: 100%;
   min-height: 280rpx;
   font-size: 28rpx;

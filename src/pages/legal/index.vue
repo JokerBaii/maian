@@ -1,11 +1,8 @@
 <template>
   <view class="page apple-page motion-page-list">
     <view class="notice">
-      <view class="notice-line"></view>
-      <view>
-        <text class="notice-title">{{ document.title }}</text>
-        <text class="notice-date">更新日期：2026年8月2日</text>
-      </view>
+      <text class="notice-title">{{ document.title }}</text>
+      <text class="notice-date">更新日期：2026年8月2日</text>
     </view>
 
     <view class="document-card">
@@ -40,8 +37,8 @@ const documents: Record<DocumentType, LegalDocument> = {
     title: '隐私政策',
     sections: [
       { title: '一、适用范围', paragraphs: ['本政策说明脉安驰援在提供急救设备、救援协同和健康管理功能时如何处理个人信息。应用仅在用户主动使用对应功能时申请必要权限。'] },
-      { title: '二、信息与用途', paragraphs: ['位置：用于展示附近急救设备、提交呼救位置、更新移动设备位置和打开系统导航。', '身份与联系方式：用于保存用户资料、紧急联系人和设备负责人联系方式；身份证仅做格式与校验位检查，并以脱敏形式保存。', '健康数据：用于展示用户主动同步的心率记录、阈值预警和体检指标分析。', '图片与设备信息：用于用户主动上传急救现场、设备、体检报告图片，以及绑定蓝牙穿戴设备。'] },
-      { title: '三、存储与共享', paragraphs: ['我们会妥善保存提供服务所必需的数据。未经你的主动操作或法律法规要求，不向无关第三方出售个人信息。地图、导航和可选的智能分析仅在你使用相应功能时处理完成服务所需的数据。'] },
+      { title: '二、信息与用途', paragraphs: ['位置：用于展示附近急救设备、提交呼救位置、更新移动设备位置和打开系统导航。', '身份与联系方式：用于保存用户资料、紧急联系人和设备负责人联系方式；身份证仅做格式与校验位检查，并以脱敏形式保存。', '健康数据：用于展示用户主动同步的心率记录、阈值预警和体检指标分析。', '图片与设备信息：用于用户主动上传急救现场、设备、体检报告图片，以及绑定蓝牙穿戴设备。', '语音输入：仅在你点击麦克风时启用，由支持该功能的浏览器语音服务识别；声音可能由该服务在线处理。关闭助手、取消语音或切换账号时停止识别。'] },
+      { title: '三、存储与共享', paragraphs: ['助手恢复：本机会保存最近八轮对话、草稿、任务字段及已上传文件的提取内容；最后活动超过24小时后不再恢复，清空助手记录或退出登录时删除本机恢复记录。清空对话不会删除已保存的业务记录。', '我们会妥善保存提供服务所必需的数据。未经你的主动操作或法律法规要求，不向无关第三方出售个人信息。地图、导航和可选的智能分析仅在你使用相应功能时处理完成服务所需的数据。'] },
       { title: '四、用户权利', paragraphs: ['用户可以在应用设置中关闭位置共享和健康数据共享，可以删除紧急联系人、本人录入的设备、健康报告及本机缓存。系统权限可在手机系统设置中撤回。'] },
       { title: '五、安全提示', paragraphs: ['请勿在公开演示环境录入真实身份证号、详细病历或其他不必要的敏感信息。发现信息安全问题时，请停止使用相关功能并联系项目负责人。'] }
     ]
@@ -99,19 +96,12 @@ function withdrawConsent() {
   color: #20364D;
 }
 .notice {
-  display: flex;
-  align-items: stretch;
-  gap: 18rpx;
-  padding: 26rpx;
-  border: 1rpx solid #DCE6F2;
-  border-radius: 18rpx;
-  background: #EDF4FC;
+  padding: 16rpx 4rpx 8rpx;
 }
-.notice-line { width: 6rpx; border-radius: 3rpx; background: #2E6DD1; }
 .notice-title,
 .notice-date { display: block; }
-.notice-title { font-size: 34rpx; font-weight: 750; }
-.notice-date { margin-top: 6rpx; color: #738399; font-size: 22rpx; }
+.notice-title { color: var(--care-ink, #1C1C1E); font-size: 44rpx; font-weight: 700; line-height: 1.3; letter-spacing: -.03em; }
+.notice-date { margin-top: 12rpx; color: var(--care-tertiary, #8E8E93); font-size: 22rpx; line-height: 1.5; }
 .document-card,
 .consent-card {
   margin-top: 20rpx;

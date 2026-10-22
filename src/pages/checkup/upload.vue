@@ -52,10 +52,12 @@
         <text>{{ submitting ? '正在识别并生成…' : '识别并生成报告' }}</text>
       </view>
     </view>
+    <assistant-companion context="health" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'

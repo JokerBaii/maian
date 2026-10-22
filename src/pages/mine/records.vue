@@ -60,10 +60,13 @@
         <text class="empty-hint">{{ currentTab === 'initiated' ? '遇到紧急情况可一键呼救' : '参与救援可积累志愿时长' }}</text>
       </view>
     </view>
+    <assistant-companion context="mine" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
@@ -156,6 +159,7 @@ function statusTone(status: string) {
 }
 
 onShow(loadRecords)
+useAssistantRefresh(loadRecords)
 </script>
 
 <style lang="scss" scoped>

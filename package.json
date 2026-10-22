@@ -3,11 +3,20 @@
   "version": "1.0.0",
   "scripts": {
     "dev:h5": "uni",
+    "dev:preview": "bash scripts/dev-preview.sh",
+    "test:preview": "python3 scripts/check-preview.py",
+    "test:ui": "node scripts/check-assistant-ui.mjs",
+    "test:agent": "node scripts/check-global-agent.mjs",
+    "test:rescue-agent": "node scripts/check-rescue-agent.mjs",
+    "test:workflows": "node scripts/check-agent-workflows.mjs",
+    "test:inputs": "node scripts/check-agent-inputs.mjs",
+    "test:business": "python3 scripts/check-business-flows.py",
     "build:ios": "uni build -p app-ios",
     "build:h5": "uni build",
     "build:mp-weixin": "uni build -p mp-weixin",
     "type-check": "vue-tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "test:layout": "node scripts/check-page-density.mjs"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",
@@ -17,6 +26,7 @@
     "@dcloudio/uni-mp-weixin": "3.0.0-4080420251103001",
     "@dcloudio/uni-ui": "^1.5.12",
     "leaflet": "^1.9.4",
+    "marked": "^18.1.1",
     "vue": "^3.4.21"
   },
   "devDependencies": {

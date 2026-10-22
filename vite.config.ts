@@ -1,8 +1,11 @@
 import { defineConfig } from 'vite'
 import uni from '@dcloudio/vite-plugin-uni'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [uni()],
+  define: {
+    __MAIAN_PREVIEW_PASSWORD__: JSON.stringify(command === 'serve' ? process.env.APP_PREVIEW_PASSWORD || '' : '')
+  },
   server: {
     proxy: {
       '/api': {
@@ -16,4 +19,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

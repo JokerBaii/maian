@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { onLaunch } from '@dcloudio/uni-app'
+import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
+import { startAssistantReminders, stopAssistantReminders } from '@/composables/useAssistantReminders'
 
 defineOptions({ name: 'MaianApp' })
+onShow(startAssistantReminders)
+onHide(stopAssistantReminders)
 
 const PRIVACY_CONSENT_KEY = 'maian:privacy-consent:v1'
 const platformShowModal = uni.showModal.bind(uni)

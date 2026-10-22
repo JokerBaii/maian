@@ -1,3 +1,4 @@
+import { ASSISTANT_SESSION_KEY } from './assistantPersistence'
 const ACCESS_TOKEN_KEY = 'maian_access_token'
 const ACCESS_TOKEN_EXPIRY_KEY = 'maian_access_token_expiry'
 
@@ -17,6 +18,7 @@ export function saveAccountSession(token: string, expiresAt: string) {
 }
 
 export function clearAccountSession() {
+  uni.removeStorageSync(ASSISTANT_SESSION_KEY)
   uni.removeStorageSync(ACCESS_TOKEN_KEY)
   uni.removeStorageSync(ACCESS_TOKEN_EXPIRY_KEY)
 }

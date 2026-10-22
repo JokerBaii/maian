@@ -63,10 +63,13 @@
       </view>
 
     </view>
+    <assistant-companion context="mine" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
@@ -120,6 +123,7 @@ async function loadProfile() {
 }
 
 onShow(loadProfile)
+useAssistantRefresh(loadProfile)
 </script>
 
 <style lang="scss" scoped>

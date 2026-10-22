@@ -79,12 +79,6 @@
       </view>
     </view>
 
-    <view class="assistant-entry" @tap="openAssistant">
-      <app-icon-tile name="settings-filled" tone="blue" />
-      <view class="assistant-entry-copy"><text>脉安助手</text><text>找设置 · 找功能 · 推荐科普</text></view>
-      <app-icon name="right" :size="16" color="#8DA0B2" />
-    </view>
-
     <view class="home-section">
       <view class="section-heading">
         <text class="section-title">今日健康</text>
@@ -167,10 +161,13 @@
     </view>
       <view class="bottom-space"></view>
     </scroll-view>
+    <assistant-companion context="home" tab-page />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
@@ -258,10 +255,6 @@ function openSOS() {
   uni.navigateTo({ url: '/pages/rescue/index' })
 }
 
-function openAssistant() {
-  uni.navigateTo({ url: '/pages/assistant/index' })
-}
-
 function openMap() {
   uni.switchTab({ url: '/pages/map/index' })
 }
@@ -295,13 +288,10 @@ function openQuiz() {
 }
 
 onShow(loadHomeData)
+useAssistantRefresh(loadHomeData)
 </script>
 
 <style lang="scss" scoped>
-.assistant-entry { display: flex; align-items: center; gap: 22rpx; margin: 26rpx 32rpx 0; padding: 24rpx; background: #fff; border: 1rpx solid rgba(60,60,67,.1); border-radius: 24rpx; }
-.assistant-entry-copy { flex: 1; font-size: 28rpx; font-weight: 600; }
-.assistant-entry-copy text { display: block; }
-.assistant-entry-copy text + text { margin-top: 7rpx; color: #8e8e93; font-size: 23rpx; font-weight: 400; }
 .home-page {
   height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px));
   overflow: hidden;

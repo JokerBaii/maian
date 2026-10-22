@@ -92,10 +92,13 @@
       :actions="contactActions"
       @select="handleContactAction"
     />
+    <assistant-companion context="mine" :subject="{ contactId: selectedContact?.id }" :hidden="popupVisible || actionSheetVisible" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
@@ -228,6 +231,7 @@ async function loadContacts() {
 }
 
 onShow(loadContacts)
+useAssistantRefresh(loadContacts)
 </script>
 
 <style lang="scss" scoped>

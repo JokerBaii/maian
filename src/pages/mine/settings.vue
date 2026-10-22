@@ -149,11 +149,14 @@
         </view>
       </view>
     </view>
+    <assistant-companion context="settings" :hidden="thresholdPopupVisible" />
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
 import { onLoad, onReady } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
@@ -186,6 +189,12 @@ const editingMax = ref(true)
 const thresholdInput = ref('')
 const cacheSizeKb = ref(0)
 const settingsReady = ref(false)
+useAssistantRefresh(async () => {
+  if (saveTimer) clearTimeout(saveTimer)
+  settingsReady.value = false
+  try { applySettings(await getUserSettings()); await nextTick() }
+  finally { settingsReady.value = true }
+})
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 const cacheSizeText = computed(() => (
   cacheSizeKb.value >= 1024

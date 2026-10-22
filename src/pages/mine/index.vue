@@ -132,10 +132,13 @@
 
       <view class="bottom-safe"></view>
     </scroll-view>
+    <assistant-companion context="mine" tab-page />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { computed, ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
@@ -223,6 +226,7 @@ async function loadStats() {
 }
 
 onShow(loadStats)
+useAssistantRefresh(loadStats)
 </script>
 
 <style lang="scss" scoped>

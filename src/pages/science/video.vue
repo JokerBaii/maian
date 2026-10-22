@@ -39,11 +39,13 @@
       <text>观看视频后可进入急救自测巩固流程；实际操作请以专业急救培训和现场调度指导为准。</text>
       <view class="quiz-button" @tap="openQuiz">完成后去自测</view>
     </view>
+    <assistant-companion context="science" />
   </view>
   <view v-else class="empty">视频课程不存在</view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getScienceContent } from '@/api/science'

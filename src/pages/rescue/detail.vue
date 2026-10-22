@@ -42,8 +42,12 @@
 
         <view v-if="rescueCall.matchedAed?.deviceStatus === 'DISABLED'" class="resource-warning">
           <text class="resource-warning-title">关联设备已报告故障</text>
-          <text>{{ isResponder ? '请联系设备管理方核实取用与保管安排，设备恢复前无法确认取用。' : '系统正在检查资源安排，请保持与志愿者联系。' }}</text>
+          <text>{{ rescueCall.status === 'SYSTEM_FAILED' ? '本次调度已结束，原设备保持停用。' : isResponder ? '请联系设备管理方核实取用与保管安排，设备恢复前无法确认取用。' : '系统正在检查资源安排，请保持与志愿者联系。' }}</text>
           <text v-if="isResponder && rescueCall.matchedAed.contactPhone" class="resource-contact" @tap="callDeviceOwner">联系设备管理方</text>
+          <view v-if="canResolveFaultyPickup" class="resource-recovery-actions">
+            <button :disabled="responderActionBusy" @tap="confirmFaultyPickupRecovery('replace')">确认更换 AED</button>
+            <button :disabled="responderActionBusy" class="resource-end" @tap="confirmFaultyPickupRecovery('end')">无法继续，结束本次调度</button>
+          </view>
         </view>
 
         <view v-if="isAwaitingMatch" class="matching-board motion-enter motion-enter-delay-1">
@@ -120,7 +124,7 @@
           <app-icon name="checkmarkempty" :size="18" color="#248A5A" />
         </view>
 
-        <view v-if="isResponder && responderNextAction" class="current-action motion-enter motion-enter-delay-2">
+        <view v-if="isResponder && responderNextAction" id="rescue-current-action" class="current-action motion-enter motion-enter-delay-2">
           <view class="current-action-copy">
             <text class="current-action-label">当前救援节点</text>
             <text class="current-action-title">{{ responderActionGuidance }}</text>
@@ -136,6 +140,14 @@
             <text class="current-action-title">施救者已提交完成，请确认现场救援已结束</text>
           </view>
           <view class="current-action-button" @tap="confirmCompletion">确认完成救援</view>
+        </view>
+
+        <view v-if="rescueCall.status === 'SYSTEM_FAILED' && !isResponder" class="current-action">
+          <view class="current-action-copy">
+            <text class="current-action-label">本次调度已结束</text>
+            <text class="current-action-title">你可以重新发起呼救，匹配新的资源</text>
+          </view>
+          <view class="current-action-button" @tap="startNewRescue">重新呼救</view>
         </view>
 
         <view class="quick-actions motion-enter motion-enter-delay-3">
@@ -197,6 +209,10 @@
           <coordination-task-card v-for="task in coordinationTasks" :key="task.id" :task="task" />
         </view>
 
+        <rescue-review-card v-if="['COMPLETED', 'NO_RESOURCE', 'EXPIRED', 'USER_CANCELLED', 'SYSTEM_FAILED'].includes(rescueCall.status)" class="panel"
+          :rescue-id="rescueId" :is-responder="isResponder" :visible="reviewVisible" :source-sequence="rescueCall.eventSequence"
+          :feedback-submitted="!!feedbackSubmitted" @focus-return="focusReviewReturn" @focus-feedback="focusReviewFeedback" />
+
         <view class="panel detail-card">
           <view class="panel-head">
             <text class="panel-title">现场信息</text>
@@ -244,7 +260,7 @@
           <view class="cancel-button" @tap="confirmCancel">取消呼救</view>
         </view>
 
-        <view v-if="feedbackCard" class="feedback-card">
+        <view v-if="feedbackCard" id="rescue-feedback" class="feedback-card">
           <template v-if="feedbackSubmitted">
             <view class="feedback-head">
               <view class="feedback-stars">
@@ -288,17 +304,21 @@
         <view class="bottom-space"></view>
       </template>
     </view>
+    <assistant-companion context="rescue" :subject="{ rescueId }" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onHide, onLoad, onShow } from '@dcloudio/uni-app'
 import 'leaflet/dist/leaflet.css'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import AppAvatar from '@/components/AppAvatar.vue'
 import CoordinationTaskCard from '@/components/CoordinationTaskCard.vue'
+import RescueReviewCard from '@/components/RescueReviewCard.vue'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
 import { listRescueCoordinationTasks, type CoordinationTask } from '@/api/agent'
 import { addBaseTileLayer } from '@/common/mapTiles'
 import { planAmapRoute } from '@/common/amapRoute'
@@ -312,6 +332,8 @@ import {
   getRescueFeedback,
   submitRescueFeedback,
   updateResponderLocation,
+  replaceFaultyAed,
+  endForFaultyAed,
   type RescueCallResponse,
   type RescueFeedbackResponse,
   type RescueParticipant
@@ -320,24 +342,24 @@ import { issueMediaDownload } from '@/api/files'
 import { connectRescueEvents } from '@/utils/rescueEvents'
 import { getCurrentGcj02Location, openMapNavigation } from '@/utils/location'
 import { rescueStatusPresentation, userFacingError } from '@/utils/presentation'
+import { createRescueCoordinationPolling } from '@/utils/rescueCoordinationPolling'
 
 const rescueId = ref('')
+useAssistantRefresh(() => loadDetail(false))
 const coordinationTasks = ref<CoordinationTask[]>([])
-let coordinationLoading = false
-
-async function loadCoordination() {
-  if (coordinationLoading || !rescueId.value) return
-  coordinationLoading = true
-  try { coordinationTasks.value = await listRescueCoordinationTasks(rescueId.value) }
-  catch { /* Keep the rescue controls available when the supplemental timeline cannot load. */ }
-  finally { coordinationLoading = false }
-}
+let coordinationVisible = false
+const reviewVisible = ref(false)
 
 function callDeviceOwner() {
   const phone = rescueCall.value?.matchedAed?.contactPhone
   if (phone) uni.makePhoneCall({ phoneNumber: phone })
 }
 const rescueCall = ref<RescueCallResponse | null>(null)
+const coordinationPolling = createRescueCoordinationPolling(
+  () => listRescueCoordinationTasks(rescueId.value),
+  tasks => { coordinationTasks.value = tasks },
+  () => rescueCall.value
+)
 const loading = ref(true)
 const errorMessage = ref('')
 const isResponder = ref(false)
@@ -349,6 +371,11 @@ let disconnectEvents: (() => void) | null = null
 let renderedGeometryKey = ''
 let lastResponderLocationSyncAt = 0
 const responderActionBusy = ref(false)
+const canResolveFaultyPickup = computed(() => isResponder.value
+  && rescueCall.value?.status === 'EN_ROUTE_TO_AED'
+  && rescueCall.value?.aedCustodyStatus === 'PICKUP_PENDING'
+  && rescueCall.value?.matchedAed?.type === 'FIXED'
+  && rescueCall.value?.matchedAed?.deviceStatus === 'DISABLED')
 const routeProgress = ref(0)
 let routeMovingMarker: any = null
 const routePlanState = ref<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
@@ -598,6 +625,13 @@ onLoad((query) => {
   }
 })
 
+onShow(() => {
+  reviewVisible.value = true
+  coordinationVisible = true
+  if (rescueId.value) coordinationPolling.start()
+})
+onHide(() => { reviewVisible.value = false; coordinationVisible = false; coordinationPolling.stop() })
+
 async function loadDetail(showLoading = true) {
   if (!rescueId.value) {
     loading.value = false
@@ -612,7 +646,7 @@ async function loadDetail(showLoading = true) {
       ? await loadResponderDetail()
       : await getRescueCall(rescueId.value)
     rescueCall.value = latest
-    void loadCoordination()
+    if (coordinationVisible) coordinationPolling.start()
     if (isResponder.value) void syncResponderLocation()
     await refreshAttachmentUrls(latest.attachmentMediaIds)
     loading.value = false
@@ -817,6 +851,11 @@ function callEmergency() {
   uni.makePhoneCall({ phoneNumber: '120' })
 }
 
+function startNewRescue() { uni.navigateTo({ url: '/pages/rescue/index' }) }
+
+function focusReviewReturn() { uni.pageScrollTo({ selector: '#rescue-current-action', duration: 240 }) }
+function focusReviewFeedback() { uni.pageScrollTo({ selector: '#rescue-feedback', duration: 240 }) }
+
 function callCounterpart() {
   if (hasCounterpartPhone.value && counterpart.value?.phone) {
     uni.makePhoneCall({ phoneNumber: counterpart.value.phone })
@@ -842,6 +881,37 @@ async function performDetailAction() {
     return
   }
   await executeDetailAction(next.action)
+}
+
+function confirmFaultyPickupRecovery(action: 'replace' | 'end') {
+  if (!canResolveFaultyPickup.value || responderActionBusy.value) return
+  const callId = rescueId.value
+  const deviceId = rescueCall.value?.matchedAed?.deviceId
+  if (!deviceId) return
+  uni.showModal({
+    title: action === 'replace' ? '确认尚未取用故障 AED' : '确认无法继续本次调度',
+    content: action === 'replace'
+      ? '请先与设备管理方核实。确认原 AED 未取用后，系统将寻找你可使用的替代设备，保留由你响应本次救援。'
+      : '请先与求救者沟通，并确认原 AED 尚未取用。结束后将通知求救者，本次调度不再继续，求救者可以重新呼救。',
+    confirmText: action === 'replace' ? '确认换机' : '确认结束',
+    success: result => {
+      if (result.confirm) void executeFaultyPickupRecovery(action, callId, deviceId)
+    }
+  })
+}
+
+async function executeFaultyPickupRecovery(action: 'replace' | 'end', callId: string, deviceId: string) {
+  if (responderActionBusy.value) return
+  responderActionBusy.value = true
+  try {
+    if (action === 'replace') await replaceFaultyAed(callId, deviceId)
+    else await endForFaultyAed(callId, deviceId)
+    await loadDetail(false)
+    uni.showToast({ title: action === 'replace' ? '已更换 AED，请核对新的取用安排' : '已结束本次调度并通知求救者', icon: 'none' })
+  } catch (error) {
+    uni.showToast({ title: userFacingError(error, '处理失败，请刷新后重试'), icon: 'none' })
+    await loadDetail(false)
+  } finally { responderActionBusy.value = false }
 }
 
 async function executeDetailAction(action: DetailTaskAction) {
@@ -925,7 +995,10 @@ function previewSceneImage(index: number) {
 }
 
 onUnmounted(() => {
+  reviewVisible.value = false
   stopPolling()
+  coordinationVisible = false
+  coordinationPolling.stop()
   disconnectEvents?.()
   destroyMap()
 })
@@ -997,12 +1070,15 @@ onUnmounted(() => {
 </style>
 
 <style lang="scss" scoped>
-.resource-warning { margin: 22rpx 28rpx; padding: 26rpx; border: 1rpx solid #e8c8a1; border-radius: 22rpx; background: #fff6e9; color: #83561c; font-size: 25rpx; line-height: 1.7; }
+.resource-warning { margin: 20rpx 0 0; padding: 22rpx; border: 1rpx solid #e8c8a1; border-radius: 24rpx; background: #fff6e9; color: #83561c; font-size: 25rpx; line-height: 1.7; }
 .resource-warning text { display: block; }
 .resource-warning-title { font-weight: 650; margin-bottom: 8rpx; }
 .resource-contact { margin-top: 12rpx; color: #2865b6; }
-.resource-coordination { margin: 28rpx; }
-.resource-coordination-title { display: block; margin-bottom: 18rpx; font-size: 28rpx; font-weight: 650; }
+.resource-recovery-actions { display: flex; flex-wrap: wrap; gap: 16rpx; margin-top: 20rpx; }
+.resource-recovery-actions button { margin: 0; padding: 0 20rpx; color: #2865b6; background: #fff; font-size: 24rpx; }
+.resource-recovery-actions .resource-end { color: #a54236; }
+.resource-coordination { margin: 20rpx 0 0; }
+.resource-coordination-title { display: block; margin-bottom: 18rpx; padding: 0 22rpx; font-size: 28rpx; font-weight: 700; }
 .page { min-height: 100vh; background: #F5F5F7; color: #1C1C1E; }
 .page-scroll { min-height: 100vh; padding: 0 24rpx; box-sizing: border-box; }
 

@@ -44,10 +44,13 @@
       </view>
     </template>
     <view class="bottom-safe"></view>
+    <assistant-companion context="science" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { resolveApiUrl } from '@/api/http'
@@ -87,6 +90,7 @@ async function loadSubmissions() {
 }
 
 onShow(loadSubmissions)
+useAssistantRefresh(loadSubmissions)
 
 function categoryLabel(category: string) {
   return ({

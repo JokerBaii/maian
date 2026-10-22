@@ -118,10 +118,12 @@
 
       <view class="bottom-safe"></view>
     </view>
+    <assistant-companion context="health" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'

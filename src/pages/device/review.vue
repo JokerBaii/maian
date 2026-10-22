@@ -30,10 +30,13 @@
       :actions="reviewActions"
       @select="handleReviewAction"
     />
+    <assistant-companion context="devices" :subject="{ deviceId: selectedDevice?.id }" :hidden="sheetVisible" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppActionSheet, { type AppActionSheetItem } from '@/components/AppActionSheet.vue'
@@ -90,6 +93,7 @@ async function review(device: EmergencyDeviceResponse, approved: boolean) {
 }
 
 onShow(load)
+useAssistantRefresh(load)
 </script>
 
 <style lang="scss" scoped>

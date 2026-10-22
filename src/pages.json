@@ -23,6 +23,10 @@
       "style": { "navigationBarTitleText": "脉安助手" }
     },
     {
+      "path": "pages/location/pick",
+      "style": { "navigationBarTitleText": "选择现场位置" }
+    },
+    {
       "path": "pages/map/index",
       "style": {
         "navigationStyle": "custom",

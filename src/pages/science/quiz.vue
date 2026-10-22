@@ -153,10 +153,12 @@
         </view>
       </view>
     </view>
+    <assistant-companion context="science" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref, computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { scienceQuizQuestions } from '@/data/editorial'

@@ -163,6 +163,18 @@ export function performResponderAction(id: string, action: ResponderAction) {
   )
 }
 
+export function replaceFaultyAed(id: string, expectedDeviceId: string) {
+  return request<ResponderTaskResponse>(`/api/v1/rescue-calls/${encodeURIComponent(id)}/aed-replacement`, {
+    method: 'POST', data: { expectedDeviceId }
+  })
+}
+
+export function endForFaultyAed(id: string, expectedDeviceId: string) {
+  return request<ResponderTaskResponse>(`/api/v1/rescue-calls/${encodeURIComponent(id)}/resource-failure`, {
+    method: 'POST', data: { expectedDeviceId }
+  })
+}
+
 export function updateResponderPresence(payload: {
   latitude: number
   longitude: number

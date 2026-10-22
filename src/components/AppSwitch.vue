@@ -34,7 +34,7 @@ function toggle() {
   position: relative;
   width: 88rpx;
   height: 52rpx;
-  flex-shrink: 0;
+  flex: none;
   box-sizing: border-box;
   padding: 4rpx;
   border-radius: 999rpx;

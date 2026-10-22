@@ -99,10 +99,13 @@
 
       <view class="bottom-safe"></view>
     </scroll-view>
+    <assistant-companion context="health" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
@@ -150,6 +153,7 @@ async function loadArchive() {
 }
 
 onShow(loadArchive)
+useAssistantRefresh(loadArchive)
 
 function formatMonthDay(date: string) {
   const [, month = '', day = ''] = date.split('-')

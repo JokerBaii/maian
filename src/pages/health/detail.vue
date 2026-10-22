@@ -19,12 +19,13 @@
         <view class="tab-indicator" :class="{ 'tab-indicator-right': activeTab === 'week' }"></view>
       </view>
 
-      <view v-if="!heartRateData.todayData.length" class="sample-note">
-        <app-icon name="info-filled" :size="15" color="#1F63D5" />
-        <text>暂无心率记录，请先连接设备并完成一次测量</text>
+      <view v-if="!hasActiveRecords" class="sample-note">
+        <app-icon-tile name="wearable" tone="slate" size="large" />
+        <text>当前时段暂无心率记录</text>
+        <text v-if="!heartRateData.wearable.connected" class="sample-action" @tap="goBind">连接设备 ›</text>
       </view>
 
-      <view v-if="activeTab === 'today'" class="chart-section">
+      <view v-if="activeTab === 'today' && hasActiveRecords" class="chart-section">
         <view class="chart-heading">
           <view>
             <text class="chart-eyebrow">24 小时心率轨迹</text>
@@ -35,13 +36,13 @@
           </view>
           <view class="normal-range">
             <view class="normal-range-dot"></view>
-            <text>正常区间 60–100</text>
+            <text>预警阈值 {{ heartRateData.minHeartRate }}–{{ heartRateData.maxHeartRate }}</text>
           </view>
         </view>
         <view class="chart-container">
           <canvas
-            canvas-id="heartRateCanvas"
-            id="heartRateCanvas"
+            :canvas-id="heartRateCanvasId"
+            :id="heartRateCanvasId"
             class="chart-canvas"
           ></canvas>
         </view>
@@ -52,32 +53,9 @@
           <text>6小时前</text>
           <text>现在</text>
         </view>
-        <view class="scene-labels">
-          <view class="scene-label-item">
-            <app-icon-tile name="cloud-filled" tone="violet" />
-            <view>
-              <text class="scene-label-text">睡眠</text>
-              <text class="scene-label-time">00:00–05:00</text>
-            </view>
-          </view>
-          <view class="scene-label-item">
-            <app-icon-tile name="heart-filled" tone="green" />
-            <view>
-              <text class="scene-label-text">静息</text>
-              <text class="scene-label-time">06:00–16:00</text>
-            </view>
-          </view>
-          <view class="scene-label-item">
-            <app-icon-tile name="fire-filled" tone="amber" />
-            <view>
-              <text class="scene-label-text">运动</text>
-              <text class="scene-label-time">17:00–18:00</text>
-            </view>
-          </view>
-        </view>
       </view>
 
-      <view v-if="activeTab === 'week'" class="chart-section">
+      <view v-if="activeTab === 'week' && hasActiveRecords" class="chart-section">
         <view class="week-chart">
           <view
             v-for="(item, idx) in weekBars"
@@ -110,80 +88,21 @@
         </view>
       </view>
 
-      <view class="stats-grid">
-        <view class="stat-card">
-          <text class="stat-value">{{ heartRateData.avg }}</text>
-          <text class="stat-label">平均心率</text>
-          <text class="stat-unit">BPM</text>
-        </view>
-        <view class="stat-card">
-          <text class="stat-value stat-value-green">{{ heartRateData.min }}</text>
-          <text class="stat-label">最低心率</text>
-          <text class="stat-unit">BPM</text>
-        </view>
-        <view class="stat-card">
-          <text class="stat-value stat-value-red">{{ heartRateData.max }}</text>
-          <text class="stat-label">最高心率</text>
-          <text class="stat-unit">BPM</text>
-        </view>
-        <view class="stat-card">
-          <text class="stat-value stat-value-orange">{{ heartRateData.alerts.length }}</text>
-          <text class="stat-label">异常次数</text>
-          <text class="stat-unit">次</text>
-        </view>
+      <view v-if="activeTab === 'today' && hasActiveRecords" class="stats-strip">
+        <view><text class="stat-label">平均</text><text class="stat-value">{{ heartRateData.avg }}</text></view>
+        <view><text class="stat-label">最低</text><text class="stat-value">{{ heartRateData.min }}</text></view>
+        <view><text class="stat-label">最高</text><text class="stat-value">{{ heartRateData.max }}</text></view>
+        <text class="stats-unit">BPM</text>
       </view>
 
-      <view class="card scene-card">
-        <view class="card-header">
-          <view class="card-title-wrap">
-            <view class="card-title-bar"></view>
-            <text class="card-title">场景心率分析</text>
-          </view>
-        </view>
-        <view class="scene-breakdown">
-          <view class="scene-row">
-            <view class="scene-row-left">
-              <app-icon-tile name="heart-filled" tone="green" />
-              <view class="scene-row-info">
-                <text class="scene-row-label">静息心率</text>
-                <text class="scene-row-desc">日常活动期间</text>
-              </view>
-            </view>
-            <view class="scene-row-value">
-              <text class="scene-row-number">{{ restingAvg }}</text>
-              <text class="scene-row-unit">BPM</text>
-            </view>
-          </view>
-          <view class="scene-row">
-            <view class="scene-row-left">
-              <app-icon-tile name="fire-filled" tone="amber" />
-              <view class="scene-row-info">
-                <text class="scene-row-label">运动心率</text>
-                <text class="scene-row-desc">运动期间</text>
-              </view>
-            </view>
-            <view class="scene-row-value">
-              <text class="scene-row-number scene-row-number-high">{{ exerciseAvg }}</text>
-              <text class="scene-row-unit">BPM</text>
-            </view>
-          </view>
-          <view class="scene-row">
-            <view class="scene-row-left">
-              <app-icon-tile name="cloud-filled" tone="violet" />
-              <view class="scene-row-info">
-                <text class="scene-row-label">睡眠心率</text>
-                <text class="scene-row-desc">睡眠期间</text>
-              </view>
-            </view>
-            <view class="scene-row-value">
-              <text class="scene-row-number scene-row-number-low">{{ sleepAvg }}</text>
-              <text class="scene-row-unit">BPM</text>
-            </view>
-          </view>
-        </view>
-      </view>
+      <app-disclosure v-if="activeTab === 'today' && sceneStats.length" class="card scene-statistics" title="场景统计">
+        <view class="scene-breakdown"><view v-for="scene in sceneStats" :key="scene.key" class="scene-row">
+          <view class="scene-row-left"><app-icon-tile :name="scene.icon" :tone="scene.tone" /><text class="scene-row-label">{{ scene.label }}</text></view>
+          <view class="scene-row-value"><text class="scene-row-number">{{ scene.value }}</text><text class="scene-row-unit">BPM</text></view>
+        </view></view>
+      </app-disclosure>
 
-      <view class="card alert-card">
+      <view v-if="heartRateData.alerts.length" class="card alert-card">
         <view class="card-header">
           <view class="card-title-wrap">
             <view class="card-title-bar alert-bar"></view>
@@ -214,35 +133,32 @@
 
       <view class="bottom-safe"></view>
     </view>
+    <assistant-companion context="health" />
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import AppIcon from '@/components/AppIcon.vue'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
+import { ref, computed, onMounted, watch, nextTick, getCurrentInstance } from 'vue'
+import AppDisclosure from '@/components/AppDisclosure.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { useHealthMonitoring } from '@/composables/useHealthMonitoring'
 
 const { monitoring: heartRateData, loadMonitoring } = useHealthMonitoring()
 const activeTab = ref<'today' | 'week'>('today')
+const instance = getCurrentInstance()
+const heartRateCanvasId = `heart-rate-${instance?.uid || 0}`
 
-const restingAvg = computed(() => {
-  const items = heartRateData.value.todayData.filter(d => d.scene === 'resting')
-  if (!items.length) return 0
-  return Math.round(items.reduce((s, d) => s + d.value, 0) / items.length)
-})
-
-const exerciseAvg = computed(() => {
-  const items = heartRateData.value.todayData.filter(d => d.scene === 'exercise')
-  if (!items.length) return 0
-  return Math.round(items.reduce((s, d) => s + d.value, 0) / items.length)
-})
-
-const sleepAvg = computed(() => {
-  const items = heartRateData.value.todayData.filter(d => d.scene === 'sleeping')
-  if (!items.length) return 0
-  return Math.round(items.reduce((s, d) => s + d.value, 0) / items.length)
-})
+const hasActiveRecords = computed(() => activeTab.value === 'today' ? heartRateData.value.todayData.length > 0 : heartRateData.value.weekData.length > 0)
+const sceneStats = computed(() => ([
+  { key: 'resting', label: '静息', icon: 'heart-filled', tone: 'green' },
+  { key: 'exercise', label: '运动', icon: 'fire-filled', tone: 'amber' },
+  { key: 'sleeping', label: '睡眠', icon: 'cloud-filled', tone: 'violet' }
+] as const).map(scene => {
+  const readings = heartRateData.value.todayData.filter(point => point.scene === scene.key)
+  return { ...scene, value: readings.length ? Math.round(readings.reduce((sum, point) => sum + point.value, 0) / readings.length) : 0 }
+}).filter(scene => scene.value > 0))
+function goBind() { uni.navigateTo({ url: '/pages/health/bind' }) }
 
 const weekBars = computed(() => {
   const data = heartRateData.value.weekData
@@ -274,14 +190,14 @@ const weekBars = computed(() => {
 async function drawTodayChart() {
   const data = heartRateData.value.todayData
   const rect = await new Promise<any>((resolve) => {
-    uni.createSelectorQuery()
-      .select('#heartRateCanvas')
+    uni.createSelectorQuery().in(instance?.proxy)
+      .select('#' + heartRateCanvasId)
       .boundingClientRect(resolve)
       .exec()
   })
   if (!rect?.width || !rect?.height || data.length < 2) return
 
-  const canvas = uni.createCanvasContext('heartRateCanvas')
+  const canvas = uni.createCanvasContext(heartRateCanvasId, instance?.proxy)
   const cw = rect.width
   const ch = rect.height
   const padLeft = 8
@@ -305,8 +221,9 @@ async function drawTodayChart() {
     canvas.stroke()
   })
 
-  const normalTop = padTop + ((maxVal - 100) / valRange) * chartH
-  const normalBottom = padTop + ((maxVal - 60) / valRange) * chartH
+  const bounded = (value: number) => Math.max(minVal, Math.min(maxVal, value))
+  const normalTop = padTop + ((maxVal - bounded(heartRateData.value.maxHeartRate)) / valRange) * chartH
+  const normalBottom = padTop + ((maxVal - bounded(heartRateData.value.minHeartRate)) / valRange) * chartH
   canvas.setFillStyle('rgba(34, 160, 107, 0.07)')
   canvas.fillRect(padLeft, normalTop, chartW, normalBottom - normalTop)
 
@@ -400,17 +317,7 @@ watch(activeTab, () => {
   background: #F3F7FA;
 }
 
-.sample-note {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  margin: 20rpx 24rpx 0;
-  padding: 14rpx 18rpx;
-  border-radius: 14rpx;
-  background: #EDF4FF;
-  color: #41658F;
-  font-size: 21rpx;
-}
+.sample-note { display: flex; flex-direction: column; align-items: center; gap: 20rpx; margin: 24rpx; padding: 64rpx 24rpx; border-radius: var(--care-group-radius, 20rpx); background: #FFF; color: #8E8E93; font-size: 26rpx; }
 
 .scroll-content {
   min-height: 100vh;
@@ -530,34 +437,6 @@ watch(activeTab, () => {
   color: #A6B0C0;
 }
 
-.scene-labels {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12rpx;
-  margin-top: 24rpx;
-}
-.scene-label-item {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  min-width: 0;
-  padding: 14rpx 12rpx;
-  border-radius: 16rpx;
-  background: #F7F9FC;
-}
-.scene-label-text {
-  display: block;
-  font-size: 22rpx;
-  font-weight: 700;
-  color: #334057;
-}
-.scene-label-time {
-  display: block;
-  margin-top: 2rpx;
-  font-size: 16rpx;
-  color: #98A3B5;
-}
-
 .week-chart {
   display: flex;
   align-items: flex-end;
@@ -629,45 +508,12 @@ watch(activeTab, () => {
   color: #86909C;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20rpx;
-  margin: 24rpx 24rpx 0;
-}
-.stat-card {
-  background: #FFFFFF;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-  box-shadow: 0 4rpx 24rpx rgba(43, 111, 240, 0.06);
-}
-.stat-value {
-  font-size: 48rpx;
-  font-weight: 800;
-  color: #2E6DD1;
-  line-height: 1.1;
-}
-.stat-value-green {
-  color: #23956A;
-}
-.stat-value-red {
-  color: #C93D46;
-}
-.stat-value-orange {
-  color: #FF9A2E;
-}
-.stat-label {
-  font-size: 24rpx;
-  color: #86909C;
-  font-weight: 500;
-}
-.stat-unit {
-  font-size: 20rpx;
-  color: #C9CDD4;
-}
+.stats-strip { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin: 24rpx 24rpx 0; padding: 22rpx 26rpx; border-radius: var(--care-group-radius, 20rpx); background: #FFF; }
+.stats-strip > view { flex: 1; }
+.stat-label { display: block; color: #8E8E93; font-size: 22rpx; }
+.stat-value { display: block; margin-top: 5rpx; color: #1C1C1E; font-size: 32rpx; font-weight: 600; }
+.stats-unit { align-self: flex-end; color: #8E8E93; font-size: 20rpx; }
+.sample-action { color: #007AFF; font-size: 24rpx; }
 
 .card {
   margin: 24rpx 24rpx 0;
@@ -723,19 +569,10 @@ watch(activeTab, () => {
   align-items: center;
   gap: 16rpx;
 }
-.scene-row-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
 .scene-row-label {
   font-size: 28rpx;
   font-weight: 600;
   color: #20364D;
-}
-.scene-row-desc {
-  font-size: 22rpx;
-  color: #C9CDD4;
 }
 .scene-row-value {
   display: flex;
@@ -747,12 +584,6 @@ watch(activeTab, () => {
   font-weight: 800;
   color: #2E6DD1;
   line-height: 1;
-}
-.scene-row-number-high {
-  color: #FF9A2E;
-}
-.scene-row-number-low {
-  color: #722ED1;
 }
 .scene-row-unit {
   font-size: 22rpx;

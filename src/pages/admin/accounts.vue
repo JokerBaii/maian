@@ -31,10 +31,13 @@
       :actions="roleActions"
       @select="changeRole"
     />
+    <assistant-companion context="mine" :subject="{ accountId: selectedAccount?.id }" :hidden="sheetVisible" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppActionSheet, { type AppActionSheetItem } from '@/components/AppActionSheet.vue'
@@ -93,6 +96,7 @@ async function changeRole(index: number) {
 }
 
 onShow(load)
+useAssistantRefresh(load)
 </script>
 
 <style lang="scss" scoped>

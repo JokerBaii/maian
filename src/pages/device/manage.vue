@@ -11,10 +11,6 @@
           <text>添加</text>
         </view>
       </view>
-      <view class="coordination-entry" @tap="openCoordination">
-        <view><text class="coordination-entry-title">资源协同</text><text class="coordination-entry-description">查看设备变化后的检查与处理结果</text></view>
-        <app-icon name="right" :size="16" color="#007AFF" />
-      </view>
       <view class="tab-bar">
         <view
           class="tab-item"
@@ -72,7 +68,6 @@
             size="large"
           />
           <text class="empty-title">{{ activeTab === 'fixed' ? '暂无固定设备' : '暂无移动设备' }}</text>
-          <text class="empty-desc">还没有添加这类急救设备</text>
           <view class="empty-btn" @tap="goAdd">
             <text class="empty-btn-text">添加设备</text>
           </view>
@@ -88,10 +83,13 @@
       :actions="deviceActions"
       @select="handleDeviceAction"
     />
+    <assistant-companion context="devices" :subject="{ deviceId: selectedDevice?.id }" :hidden="sheetVisible" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
@@ -327,13 +325,11 @@ function confirmDelete(device: DeviceView) {
 }
 
 onShow(loadDevices)
+useAssistantRefresh(loadDevices)
 
 </script>
 
 <style lang="scss" scoped>
-.coordination-entry { margin: 8rpx 28rpx 24rpx; padding: 24rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; border-radius: 20rpx; background: #edf4ff; }
-.coordination-entry-title { display: block; font-size: 28rpx; font-weight: 600; color: #2865b6; }
-.coordination-entry-description { display: block; margin-top: 8rpx; color: #636366; font-size: 23rpx; }
 .page {
   min-height: 100vh;
   background: #F2F2F7;
@@ -468,11 +464,6 @@ onShow(loadDevices)
   font-weight: 600;
   color: #20364D;
   margin-bottom: 12rpx;
-}
-.empty-desc {
-  font-size: 22rpx;
-  color: #86909C;
-  margin-bottom: 26rpx;
 }
 .empty-btn {
   padding: 14rpx 34rpx;

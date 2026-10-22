@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import pagesConfig from '../pages.json'
 
 const tabPages = new Set((pagesConfig.tabBar?.list || []).map((item: { pagePath: string }) => item.pagePath))
-const pageModules = import.meta.glob('../pages/**/*.vue', {
+const pageModules = import.meta.glob(['../pages/**/*.vue', '../components/**/*.vue', '../utils/**/*.ts'], {
   query: '?raw',
   import: 'default',
   eager: true

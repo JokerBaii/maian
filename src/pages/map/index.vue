@@ -224,10 +224,13 @@
     <view class="locate-btn" :class="{ 'locate-btn-drawer-expanded': drawerExpanded }" @tap="locateMe">
       <app-icon class="locate-icon" name="location-filled" :size="24" color="#1F63D5" />
     </view>
+    <assistant-companion context="map" :subject="{ deviceId: focusedDeviceId }" tab-page :hidden="popupVisible || drawerExpanded" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import 'leaflet/dist/leaflet.css'
@@ -396,6 +399,7 @@ function preloadMarkerAssets() {
 }
 
 const selectedDevice = ref<any>(null)
+const focusedDeviceId = ref('')
 const popupVisible = ref(false)
 
 const drawerExpanded = ref(false)
@@ -622,6 +626,7 @@ function selectDeviceById(id: string) {
 }
 
 function selectDevice(device: any) {
+  focusedDeviceId.value = device.id
   selectedDevice.value = device
   popupVisible.value = true
 
@@ -754,6 +759,7 @@ onShow(() => {
   loadDevices()
   scheduleMarkerUpdate()
 })
+useAssistantRefresh(async () => { if (initializedRef) { await loadDevices(); scheduleMarkerUpdate() } })
 
 let markerUpdateTimer: ReturnType<typeof setTimeout> | null = null
 let initializedRef = false

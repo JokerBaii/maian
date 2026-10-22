@@ -39,13 +39,14 @@
             <app-icon-tile name="hospital" tone="blue" />
             <text>{{ report.hospital }}</text>
           </view>
+          <app-disclosure v-if="sourceImageUrl" title="原始报告" class="source-disclosure">
           <image
-            v-if="sourceImageUrl"
             class="source-image"
             :src="resolveApiUrl(sourceImageUrl)"
             mode="aspectFill"
             @tap="previewSourceImage"
           />
+          </app-disclosure>
         </view>
 
         <view class="report-section">
@@ -94,7 +95,7 @@
           </view>
         </view>
 
-        <view class="report-section">
+        <view v-if="report.recommendations.length" class="report-section">
           <view class="section-head">
             <text class="section-title">建议</text>
           </view>
@@ -122,10 +123,13 @@
         <view class="bottom-space"></view>
       </template>
     </view>
+    <assistant-companion context="health" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
+import AppDisclosure from '@/components/AppDisclosure.vue'
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
@@ -217,6 +221,8 @@ function toggleIndicators() {
 </script>
 
 <style lang="scss" scoped>
+.source-disclosure { margin-top: 22rpx; }
+.source-disclosure .source-image { margin-top: 0; }
 .page {
   min-height: 100vh;
   background: #FFFFFF;

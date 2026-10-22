@@ -1,9 +1,5 @@
 <template>
   <view class="page apple-page">
-    <view class="intro">
-      <text class="title">资源协同</text>
-      <text class="description">设备变化后，检查救援关联、寻找替代资源，并跟踪处理结果。</text>
-    </view>
     <view class="summary-row">
       <text>{{ activeCount ? `${activeCount} 项正在处理` : '最近的设备协同记录' }}</text>
       <text class="refresh" @tap="loadTasks">刷新</text>
@@ -13,14 +9,18 @@
       <coordination-task-card v-for="task in tasks" :key="task.id" :task="task" allow-retry @retry="retryTask(task.id)" />
       <view v-if="!tasks.length" class="empty">
         <text class="empty-title">{{ loading ? '正在同步协同记录…' : '暂无设备协同任务' }}</text>
-        <text>设备停用、故障上报、审核通过或重新上线后，会自动产生真实执行记录。</text>
+        <text>设备状态变化后，系统会自动跟进。</text>
         <text class="refresh" @tap="openDevices">管理我的设备</text>
       </view>
     </template>
+    <app-disclosure v-if="tasks.length" title="协同说明" class="coordination-help"><text>设备变化后，系统会检查关联救援、寻找替代资源并跟进结果。每条记录均可展开查看处理过程。</text></app-disclosure>
+    <assistant-companion context="devices" />
   </view>
 </template>
 
 <script setup lang="ts">
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
+import AppDisclosure from '@/components/AppDisclosure.vue'
 import { computed, ref } from 'vue'
 import { onHide, onShow, onUnload } from '@dcloudio/uni-app'
 import CoordinationTaskCard from '@/components/CoordinationTaskCard.vue'
@@ -56,9 +56,7 @@ onUnload(stop)
 
 <style scoped lang="scss">
 .page { min-height: 100vh; box-sizing: border-box; padding: 32rpx 28rpx calc(40rpx + env(safe-area-inset-bottom)); background: #f2f2f7; }
-.intro { padding: 8rpx 4rpx 30rpx; }
-.title { display: block; font-size: 40rpx; font-weight: 700; color: #1c1c1e; }
-.description { display: block; margin-top: 14rpx; color: #636366; font-size: 26rpx; line-height: 1.6; }
+.coordination-help { padding: 8rpx 4rpx; color: #8E8E93; font-size: 23rpx; line-height: 1.65; }
 .summary-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20rpx; color: #636366; font-size: 24rpx; }
 .refresh { display: inline-block; padding: 12rpx 0; color: #2865b6; }
 .empty { padding: 48rpx 30rpx; display: flex; flex-direction: column; gap: 20rpx; background: #fff; border-radius: 24rpx; font-size: 26rpx; color: #636366; line-height: 1.7; }

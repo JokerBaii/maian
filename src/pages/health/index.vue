@@ -4,7 +4,6 @@
       <view class="mast-content">
         <view class="mast-copy">
           <text class="mast-title">健康</text>
-          <text class="mast-caption">今日生命体征</text>
         </view>
         <view class="mast-device-action" aria-label="查看健康设备" @tap="goBind">
           <text>设备</text>
@@ -17,7 +16,6 @@
       <view class="signal-panel">
         <view class="signal-header">
           <view>
-            <text class="signal-kicker">生命线</text>
             <text class="signal-title">心率</text>
           </view>
         </view>
@@ -28,7 +26,7 @@
             <text class="reading-value">{{ displayHeartRate }}</text>
             <text class="reading-unit">BPM</text>
           </view>
-          <text class="reading-context">{{ sceneLabel }}</text>
+          <text v-if="isDeviceConnected" class="reading-context">{{ sceneLabel }}</text>
         </view>
 
         <view class="chart-header">
@@ -56,15 +54,15 @@
         <view class="trend-chart" :class="{ 'trend-chart-switching': trendSwitching }">
           <canvas canvas-id="healthTrendCanvas" id="healthTrendCanvas" class="trend-canvas"></canvas>
           <view v-if="!hasActiveTrend" class="trend-empty">
-            <text class="trend-empty-text">暂无心率记录</text>
-            <text class="trend-empty-hint">连接穿戴设备后自动同步</text>
+            <text class="trend-empty-text">{{ activeTrendData.length ? '正在积累趋势数据' : '暂无心率记录' }}</text>
+            <text v-if="!isDeviceConnected" class="trend-empty-action" @tap="goBind">连接穿戴设备 ›</text>
           </view>
         </view>
         <view v-if="hasActiveTrend" class="trend-labels">
           <text v-for="label in trendLabels" :key="label">{{ label }}</text>
         </view>
 
-        <view class="metric-row">
+        <view v-if="activeTrendData.length" class="metric-row">
           <view class="metric">
             <text class="metric-label">最低</text>
             <text class="metric-value">{{ activeMetrics.min || '--' }}</text>
@@ -158,10 +156,13 @@
 
       <view class="bottom-safe"></view>
     </scroll-view>
+    <assistant-companion context="health" tab-page />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
+import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
@@ -300,6 +301,7 @@ onMounted(async () => {
 onShow(() => {
   if (initializedRef) loadHealthData()
 })
+useAssistantRefresh(() => { if (initializedRef) return loadHealthData() })
 
 let initializedRef = false
 
@@ -383,12 +385,6 @@ function goArchive() {
   letter-spacing: -2rpx;
 }
 
-.mast-caption {
-  margin-top: 7rpx;
-  color: #8A949F;
-  font-size: 18rpx;
-  font-weight: 520;
-}
 
 .mast-device-action {
   display: flex;
@@ -454,12 +450,6 @@ function goArchive() {
   display: block;
 }
 
-.signal-kicker {
-  color: #2E6DD1;
-  font-size: 18rpx;
-  font-weight: 800;
-  letter-spacing: 1rpx;
-}
 
 .signal-title {
   margin-top: 4rpx;
@@ -580,8 +570,8 @@ function goArchive() {
   justify-content: center;
   gap: 8rpx;
 }
+.trend-empty-action { margin-top: 8rpx; color: #007AFF; font-size: 23rpx; }
 .trend-empty-text { color: #68758A; font-size: 25rpx; font-weight: 600; }
-.trend-empty-hint { color: #A8B4C4; font-size: 21rpx; }
 
 .trend-labels {
   display: flex;
