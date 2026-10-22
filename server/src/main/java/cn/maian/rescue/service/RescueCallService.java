@@ -143,6 +143,13 @@ public class RescueCallService {
         responderPresenceRepository.save(presence);
     }
 
+    @Transactional
+    public void stopResponding() {
+        currentUserService.requireAnyRole("VOLUNTEER");
+        responderPresenceRepository.findById(currentUserService.currentUserId()).ifPresent(presence ->
+            presence.update(presence.getLatitude(), presence.getLongitude(), false, clock.instant()));
+    }
+
     @Transactional(readOnly = true)
     public Page<ResponderTaskResponse> findResponderTasks(Pageable pageable) {
         currentUserService.requireAnyRole("VOLUNTEER");
@@ -201,6 +208,37 @@ public class RescueCallService {
     @Transactional
     public ResponderTaskResponse pickUpAed(UUID id) {
         return responderAction(id, RescueEventType.AED_PICKED_UP, "AED 已取出，正在赶往求救者", RescueCall::pickUpAed);
+    }
+
+    @Transactional
+    public ResponderTaskResponse replaceFaultyAed(UUID id, UUID expectedDeviceId) {
+        currentUserService.requireAnyRole("VOLUNTEER");
+        UUID responderId = currentUserService.currentUserId();
+        RescueCall call = findForUpdate(id);
+        call.requireResponder(responderId);
+        call.requireFaultyPickup(expectedDeviceId);
+        var match = aedDispatchService.matchFastestForResponder(call, responderId)
+            .orElseThrow(() -> new cn.maian.common.exception.InvalidStateTransitionException(
+                "暂未找到可用的替代 AED，可稍后重试；无法继续时请确认结束本次调度"));
+        call.replaceFaultyPickup(expectedDeviceId, match.device(), match.matchedAt(),
+            match.score().distanceMeters(), match.score().estimatedArrivalSeconds(), match.score().strategy());
+        appendCurrentEvent(call, RescueEventType.AED_REPLACED, responderId,
+            "施救者确认原 AED 故障且尚未取用，已更换可用设备", match.matchedAt());
+        return assignedResponse(call);
+    }
+
+    @Transactional
+    public ResponderTaskResponse endForFaultyAed(UUID id, UUID expectedDeviceId) {
+        currentUserService.requireAnyRole("VOLUNTEER");
+        UUID responderId = currentUserService.currentUserId();
+        RescueCall call = findForUpdate(id);
+        call.requireResponder(responderId);
+        Instant now = clock.instant();
+        call.endForFaultyPickup(expectedDeviceId, now);
+        activeRescueLockRepository.deleteByRescueCallId(call.getId());
+        appendCurrentEvent(call, RescueEventType.SYSTEM_FAILED, responderId,
+            "施救者确认故障 AED 尚未取用且无法继续，已结束本次调度，求救者可重新呼救", now);
+        return assignedResponse(call);
     }
 
     @Transactional

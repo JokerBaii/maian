@@ -31,13 +31,18 @@ public class AgentModelGateway {
     }
 
     public String invoke(String instruction, String input, BoundedTools tools) {
+        return invoke(instruction, input, tools, null);
+    }
+
+    public String invoke(String instruction, String input, BoundedTools tools, java.util.function.Consumer<String> answer) {
         if (!enabled) return "RULES";
-        Future<?> future = null;
+        Future<String> future = null;
         try {
             future = executor.submit(() -> builders.getObject().build().prompt()
                 .system(instruction).user(input)
                 .tools(tools).call().content());
-            future.get(12, TimeUnit.SECONDS);
+            String content = future.get(12, TimeUnit.SECONDS);
+            if (answer != null && content != null) answer.accept(content);
             return "SPRING_AI";
         } catch (Exception exception) {
             if (future != null) future.cancel(true);

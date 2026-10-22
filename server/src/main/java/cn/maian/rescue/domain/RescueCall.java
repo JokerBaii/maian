@@ -231,6 +231,49 @@ public class RescueCall {
         touch(now);
     }
 
+    public void requireFaultyPickup(UUID expectedDeviceId) {
+        requireStatus(RescueStatus.EN_ROUTE_TO_AED);
+        if (matchedDevice == null || !matchedDevice.getId().equals(expectedDeviceId)
+            || matchedDevice.getType() != DeviceType.FIXED
+            || matchedDevice.getStatus() != cn.maian.device.domain.DeviceStatus.DISABLED
+            || aedCustodyStatus != AedCustodyStatus.PICKUP_PENDING) {
+            throw invalid("设备或取用状态已变化，请刷新后重试");
+        }
+    }
+
+    public void replaceFaultyPickup(UUID expectedDeviceId, EmergencyDevice replacement, Instant now,
+        int distanceMeters, int arrivalSeconds, String strategy) {
+        requireFaultyPickup(expectedDeviceId);
+        if (replacement.getStatus() != cn.maian.device.domain.DeviceStatus.RESERVED
+            || !id.equals(replacement.getReservedForCallId())
+            || (replacement.getType() == DeviceType.MOBILE
+                && !responderUserId.equals(replacement.getRegisteredByUserId()))) {
+            throw invalid("替代设备未为本次救援预留或不属于当前携带者");
+        }
+        matchedDevice.releaseReservation(id);
+        matchedDevice = replacement;
+        matchedAt = now;
+        matchedDistanceMeters = distanceMeters;
+        estimatedArrivalSeconds = arrivalSeconds;
+        matchedSnapshotLatitude = replacement.getLatitude();
+        matchedSnapshotLongitude = replacement.getLongitude();
+        matchedSnapshotAddress = replacement.getAddress();
+        matchStrategy = strategy;
+        arrivedAtAedAt = null;
+        if (replacement.getType() == DeviceType.FIXED) {
+            aedCustodyStatus = AedCustodyStatus.PICKUP_PENDING;
+        } else {
+            status = RescueStatus.EN_ROUTE_TO_REQUESTER;
+            aedCustodyStatus = AedCustodyStatus.IN_CUSTODY;
+        }
+        touch(now);
+    }
+
+    public void endForFaultyPickup(UUID expectedDeviceId, Instant now) {
+        requireFaultyPickup(expectedDeviceId);
+        finishAs(RescueStatus.SYSTEM_FAILED, now);
+    }
+
     public void arriveAtRequester(Instant now) {
         requireStatus(RescueStatus.EN_ROUTE_TO_REQUESTER);
         status = RescueStatus.ARRIVED;

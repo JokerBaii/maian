@@ -5,5 +5,6 @@ public enum MediaPurpose {
     RESCUE_ATTACHMENT,
     DEVICE_IMAGE,
     VEHICLE_IMAGE,
-    SCIENCE_COVER
+    SCIENCE_COVER,
+    AGENT_DOCUMENT
 }

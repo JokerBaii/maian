@@ -27,6 +27,7 @@ public class MediaAsset {
     private UUID ownerUserId;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 30, nullable = false)
     private MediaPurpose purpose;
 
@@ -43,6 +44,9 @@ public class MediaAsset {
 
     @Column(length = 40, nullable = false)
     private String contentType;
+
+    @Column(length = 255)
+    private String originalFilename;
 
     @Column(nullable = false)
     private long sizeBytes;
@@ -126,6 +130,8 @@ public class MediaAsset {
     public MediaStatus getStatus() { return status; }
     public String getStorageKey() { return storageKey; }
     public String getContentType() { return contentType; }
+    public String getOriginalFilename() { return originalFilename; }
+    public void setOriginalFilename(String value) { originalFilename = value; }
     public long getSizeBytes() { return sizeBytes; }
     public String getSha256() { return sha256; }
     public String getReferenceType() { return referenceType; }

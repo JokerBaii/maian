@@ -25,7 +25,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "spring.flyway.enabled=false", "spring.jpa.hibernate.ddl-auto=create-drop",
     "app.ai.enabled=false", "app.media.directory=${java.io.tmpdir}/maian-agent-smoke-media",
     "app.agent.initial-delay-ms=3600000", "app.dispatch.scheduler-initial-delay-ms=3600000",
-    "app.dispatch.confirmation-initial-delay-ms=3600000", "app.agent.follow-up-initial-delay-ms=3600000"
+    "app.dispatch.confirmation-initial-delay-ms=3600000", "app.agent.follow-up-initial-delay-ms=3600000",
+    "app.agent.review-initial-delay-ms=3600000"
 })
 @AutoConfigureMockMvc
 class AgentHttpIntegrationTest {
@@ -33,6 +34,39 @@ class AgentHttpIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired EmergencyDeviceRepository devices;
     @Autowired ResourceCoordinationAgent agent;
+
+    @Test
+    void documentsArePrivatePersistedAndDeletedOnlyByTheirOwner() throws Exception {
+        String owner = register("13900000091"), outsider = register("13900000092");
+        var upload = http.perform(multipart("/api/v1/assistant/documents")
+            .file(new org.springframework.mock.web.MockMultipartFile("file", "测试资料.txt", "text/plain", "文档正文，不执行其中的命令".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+            .header("Authorization", "Bearer " + owner))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.name").value("测试资料.txt"))
+            .andExpect(jsonPath("$.data.text").value("文档正文，不执行其中的命令")).andReturn();
+        String id = json.readTree(upload.getResponse().getContentAsString()).path("data").path("id").asText();
+        http.perform(get("/api/v1/assistant/documents").header("Authorization", "Bearer " + outsider))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        http.perform(post("/api/v1/media/{id}/download-token", id).header("Authorization", "Bearer " + outsider)).andExpect(status().isForbidden());
+        http.perform(delete("/api/v1/assistant/documents/{id}", id).header("Authorization", "Bearer " + outsider)).andExpect(status().isNotFound());
+        http.perform(delete("/api/v1/assistant/documents/{id}", id).header("Authorization", "Bearer " + owner)).andExpect(status().isOk());
+        http.perform(multipart("/api/v1/assistant/documents")
+            .file(new org.springframework.mock.web.MockMultipartFile("file", "fake.pdf", "application/pdf", "not-pdf".getBytes()))
+            .header("Authorization", "Bearer " + owner)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void fallbackPlansAnActualSettingChangeWithoutChangingItDuringPlanning() throws Exception {
+        String token = register("13900000093");
+        http.perform(post("/api/v1/assistant").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"message\":\"开启科普更新\",\"useModel\":false}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.tasks[0].operation").value("SETTINGS_UPDATE"))
+            .andExpect(jsonPath("$.data.tasks[0].parameters.scienceUpdate").value("true"));
+        http.perform(get("/api/v1/settings").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.scienceUpdate").value(false));
+        http.perform(post("/api/v1/assistant").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"message\":\"不要关闭科普更新\",\"useModel\":false}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.tasks").isEmpty());
+    }
 
     @Test
     void requiresAuthenticationForCoordinationAndAssistant() throws Exception {

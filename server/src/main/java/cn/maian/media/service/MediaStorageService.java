@@ -20,6 +20,7 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import cn.maian.agent.service.AgentDocumentParser;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -93,7 +94,12 @@ public class MediaStorageService {
         }
         checkCapacity(ownerId, file.getSize());
 
-        NormalizedImage normalized = normalize(file);
+        NormalizedImage normalized;
+        AgentDocumentParser.Parsed document = null;
+        if (purpose == MediaPurpose.AGENT_DOCUMENT) {
+            document = AgentDocumentParser.validate(file);
+            normalized = new NormalizedImage(document.bytes(), document.contentType(), document.extension());
+        } else normalized = normalize(file);
         checkCapacity(ownerId, normalized.bytes().length);
         UUID mediaId = UUID.randomUUID();
         String storageKey = mediaId.toString().substring(0, 2) + "/" + mediaId + normalized.extension();
@@ -106,8 +112,11 @@ public class MediaStorageService {
                 mediaId, ownerId, purpose, storageKey, normalized.contentType(),
                 normalized.bytes().length, sha256(normalized.bytes()), clock.instant()
             );
-            mediaAssetRepository.save(asset);
-            return new UploadResult(asset, issueDownload(asset));
+            String filename = file.getOriginalFilename();
+            if (filename != null) asset.setOriginalFilename(filename.replaceAll("[\\\\/\\p{Cntrl}]", "_").substring(0, Math.min(255, filename.length())));
+            if (purpose == MediaPurpose.AGENT_DOCUMENT) asset.attach("AGENT_DOCUMENT", mediaId, false, clock.instant());
+            mediaAssetRepository.saveAndFlush(asset);
+            return new UploadResult(asset, issueDownload(asset), document);
         } catch (RuntimeException | IOException exception) {
             try {
                 Files.deleteIfExists(target);
@@ -366,7 +375,7 @@ public class MediaStorageService {
     public record IssuedDownload(String url, Instant expiresAt) {
     }
 
-    public record UploadResult(MediaAsset asset, IssuedDownload download) {
+    public record UploadResult(MediaAsset asset, IssuedDownload download, AgentDocumentParser.Parsed document) {
     }
 
     public record StoredContent(MediaAsset asset, Resource resource, String xAccelPath) {

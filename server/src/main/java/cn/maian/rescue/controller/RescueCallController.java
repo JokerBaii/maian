@@ -8,6 +8,7 @@ import cn.maian.rescue.dto.LocationUpdateRequest;
 import cn.maian.rescue.dto.RequesterRescueResponse;
 import cn.maian.rescue.dto.ResponderPresenceRequest;
 import cn.maian.rescue.dto.ResponderTaskResponse;
+import cn.maian.rescue.dto.FaultyAedRequest;
 import cn.maian.rescue.service.RescueCallService;
 import cn.maian.rescue.service.RescueAttachmentService;
 import jakarta.validation.Valid;
@@ -78,6 +79,12 @@ public class RescueCallController {
         return ApiResponse.ok(PageResponse.from(rescueCallService.findResponderTasks(pageable)));
     }
 
+    @org.springframework.web.bind.annotation.DeleteMapping("/responder-presence")
+    public ApiResponse<Void> stopResponding() {
+        rescueCallService.stopResponding();
+        return ApiResponse.ok(null);
+    }
+
     @GetMapping("/responder-tasks/{id}")
     public ApiResponse<ResponderTaskResponse> findResponderTask(@PathVariable UUID id) {
         return ApiResponse.ok(rescueCallService.findResponderTask(id));
@@ -96,6 +103,20 @@ public class RescueCallController {
     @PostMapping("/{id}/aed-pickup")
     public ApiResponse<ResponderTaskResponse> pickUpAed(@PathVariable UUID id) {
         return ApiResponse.ok(rescueCallService.pickUpAed(id));
+    }
+
+    @PostMapping("/{id}/aed-replacement")
+    public ApiResponse<ResponderTaskResponse> replaceFaultyAed(
+        @PathVariable UUID id, @Valid @RequestBody FaultyAedRequest request
+    ) {
+        return ApiResponse.ok(rescueCallService.replaceFaultyAed(id, request.expectedDeviceId()));
+    }
+
+    @PostMapping("/{id}/resource-failure")
+    public ApiResponse<ResponderTaskResponse> endForFaultyAed(
+        @PathVariable UUID id, @Valid @RequestBody FaultyAedRequest request
+    ) {
+        return ApiResponse.ok(rescueCallService.endForFaultyAed(id, request.expectedDeviceId()));
     }
 
     @PostMapping("/{id}/requester-arrival")

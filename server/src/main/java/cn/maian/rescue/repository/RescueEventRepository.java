@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface RescueEventRepository extends JpaRepository<RescueEvent, UUID> {
     List<RescueEvent> findByRescueCallIdAndSequenceGreaterThanOrderBySequenceAsc(UUID rescueCallId, long sequence);
+    List<RescueEvent> findTop100ByRescueCallIdOrderBySequenceDesc(UUID rescueCallId);
 }

@@ -36,6 +36,9 @@ spring:
         options:
           model: ${OPENAI_MODEL:deepseek-chat}
           temperature: 0.2
+          extra-body:
+            thinking:
+              type: disabled
 
 app:
   auth:

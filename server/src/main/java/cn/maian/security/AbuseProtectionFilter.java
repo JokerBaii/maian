@@ -61,6 +61,9 @@ public class AbuseProtectionFilter extends OncePerRequestFilter {
         String method = request.getMethod();
         String path = request.getRequestURI();
         String user = currentSubject();
+        if ("POST".equals(method) && path.startsWith("/api/v1/rescue-reviews/")) {
+            return new Limit("rescue-review:user:" + user, 20, "rescue-review:ip:" + clientIp(request), 60);
+        }
         if ("POST".equals(method) && "/api/v1/assistant".equals(path)) {
             return new Limit("assistant:user:" + user, 30, "assistant:ip:" + clientIp(request), 100);
         }

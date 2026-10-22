@@ -2,6 +2,7 @@ package cn.maian.media.repository;
 
 import cn.maian.media.domain.MediaAsset;
 import cn.maian.media.domain.MediaStatus;
+import cn.maian.media.domain.MediaPurpose;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface MediaAssetRepository extends JpaRepository<MediaAsset, UUID> {
+    List<MediaAsset> findTop100ByOwnerUserIdAndPurposeOrderByCreatedAtDesc(UUID ownerUserId, MediaPurpose purpose);
 
     @Query("select coalesce(sum(asset.sizeBytes), 0) from MediaAsset asset where asset.ownerUserId = :ownerUserId")
     long totalBytesForOwner(UUID ownerUserId);

@@ -10,6 +10,8 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ContentDisposition;
+import java.nio.charset.StandardCharsets;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -60,7 +62,8 @@ public class MediaController {
         var content = mediaStorageService.loadSigned(mediaId, token);
         var builder = ResponseEntity.ok()
             .contentType(MediaType.parseMediaType(content.asset().getContentType()))
-            .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+            .header(HttpHeaders.CONTENT_DISPOSITION, content.asset().getPurpose() == MediaPurpose.AGENT_DOCUMENT
+                ? ContentDisposition.attachment().filename(content.asset().getOriginalFilename() == null ? "document" : content.asset().getOriginalFilename(), StandardCharsets.UTF_8).build().toString() : "inline")
             .header("X-Content-Type-Options", "nosniff");
         if (content.asset().getVisibility() == MediaVisibility.PRIVATE) {
             builder.cacheControl(CacheControl.noStore().mustRevalidate());

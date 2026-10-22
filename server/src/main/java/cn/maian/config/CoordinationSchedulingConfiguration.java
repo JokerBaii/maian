@@ -21,4 +21,18 @@ public class CoordinationSchedulingConfiguration {
         scheduler.setThreadNamePrefix("maian-coordination-");
         return scheduler;
     }
+    @Bean(name = "reminderScheduler")
+    ThreadPoolTaskScheduler reminderScheduler() {
+        var scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("maian-reminder-");
+        return scheduler;
+    }
+    @Bean(name = "reviewScheduler")
+    ThreadPoolTaskScheduler reviewScheduler() {
+        var scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("maian-review-");
+        return scheduler;
+    }
 }

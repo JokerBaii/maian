@@ -207,6 +207,12 @@ public class ResourceCoordinationService {
             task.resolve("关联救援已结束，无需继续等待替代资源；原设备保持当前状态", "救援任务", now);
             return;
         }
+        if (call.getStatus() == RescueStatus.SYSTEM_FAILED
+            && call.getAedCustodyStatus() == AedCustodyStatus.PICKUP_PENDING
+            && matched != null && !call.getId().equals(matched.getReservedForCallId())) {
+            task.resolve("施救者已确认设备未取用并结束本次调度，求救者可重新呼救；原设备保持当前状态", "人工核实", now);
+            return;
+        }
         if (matched == null) return;
         boolean restored = matched.getStatus() == DeviceStatus.AVAILABLE || matched.getStatus() == DeviceStatus.RESERVED;
         if (call.getId().equals(matched.getReservedForCallId()) && restored) {

@@ -101,6 +101,72 @@ class SpringAiAgentIntegrationTest {
     }
 
     @Test
+    void immediateRescueBypassesModelLatencyAndKeepsTheObservedDescription() {
+        var contents = mock(ScienceContentRepository.class);
+        var result = new AssistantService(contents, gateway).assist("有个人晕倒了，需要急救", true);
+        assertThat(result.executionMode()).isEqualTo("RULES");
+        assertThat(result.tasks()).hasSize(1);
+        assertThat(result.tasks().getFirst().operation()).isEqualTo("RESCUE_CREATE");
+        assertThat(result.tasks().getFirst().parameters()).containsEntry("description", "有个人晕倒了，需要急救");
+        assertThat(result.tasks().getFirst().parameters()).doesNotContainKeys("latitude", "longitude", "urgency");
+        verifyNoInteractions(contents);
+        http.verify();
+    }
+
+    @Test
+    void hypotheticalHistoricalAndNegatedRescuesDoNotTakeTheImmediateRoute() {
+        for (String text : List.of("不要发起呼救", "别发起呼救", "如果有人晕倒了，需要急救", "昨天有人晕倒了", "学习有人晕倒时的急救知识", "如何发起呼救", "取消呼救")) {
+            assertThat(AssistantOperations.isImmediateRescue(text)).as(text).isFalse();
+        }
+    }
+
+    @Test
+    void modelCanSupplementAnExistingTaskWithoutReplanningOrSendingItsOldValues() throws Exception {
+        expectTool("continueTask", Map.of("parameters", Map.of("category","device")));
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andRespond(withSuccess(completion("补充完成"), MediaType.APPLICATION_JSON));
+        var result = new AssistantService(mock(ScienceContentRepository.class), gateway).assist("归到设备知识",true,null,
+            new cn.maian.agent.dto.AssistantContext.Pending("SCIENCE_SUBMIT",List.of("category"),List.of("category")));
+        assertThat(result.executionMode()).isEqualTo("SPRING_AI");
+        assertThat(result.continuation()).isTrue();
+        assertThat(result.tasks()).hasSize(1);
+        assertThat(result.tasks().getFirst().parameters()).containsExactlyEntriesOf(Map.of("category","device"));
+        http.verify();
+    }
+
+    @Test
+    void modelPlansAValidatedBusinessOperationWithoutInventingExecutionSuccess() throws Exception {
+        expectTool("planTask", Map.of("operation", "SETTINGS_UPDATE", "parameters", Map.of("scienceUpdate", "false")));
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andRespond(withSuccess(completion("已完成设置修改"), MediaType.APPLICATION_JSON));
+        var contents = mock(ScienceContentRepository.class);
+        var result = new AssistantService(contents, gateway).assist("把科普推送关掉", true);
+        assertThat(result.executionMode()).isEqualTo("SPRING_AI");
+        assertThat(result.tasks()).singleElement().satisfies(task -> {
+            assertThat(task.operation()).isEqualTo("SETTINGS_UPDATE");
+            assertThat(task.parameters()).containsEntry("scienceUpdate", "false");
+        });
+        assertThat(result.reply()).doesNotContain("已完成设置修改");
+        verifyNoInteractions(contents); http.verify();
+    }
+
+    @Test
+    void compoundCommandUsesModelToolsForBothOperationsInOrder() throws Exception {
+        expectTool("planTask", Map.of("operation", "VOLUNTEER_AVAILABILITY", "parameters", Map.of("available", "true")));
+        expectTool("planTask", Map.of("operation", "SETTINGS_UPDATE", "parameters", Map.of("scienceUpdate", "false")));
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("开始接单，并关闭科普更新")))
+            .andRespond(withSuccess(completion("准备按顺序办理"), MediaType.APPLICATION_JSON));
+        var result = new AssistantService(mock(ScienceContentRepository.class), gateway)
+            .assist("开始接单，并关闭科普更新", true);
+        assertThat(result.executionMode()).isEqualTo("SPRING_AI");
+        assertThat(result.tasks()).extracting(task -> task.operation())
+            .containsExactly("VOLUNTEER_AVAILABILITY", "SETTINGS_UPDATE");
+        assertThat(result.tasks().get(1).parameters()).containsEntry("scienceUpdate", "false");
+        http.verify();
+    }
+
+    @Test
     void assistantUsesToolCardsAndIgnoresModelInventedResult() throws Exception {
         expectTool("findAppPage", Map.of("query", "资源协同"));
         http.expect(requestTo("http://model.test/v1/chat/completions"))
@@ -119,6 +185,39 @@ class SpringAiAgentIntegrationTest {
     }
 
     @Test
+    void modelCanGreetNaturallyWithoutBeingForcedToCallASearchTool() throws Exception {
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andRespond(withSuccess(completion("Hello！我是脉脉，今天想聊什么？"), MediaType.APPLICATION_JSON));
+        var contents = mock(ScienceContentRepository.class);
+        var result = new AssistantService(contents, gateway).assist("Hello", true);
+        assertThat(result.executionMode()).isEqualTo("SPRING_AI");
+        assertThat(result.conversation()).isTrue();
+        assertThat(result.reply()).isEqualTo("Hello！我是脉脉，今天想聊什么？");
+        assertThat(result.tasks()).isEmpty(); assertThat(result.actions()).isEmpty(); assertThat(result.steps()).isEmpty();
+        verifyNoInteractions(contents); http.verify();
+    }
+
+    @Test
+    void conversationHistoryReachesModelAndDoesNotAuthorizeAnOperation() throws Exception {
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("想了解怎么添加紧急联系人")))
+            .andRespond(withSuccess(completion("可以先告诉我联系人的姓名、手机号和关系，我会接着帮你办理。"), MediaType.APPLICATION_JSON));
+        var result = new AssistantService(mock(ScienceContentRepository.class), gateway).assist("那要提供什么？",true,null,null,
+            List.of(new cn.maian.agent.dto.AssistantContext.Turn("想了解怎么添加紧急联系人", "可以，我帮你介绍。")));
+        assertThat(result.conversation()).isTrue(); assertThat(result.tasks()).isEmpty();
+        assertThat(result.reply()).contains("姓名", "手机号"); http.verify();
+    }
+
+    @Test
+    void plainTextCannotPretendThatAnOperationHasCompleted() throws Exception {
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andRespond(withSuccess(completion("已关闭科普更新"), MediaType.APPLICATION_JSON));
+        var result = new AssistantService(mock(ScienceContentRepository.class), gateway).assist("把科普更新关掉",true);
+        assertThat(result.reply()).doesNotContain("已关闭"); assertThat(result.conversation()).isFalse();
+        http.verify();
+    }
+
+    @Test
     void modelWithoutToolCallsFallsBackInsteadOfClaimingAiExecution() throws Exception {
         http.expect(requestTo("http://model.test/v1/chat/completions"))
             .andRespond(withSuccess(completion("你可以打开 /pages/imaginary"), MediaType.APPLICATION_JSON));
@@ -132,7 +231,54 @@ class SpringAiAgentIntegrationTest {
         http.verify();
     }
 
-    private void expectTool(String name, Map<String, String> arguments) throws Exception {
+    @Test
+    void rescueReviewUsesRealToolProtocolAndOnlySendsControlledCountsAndStates() throws Exception {
+        var service = mock(RescueReviewService.class);
+        UUID id = UUID.randomUUID(), token = UUID.randomUUID();
+        when(service.pending()).thenReturn(List.of(id));
+        when(service.claim(id)).thenReturn(new RescueReviewService.Claim(token, true));
+        when(service.inspectTimeline(id, token)).thenReturn("terminal_status=COMPLETED; event_count=8");
+        when(service.inspectFollowUps(id, token)).thenReturn("return_pending=true; feedback_pending=true");
+        when(service.findLearningMaterials(id, token)).thenReturn("article_count=1");
+        when(service.assemble(id, token)).thenReturn("review_assembled; pending_count=2");
+        expectTool("inspectTimeline", Map.of());
+        expectTool("inspectFollowUps", Map.of());
+        expectTool("findLearningMaterials", Map.of());
+        expectTool("assembleReview", Map.of());
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andExpect(jsonPath("$.messages[?(@.role == 'tool')]").value(org.hamcrest.Matchers.hasSize(4)))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("event_count=8")))
+            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(id.toString()))))
+            .andRespond(withSuccess(completion("模型自由文本不能替代业务事实"), MediaType.APPLICATION_JSON));
+        new RescueReviewAgent(service, gateway).process();
+        var order = inOrder(service);
+        order.verify(service).inspectTimeline(id, token);
+        order.verify(service).inspectFollowUps(id, token);
+        order.verify(service).findLearningMaterials(id, token);
+        order.verify(service).assemble(id, token);
+        order.verify(service).complete(id, token, "SPRING_AI");
+        http.verify();
+    }
+
+    @Test
+    void reviewWithoutCompletedModelToolsFallsBackToBusinessChecks() throws Exception {
+        var service = mock(RescueReviewService.class);
+        UUID id = UUID.randomUUID(), token = UUID.randomUUID();
+        when(service.pending()).thenReturn(List.of(id));
+        when(service.claim(id)).thenReturn(new RescueReviewService.Claim(token, true));
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andRespond(withSuccess(completion("未执行工具的模型结论不会作为页面事实"), MediaType.APPLICATION_JSON));
+        new RescueReviewAgent(service, gateway).process();
+        var order = inOrder(service);
+        order.verify(service).inspectTimeline(id, token);
+        order.verify(service).inspectFollowUps(id, token);
+        order.verify(service).findLearningMaterials(id, token);
+        order.verify(service).assemble(id, token);
+        order.verify(service).complete(id, token, "RULE_FALLBACK");
+        http.verify();
+    }
+
+    private void expectTool(String name, Map<String, ?> arguments) throws Exception {
         var function = Map.of("name", name, "arguments", json.writeValueAsString(arguments));
         var message = Map.of("role", "assistant", "content", "", "tool_calls",
             List.of(Map.of("id", "call-" + name, "type", "function", "function", function)));
