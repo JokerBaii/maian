@@ -27,6 +27,8 @@ location /api/ {
 ## 当前公网实例（2026-10-26）
 
 - 应用入口：`https://121.41.195.165/maian/`；HTTP 应用路径自动跳转 HTTPS。原有 HTTP 首页继续使用原网站。
+- 登录页已提供「平台管理员登录」，首页右上角「平台管理」可进入同一入口；管理员也可直接访问 `https://121.41.195.165/maian/#/pages/auth/login?portal=admin`。使用已有管理员账户的手机号和密码，登录后进入审核及账户权限功能。
+- 管理员入口前端更新位于 `/opt/maian/releases/admin-entry-20261026T153759Z/`，原前端备份为同目录 `before-h5.tar.gz`。此次发布保留公网地图配置及旧版静态资源，未更换后端文件。
 - 前端以 `VITE_API_BASE_URL=/maian-api npm run build:h5` 构建；Nginx 将 `/maian-api/` 转发至本机 `127.0.0.1:8080/`，避免占用现有网站接口。
 - Java 21、MySQL 8、Nginx 和 `maian-server.service` 已运行，服务开机启动。MySQL 只监听本机，17 个 Flyway 迁移已在空库实际执行成功。
 - 约 1.6GB 内存的实例使用 Java `-Xmx448m`、MySQL 128MB 缓冲池和 2GB swap；Java 配置位于 `/etc/systemd/system/maian-server.service.d/resources.conf`。私有媒体由后端校验签名后读取，`MEDIA_USE_X_ACCEL=false`，媒体目录不公开。

@@ -3,8 +3,13 @@
     <scroll-view class="login-scroll" scroll-y :show-scrollbar="false" :scroll-into-view="scrollTarget" scroll-with-animation>
       <view class="brand-block motion-enter">
         <app-brand size="large" />
-        <text class="screen-title">{{ registerMode ? '创建账户' : '欢迎回来' }}</text>
-        <text class="brand-copy">{{ registerMode ? '创建你的健康与急救账户' : '登录后继续使用健康与急救服务' }}</text>
+        <text class="screen-title">{{ adminMode ? '平台管理员登录' : registerMode ? '创建账户' : '欢迎回来' }}</text>
+        <text class="brand-copy">{{ adminMode ? '使用已授权的管理员账号，处理设备、内容审核与账户权限' : registerMode ? '创建你的健康与急救账户' : '登录后继续使用健康与急救服务' }}</text>
+      </view>
+
+      <view v-if="!registerMode" class="portal-switch">
+        <button class="portal-option" :class="{ selected: !adminMode }" :disabled="submitting" @tap="selectPortal(false)">用户登录</button>
+        <button class="portal-option" :class="{ selected: adminMode }" :disabled="submitting" @tap="selectPortal(true)">平台管理员登录</button>
       </view>
 
       <view id="login-fields" class="auth-surface motion-enter motion-enter-delay-1">
@@ -14,22 +19,23 @@
         </view>
         <view class="field-row">
           <text class="field-label">手机号</text>
-          <input v-model="phone" class="field-input" type="number" placeholder="请输入手机号" maxlength="11" />
+          <input v-model="phone" class="field-input" type="number" :placeholder="adminMode ? '请输入管理员手机号' : '请输入手机号'" maxlength="11" />
         </view>
         <view class="field-row field-row-last">
           <text class="field-label">密码</text>
-          <input v-model="password" class="field-input" password placeholder="8–72 位字符" maxlength="72" @confirm="submit" />
+          <input v-model="password" class="field-input" password :placeholder="adminMode ? '请输入管理员密码' : '8–72 位字符'" maxlength="72" @confirm="submit" />
         </view>
       </view>
 
       <view class="primary-action app-motion-control" :class="{ disabled: submitting }" @tap="submit">
-        <text>{{ submitting ? '请稍候…' : registerMode ? '创建账户' : '登录' }}</text>
+        <text>{{ submitting ? '请稍候…' : adminMode ? '登录管理平台' : registerMode ? '创建账户' : '登录' }}</text>
       </view>
-      <view class="mode-action" @tap="toggleMode">
+      <text v-if="adminMode" class="admin-hint">仅限已有管理员权限的账户使用</text>
+      <view v-else class="mode-action" @tap="toggleMode">
         <text>{{ registerMode ? '已有账户？登录' : '还没有账户？注册' }}</text>
       </view>
 
-      <view v-if="previewPassword && !registerMode" class="demo-accounts">
+      <view v-if="previewPassword && !registerMode && !adminMode" class="demo-accounts">
         <text class="demo-heading">演示账号 · 点击填入</text>
         <view class="demo-account-list">
           <button v-for="account in demoAccounts" :key="account.phone" class="demo-account" :data-phone="account.phone" :disabled="submitting" @tap="fillDemoAccount(account)">
@@ -51,7 +57,8 @@ import { nextTick, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import AppBrand from '@/components/AppBrand.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
-import { loginWithPassword, registerAccount } from '@/api/auth'
+import { loginPlatformAdmin, loginWithPassword, registerAccount } from '@/api/auth'
+import { getCurrentProfile } from '@/api/user'
 import { hasAccountSession } from '@/utils/authSession'
 import { userFacingError } from '@/utils/presentation'
 
@@ -59,6 +66,7 @@ const phone = ref('')
 const password = ref('')
 const nickname = ref('')
 const registerMode = ref(false)
+const adminMode = ref(false)
 const submitting = ref(false)
 const scrollTarget = ref('')
 const previewPassword = __MAIAN_PREVIEW_PASSWORD__
@@ -78,13 +86,30 @@ async function fillDemoAccount(account: typeof demoAccounts[number]) {
   scrollTarget.value = 'login-fields'
 }
 
-onLoad(() => {
+onLoad(async options => {
+  adminMode.value = options?.portal === 'admin'
   if (hasAccountSession()) {
-    uni.switchTab({ url: '/pages/index/index' })
+    if (!adminMode.value) {
+      uni.switchTab({ url: '/pages/index/index' })
+      return
+    }
+    try {
+      const profile = await getCurrentProfile()
+      if (profile.role === 'ADMIN') uni.switchTab({ url: '/pages/mine/index' })
+    } catch {
+      // Keep the login form available when the existing session cannot be verified.
+    }
   }
 })
 
+function selectPortal(admin: boolean) {
+  if (submitting.value || adminMode.value === admin) return
+  adminMode.value = admin
+  password.value = ''
+}
+
 function toggleMode() {
+  if (submitting.value) return
   registerMode.value = !registerMode.value
   password.value = ''
 }
@@ -107,10 +132,12 @@ async function submit() {
   try {
     if (registerMode.value) {
       await registerAccount(phone.value, password.value, nickname.value.trim())
+    } else if (adminMode.value) {
+      await loginPlatformAdmin(phone.value, password.value)
     } else {
       await loginWithPassword(phone.value, password.value)
     }
-    uni.switchTab({ url: '/pages/index/index' })
+    uni.switchTab({ url: adminMode.value ? '/pages/mine/index' : '/pages/index/index' })
   } catch (error: any) {
     uni.showToast({ title: userFacingError(error, registerMode.value ? '注册失败' : '登录失败'), icon: 'none' })
   } finally {
@@ -126,6 +153,11 @@ async function submit() {
 .brand-block { padding: calc(70rpx + env(safe-area-inset-top)) 40rpx 38rpx; }
 .screen-title { display: block; margin-top: 54rpx; font-size: 45rpx; font-weight: 740; letter-spacing: -1rpx; }
 .brand-copy { display: block; max-width: 590rpx; margin-top: 12rpx; color: #636366; font-size: 27rpx; line-height: 1.5; }
+.portal-switch { display: flex; gap: 8rpx; margin: 0 28rpx 24rpx; padding: 8rpx; border-radius: 18rpx; background: #E5E5EA; }
+.portal-option { flex: 1; margin: 0; padding: 18rpx 8rpx; border-radius: 14rpx; background: transparent; color: #636366; font-size: 25rpx; line-height: 1.4; }
+.portal-option::after { border: 0; }
+.portal-option.selected { background: #FFFFFF; color: #1C1C1E; font-weight: 650; box-shadow: 0 2rpx 8rpx rgba(0,0,0,.06); }
+.admin-hint { display: block; margin: 22rpx 28rpx; color: #636366; text-align: center; font-size: 23rpx; }
 .auth-surface { margin: 0 28rpx; padding-left: 24rpx; overflow: hidden; border: 1rpx solid rgba(60,60,67,.12); border-radius: 22rpx; background: #FFFFFF; }
 .field-row { display: grid; min-height: 96rpx; grid-template-columns: 112rpx minmax(0,1fr); align-items: center; border-bottom: 1rpx solid rgba(60,60,67,.14); }
 .field-row-last { border-bottom: 0; }

@@ -11,6 +11,10 @@
 
       <view class="hero-nav">
         <app-brand />
+        <button class="admin-entry" @tap="openAdmin">
+          <app-icon name="auth-filled" :size="15" color="#2E6DD1" />
+          <text>平台管理</text>
+        </button>
       </view>
 
       <view class="hero-copy">
@@ -251,6 +255,10 @@ async function loadHomeData() {
   }
 }
 
+function openAdmin() {
+  uni.navigateTo({ url: '/pages/auth/login?portal=admin' })
+}
+
 function openSOS() {
   uni.navigateTo({ url: '/pages/rescue/index' })
 }
@@ -339,9 +347,13 @@ useAssistantRefresh(loadHomeData)
 .hero-nav {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   height: 92rpx;
   padding: 0 32rpx;
 }
+
+.admin-entry { display: flex; flex: none; align-items: center; gap: 8rpx; margin: 0; padding: 14rpx 18rpx; border-radius: 28rpx; background: rgba(255,255,255,.8); color: #2E6DD1; font-size: 23rpx; line-height: 1.4; }
+.admin-entry::after { border: 0; }
 
 .hero-copy {
   width: 64%;
