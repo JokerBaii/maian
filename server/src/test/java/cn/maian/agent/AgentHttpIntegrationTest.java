@@ -55,6 +55,34 @@ class AgentHttpIntegrationTest {
     }
 
     @Test
+    void documentAnalysisChecksOwnershipAndNeverCreatesReportsOrEnablesSharing() throws Exception {
+        String owner = register("13900000094"), outsider = register("13900000095");
+        var uploaded = http.perform(multipart("/api/v1/assistant/documents")
+            .file(new org.springframework.mock.web.MockMultipartFile("file", "附件.txt", "text/plain",
+                "临床检验报告\n血糖 95 mg/dL\n血红蛋白 140 g/L".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+            .header("Authorization", "Bearer " + owner)).andExpect(status().isOk()).andReturn();
+        String id = json.readTree(uploaded.getResponse().getContentAsString()).path("data").path("id").asText();
+        http.perform(post("/api/v1/assistant/documents/{id}/analysis", id)
+            .header("Authorization", "Bearer " + outsider).contentType(MediaType.APPLICATION_JSON).content("{\"useModel\":true}"))
+            .andExpect(status().isNotFound());
+        http.perform(post("/api/v1/assistant/documents/{id}/analysis", id)
+            .header("Authorization", "Bearer " + owner).contentType(MediaType.APPLICATION_JSON).content("{\"useModel\":true}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.kind").value("REPORT"))
+            .andExpect(jsonPath("$.data.report.hospital").value(""))
+            .andExpect(jsonPath("$.data.report.checkupDate").isEmpty())
+            .andExpect(jsonPath("$.data.report.indicators[0].value").value("95"))
+            .andExpect(jsonPath("$.data.report.indicators[0].unit").value("mg/dL"));
+        http.perform(get("/api/v1/settings").header("Authorization", "Bearer " + owner))
+            .andExpect(jsonPath("$.data.healthDataShare").value(false));
+        http.perform(get("/api/v1/health-reports").header("Authorization", "Bearer " + owner))
+            .andExpect(jsonPath("$.data").isEmpty());
+        http.perform(delete("/api/v1/assistant/documents/{id}", id).header("Authorization", "Bearer " + owner)).andExpect(status().isOk());
+        http.perform(post("/api/v1/assistant/documents/{id}/analysis", id)
+            .header("Authorization", "Bearer " + owner).contentType(MediaType.APPLICATION_JSON).content("{\"useModel\":false}"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
     void fallbackPlansAnActualSettingChangeWithoutChangingItDuringPlanning() throws Exception {
         String token = register("13900000093");
         http.perform(post("/api/v1/assistant").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)

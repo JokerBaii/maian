@@ -179,6 +179,8 @@ uni-app { display: block; min-height: 100vh; overflow: visible; background: #F3F
 
 
 /* #ifdef H5 */
+/* System consent dialogs and loading feedback sit above app sheets and the assistant. */
+uni-modal, uni-toast { z-index: 1500 !important; }
 uni-modal .uni-mask { background: rgba(0, 0, 0, .28) !important; }
 uni-modal .uni-modal {
   width: 540rpx !important;

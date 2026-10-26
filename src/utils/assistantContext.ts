@@ -5,7 +5,7 @@ export function pageAssistantContext(page: string, query: Record<string,string> 
   const key = ({ 'pages/device/add': 'deviceId', 'pages/rescue/detail': 'rescueId', 'pages/checkup/report': 'reportId', 'pages/science/detail': 'articleId' } as const)[context.page as 'pages/device/add']
   if (key && query.id) context[key] = query.id
   for (const [name,value] of Object.entries(subject)) {
-    if (value && ['deviceId','rescueId','reportId','articleId','contactId','submissionId','reminderId','accountId','settingKey'].includes(name)) (context as Record<string,string>)[name] = value
+    if (value && ['deviceId','rescueId','reportId','articleId','contactId','submissionId','reminderId','accountId','settingKey','documentId'].includes(name)) (context as Record<string,string>)[name] = value
   }
   return context
 }

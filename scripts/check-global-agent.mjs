@@ -73,26 +73,12 @@ try {
  await ask('把最低心率阈值改成200','SETTINGS_UPDATE','ERROR');assert.equal((await api('GET','/settings')).minHeartRate,before.minHeartRate);
  pass('非法阈值由业务接口拒绝，未写入健康设置');
 
- await ask('添加一个紧急联系人','CONTACT_SAVE','INPUT');
- assert.equal(await b.evaluate(`${last}?.querySelector('.agent-task-primary')?.hasAttribute('disabled')`),true);
- const fieldsBox=await b.evaluate(`${last}?.querySelector('.agent-task-fields').getBoundingClientRect().toJSON()`);
- assert.ok(fieldsBox.height<=156,'Contact form no longer fits three compact rows');
- await b.shot(path.join(output,'global-agent-contact-form.png'));
- await b.fill('.assistant-overlay .assistant-exchange:last-child [data-field="name"] input','测试家人');
- await b.fill('.assistant-overlay .assistant-exchange:last-child [data-field="phone"] input','13800000000');
- await b.fill('.assistant-overlay .assistant-exchange:last-child [data-field="relation"] input','同学');
- await b.call('Emulation.setDeviceMetricsOverride',{width:320,height:568,deviceScaleFactor:1,mobile:true});
- await b.evaluate(`${last}?.querySelector('.agent-task-primary').scrollIntoView({block:'nearest'})`);await pause(350);
- const actionBox=await b.evaluate(`${last}?.querySelector('.agent-task-primary').getBoundingClientRect().toJSON()`);
- const composerBox=await b.evaluate("document.querySelector('.assistant-overlay .assistant-compose').getBoundingClientRect().toJSON()");
- assert.ok(actionBox.top>0&&actionBox.bottom<=composerBox.top,'Compact form submit is covered by the composer');
- await b.shot(path.join(output,'global-agent-contact-small.png'));
- await b.click('.assistant-overlay .assistant-exchange:last-child .agent-task-primary');await waitPhase('DONE');
- await b.call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await pause(250);
+ await ask('添加紧急联系人，姓名测试家人，手机号13800000000，关系是同学','CONTACT_SAVE','DONE');
+ await b.shot(path.join(output,'global-agent-contact-created.png'));
  assert.ok((await api('GET','/emergency-contacts')).some(c=>c.name==='测试家人'));
  await ask('删除联系人测试家人','CONTACT_DELETE','CONFIRM');assert.equal((await api('GET','/emergency-contacts')).length,1);
  await b.click('.assistant-overlay .assistant-exchange:last-child .agent-task-primary');await waitPhase('DONE');assert.equal((await api('GET','/emergency-contacts')).length,0);
- pass('联系人三行补填、空值拦截、小屏保存和真实新增，删除前确认对象');
+ pass('一次自然语言指令直接新增联系人，不要求重复填表或保存确认；删除保留一次确认');
 
  const note=path.join(output,'global-agent-note.txt');fs.writeFileSync(note,'【自测】全局Agent通用附件。此文件仅测试上传和读取。');
  await ask('我要上传一个文档',['DOCUMENT_AUTO','DOCUMENT_UPLOAD'],'FILE');await chooseFile(note);await waitPhase('DONE');

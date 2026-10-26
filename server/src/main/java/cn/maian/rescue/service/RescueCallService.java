@@ -30,22 +30,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 public class RescueCallService {
 
-    private static final EnumSet<RescueStatus> ACTIVE_STATUSES = EnumSet.of(
-        RescueStatus.PENDING,
-        RescueStatus.MATCHING,
-        RescueStatus.EN_ROUTE_TO_AED,
-        RescueStatus.EN_ROUTE_TO_REQUESTER,
-        RescueStatus.ARRIVED,
-        RescueStatus.RESCUING,
-        RescueStatus.PENDING_CONFIRMATION
-    );
     private static final int OFFER_CANDIDATE_LIMIT = 200;
     private static final double LATITUDE_KM_PER_DEGREE = 111.32;
 
@@ -100,7 +90,7 @@ public class RescueCallService {
         }
 
         var activeCalls = rescueCallRepository.findActiveOwned(
-            requesterId, ACTIVE_STATUSES, PageRequest.of(0, 1)
+            requesterId, RescueStatus.activeStatuses(), PageRequest.of(0, 1)
         );
         if (!activeCalls.isEmpty()) {
             return requesterResponse(activeCalls.getFirst());
@@ -156,7 +146,7 @@ public class RescueCallService {
         UUID responderId = currentUserService.currentUserId();
         List<ResponderTaskResponse> tasks = new ArrayList<>();
         rescueCallRepository.findAssignedToResponder(
-            responderId, ACTIVE_STATUSES, PageRequest.of(0, OFFER_CANDIDATE_LIMIT)
+            responderId, RescueStatus.activeStatuses(), PageRequest.of(0, OFFER_CANDIDATE_LIMIT)
         ).stream().map(this::assignedResponse).forEach(tasks::add);
 
         responderPresenceRepository.findById(responderId)

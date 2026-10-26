@@ -107,6 +107,7 @@
 </template>
 
 <script setup lang="ts">
+import { scienceCategoryLabel } from '@/data/editorial'
 import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
 import { ref, computed, onMounted } from 'vue'
@@ -253,7 +254,7 @@ onMounted(async () => {
     const content = await getScienceContent(articleId.value)
     article.value = {
       title: content.title,
-      categoryLabel: ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[content.category || ''] || '科普内容',
+      categoryLabel: scienceCategoryLabel(content.category, '科普内容'),
       cover: content.coverUrl || '/static/editorial/editorial-monitoring-light-v1.webp',
       author: content.author,
       publishTime: content.publishedAt.slice(0, 10),

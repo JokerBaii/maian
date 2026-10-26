@@ -15,7 +15,8 @@ public record AssistantContext(
     @Pattern(regexp = "^[a-fA-F0-9-]{36}$") String submissionId,
     @Pattern(regexp = "^[a-fA-F0-9-]{36}$") String reminderId,
     @Pattern(regexp = "^[a-fA-F0-9-]{36}$") String accountId,
-    @Size(max = 40) @Pattern(regexp = "^[a-zA-Z]+$") String settingKey
+    @Size(max = 40) @Pattern(regexp = "^[a-zA-Z]+$") String settingKey,
+    @Pattern(regexp = "^[a-fA-F0-9-]{36}$") String documentId
 ) {
     public record Turn(@jakarta.validation.constraints.NotBlank @Size(max = 300) String question,
         @jakarta.validation.constraints.NotBlank @Size(max = 1000) String reply) {}

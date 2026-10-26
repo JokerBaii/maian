@@ -131,7 +131,7 @@ import { onShow } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppNavBar from '@/components/AppNavBar.vue'
 import { resolveApiUrl } from '@/api/http'
-import { scienceCategories } from '@/data/editorial'
+import { scienceCategories, scienceCategoryLabel } from '@/data/editorial'
 import { listScienceContent } from '@/api/science'
 
 const statusBarHeight = ref(0)
@@ -159,7 +159,7 @@ onShow(async () => {
     ])
     articles.value = articleRows.map(item => ({
       ...item,
-      categoryLabel: ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[item.category || ''] || '科普内容',
+      categoryLabel: scienceCategoryLabel(item.category, '科普内容'),
       cover: item.coverUrl || '/static/editorial/editorial-monitoring-light-v1.webp'
     }))
     videos.value = videoRows.map(item => ({

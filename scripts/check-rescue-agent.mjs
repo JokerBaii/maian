@@ -16,10 +16,8 @@ async function api(method, url, data, access = token) {
 }
 const b = await launchBrowser();
 const pass = name => { results.push(name); console.log('PASS ' + name); };
-const task = '.assistant-overlay .assistant-exchange:last-child .agent-task';
-async function waitPhase(phase) { await b.waitFor(`document.querySelector('${task}')?.getAttribute('data-phase')==='${phase}'`, 20000); await pause(250); }
-async function ask() {
-  await b.fill('.assistant-overlay .assistant-draft textarea', '有个人晕倒了，需要急救');
+async function ask(message = '有个人晕倒了，需要急救') {
+  await b.fill('.assistant-overlay .assistant-draft textarea', message);
   await b.click('.assistant-overlay .assistant-send');
 }
 try {
@@ -31,28 +29,29 @@ try {
   await b.click('uni-modal .uni-modal__btn_primary');
   await b.fill('.field-row:not(.field-row-last) input', phone); await b.fill('.field-row-last input', password); await b.click('.primary-action');
   await b.waitFor("document.querySelector('.assistant-dock-button')");
-  const position = await b.evaluate("import('/maian/src/utils/location.ts').then(m=>m.wgs84ToGcj02(113.47,22.34))");
-  deviceId = (await api('POST', '/emergency-devices', { name: '【自测】急救Agent专用AED', address: '【自测】定位测试现场', type: 'FIXED', category: 'AED', latitude: position.latitude + .0001, longitude: position.longitude, serviceWindows: ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'].map(dayOfWeek => ({ dayOfWeek, opensAt: '00:00', closesAt: '00:00' })), imageMediaIds: [], vehicleImageMediaIds: [] })).id;
+  const position = await b.evaluate("import('/maian/src/utils/location.ts').then(m=>m.getCurrentGcj02Location())");
+  deviceId = (await api('POST', '/emergency-devices', { name: '【自测】急救Agent专用AED', address: '【自测】定位测试现场', type: 'FIXED', category: 'AED', latitude: position.latitude + .00001, longitude: position.longitude, serviceWindows: ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'].map(dayOfWeek => ({ dayOfWeek, opensAt: '00:00', closesAt: '00:00' })), imageMediaIds: [], vehicleImageMediaIds: [] })).id;
   const admin = (await api('POST', '/auth/login', { phone: '19900000003', password: fs.readFileSync('.cache/preview/password', 'utf8').trim() })).accessToken;
   await api('PATCH', `/emergency-devices/${deviceId}/review`, { approved: true, reviewNote: '本地急救Agent回归' }, admin);
   await b.click('.assistant-dock-button');
-  const started = Date.now(); await ask(); await waitPhase('CONFIRM');
-  assert.ok(Date.now() - started < 5000, 'Immediate rescue waited for model planning');
-  assert.equal(await b.evaluate(`document.querySelectorAll('${task} [data-field="latitude"],${task} [data-field="longitude"],${task} .agent-task-fields').length`), 0);
-  assert.equal((await api('GET', '/rescue-calls')).content.length, 0);
-  assert.equal((await api('GET', '/emergency-devices/mine/' + deviceId)).status, 'AVAILABLE');
-  assert.ok((await b.evaluate(`document.querySelector('${task}').innerText`)).includes('急救Agent专用AED'));
-  await b.shot(path.join(output, 'rescue-agent-location-preview.png'));
-  pass('现场描述直接进入定位和真实附近AED查询，不填坐标、不等待模型，确认前不创建呼救或占用设备');
-  await b.click(task + ' .agent-task-primary'); await waitPhase('DONE');
+  await ask();
+  await b.waitFor("location.hash.includes('pages/rescue/index')&&document.querySelector('.sos-primary')?.innerText==='发出紧急呼救'",25000);
+  const planningMode = await b.evaluate("import('/maian/src/composables/useAssistantSession.ts').then(m=>m.assistantSession.entries.value.at(-1).result.executionMode)");
+  assert.equal(planningMode,'SPRING_AI');
+  assert.equal(await b.evaluate("document.querySelector('.stage-desc').innerText"),'有个人晕倒了，需要急救');
+  assert.equal((await api('GET','/rescue-calls')).content.length,0);
+  assert.equal((await api('GET','/emergency-devices/mine/'+deviceId)).status,'AVAILABLE');
+  await b.shot(path.join(output,'rescue-agent-emergency-page.png'));
+  pass('真实模型识别求助后直接进入急救页，自动定位并带入描述，不显示助手确认表单、不提前占用设备');
+  await b.click('.sos-primary');
+  await b.waitFor("location.hash.includes('pages/rescue/detail?id=')",20000);
   const call = (await api('GET', '/rescue-calls')).content[0]; callId = call.id;
   assert.ok(Math.abs(call.latitude - position.latitude) < .000001 && Math.abs(call.longitude - position.longitude) < .000001);
   assert.deepEqual(call.symptoms, ['需要紧急救助']); assert.equal(call.matchedAed.deviceId, deviceId);
   await b.shot(path.join(output, 'rescue-agent-created.png'));
   await api('POST', '/rescue-calls/' + callId + '/cancellation'); callId = undefined;
-  pass('一次确认后使用真实定位创建呼救并由原调度器匹配专用测试AED');
+  pass('只点击一次急救页发送按钮，使用现场定位创建呼救并由原调度器匹配专用测试AED');
 
-  await b.click('.assistant-overlay [aria-label="关闭助手"]');
   await b.evaluate(`new Promise((resolve,reject)=>uni.navigateTo({url:'/pages/rescue/detail?id=${call.id}',success:resolve,fail:reject}))`);
   await b.waitFor("document.querySelector('.rescue-review')&&document.querySelector('.detail-card')");
   assert.equal(await b.evaluate("document.querySelector('.review-options')!==null"),false);
@@ -96,32 +95,16 @@ try {
   assert.equal(await b.evaluate("document.querySelectorAll('.review-article').length"),actualReview.articles.length);
   await b.click('.review-details-toggle');assert.equal(await b.evaluate("document.querySelector('.review-details')!==null"),false);
   pass('真实复盘默认只显示结论和待办，事件/过程/学习分开查看，缺失时效不占位');
-  await b.evaluate("new Promise((resolve,reject)=>uni.navigateBack({success:resolve,fail:reject}))");await b.waitFor("document.querySelector('.assistant-dock-button')");await b.click('.assistant-dock-button');
+  await b.evaluate("new Promise((resolve,reject)=>uni.switchTab({url:'/pages/index/index',success:resolve,fail:reject}))");await b.waitFor("document.querySelector('.assistant-dock-button')");await b.click('.assistant-dock-button');
   pass('救援详情复盘与相邻卡片边缘、标题、按钮及开关在320/390/768宽度下对齐');
 
 
   await b.click('.assistant-overlay [aria-label="清空查找记录"]');
-  await b.call('Browser.setPermission', { permission: { name: 'geolocation' }, setting: 'denied', origin: base });
-  await ask(); await waitPhase('INPUT');
-  assert.equal(await b.evaluate(`document.querySelector('${task} .agent-task-primary')!==null`), false);
-  assert.ok((await b.evaluate(`document.querySelector('${task}').innerText`)).includes('未获取到位置'));
-  assert.equal((await api('GET', '/rescue-calls')).content.length, 1);
-  await b.shot(path.join(output, 'rescue-agent-denied-location.png'));
-  pass('拒绝定位时明确提示重试和地图选点，不使用默认地图中心、不自动发送呼救');
-
-  await b.click('.agent-rescue-location-actions uni-button:nth-child(2)');
-  await b.waitFor("location.hash.includes('pages/location/pick')");
-  await b.waitFor("document.querySelector('#location-picker-map .leaflet-pane')");
-  assert.equal(await b.evaluate("document.querySelector('.location-picker-confirm').hasAttribute('disabled')"), true);
-  await b.click('#location-picker-map');
-  await b.waitFor("!document.querySelector('.location-picker-confirm').hasAttribute('disabled')");
-  await b.shot(path.join(output, 'rescue-agent-map-selection.png'));
-  await b.click('.location-picker-confirm');
-  await b.waitFor("document.querySelector('.assistant-overlay')"); await waitPhase('CONFIRM');
-  assert.ok((await b.evaluate(`document.querySelector('${task}').innerText`)).includes('已获取现场位置'));
-  assert.equal((await api('GET', '/rescue-calls')).content.length, 1);
-  await b.click(task + ' .agent-task-cancel');
-  pass('真实地图点选返回后自动恢复助手，重新查询资源并等待确认');
+  await ask('故事里主角晕倒了，我是在讨论剧情，不需要打开急救页');
+  await b.waitFor("import('/maian/src/composables/useAssistantSession.ts').then(m=>!m.assistantSession.busy.value)",25000);
+  assert.ok(!(await b.evaluate('location.hash')).includes('pages/rescue/index'));
+  assert.equal((await api('GET','/rescue-calls')).content.length,1);
+  pass('模型结合语境讨论剧情时不会因为晕倒关键词跳转或创建呼救');
   assert.deepEqual(b.errors, []); pass('无未处理浏览器异常');
 } catch (error) {
   console.log('STATE', await b.evaluate("document.body.innerText.slice(-1600)").catch(() => null));

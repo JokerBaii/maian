@@ -30,7 +30,7 @@ export interface AssistantResult {
   conversation?: boolean
 }
 
-export interface AssistantContext { page?: string; deviceId?: string; rescueId?: string; reportId?: string; articleId?: string; contactId?: string; submissionId?: string; reminderId?: string; accountId?: string; settingKey?: string }
+export interface AssistantContext { page?: string; deviceId?: string; rescueId?: string; reportId?: string; articleId?: string; contactId?: string; submissionId?: string; reminderId?: string; accountId?: string; settingKey?: string; documentId?: string }
 export interface AssistantPending { operation: string; editableKeys: string[]; missingKeys: string[] }
 export interface AssistantTurn { question: string; reply: string }
 

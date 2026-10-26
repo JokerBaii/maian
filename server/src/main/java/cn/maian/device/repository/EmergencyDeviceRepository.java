@@ -19,17 +19,9 @@ import java.util.UUID;
 
 public interface EmergencyDeviceRepository extends JpaRepository<EmergencyDevice, UUID> {
 
-    Page<EmergencyDevice> findAllByType(DeviceType type, Pageable pageable);
-
     Page<EmergencyDevice> findAllByStatus(DeviceStatus status, Pageable pageable);
     Page<EmergencyDevice> findAllByStatusIn(Collection<DeviceStatus> statuses, Pageable pageable);
     Page<EmergencyDevice> findAllByTypeAndStatusIn(
-        DeviceType type,
-        Collection<DeviceStatus> statuses,
-        Pageable pageable
-    );
-    Page<EmergencyDevice> findAllByStatusNotIn(Collection<DeviceStatus> statuses, Pageable pageable);
-    Page<EmergencyDevice> findAllByTypeAndStatusNotIn(
         DeviceType type,
         Collection<DeviceStatus> statuses,
         Pageable pageable

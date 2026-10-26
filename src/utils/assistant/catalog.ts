@@ -1,5 +1,6 @@
+import { scienceCategories } from '@/data/editorial'
 import type { AssistantTask, AssistantAction, AssistantContext } from '@/api/agent'
-import type { AgentDocument } from '@/api/agentDocuments'
+import type { AgentDocument, DocumentAnalysis } from '@/api/agentDocuments'
 import type { AppLocation, MapNavigationTarget } from '@/utils/location'
 
 type Option = { value: string; label: string }
@@ -14,9 +15,10 @@ export interface TaskRun extends AssistantTask {
   items: { title: string; detail: string; documentId?: string; navigation?: MapNavigationTarget; reference?: AssistantContext }[]
   links: AssistantAction[]
   document?: AgentDocument
+  analysis?: DocumentAnalysis
+  useModel?: boolean
   mediaId?: string
   fileName?: string
-  rescue?: { location?: AppLocation; locatedAt?: number; locationError?: string; resourceError?: string }
   context?: AssistantContext
   output?: AssistantContext
   location?: AppLocation
@@ -29,6 +31,7 @@ export interface TaskRun extends AssistantTask {
 export interface TaskEnvironment {
   api: (path: string, method?: UniNamespace.RequestOptions['method'] | 'PATCH', data?: any, timeout?: number) => Promise<any>
   currentLocation: () => Promise<AppLocation>
+  navigate: (action: { url: string }) => Promise<void>
 }
 interface TaskDefinition {
   title: string
@@ -36,6 +39,7 @@ interface TaskDefinition {
   createsRecord?: boolean
   locationRequired?: boolean
   refresh?: boolean
+  navigation?: boolean
   source?: string
   fields?: TaskField[]
   rescueAction?: string
@@ -49,14 +53,15 @@ const approvalOptions = [{ value: 'true', label: '通过' }, { value: 'false', l
 
 /** One definition per allowed operation: form, target, confirmation and persistence policy. */
 export const TASK_DEFINITIONS: Record<string, TaskDefinition> = {
+  OPEN_PAGE: { title: '打开页面', navigation: true },
   VOLUNTEER_AVAILABILITY: { title: '设置救援响应状态' },
   REMINDER_CREATE: { title: '创建站内提醒', createsRecord: true },
   REMINDER_LIST: { title: '查看提醒' },
   REMINDER_DISMISS: { title: '结束提醒', refresh: true, source: '/api/v1/assistant/reminders' },
   CONTACT_UPDATE: { title: '修改紧急联系人', refresh: true, source: '/api/v1/emergency-contacts' },
-  CONTACT_CALL: { title: '联系紧急联系人', confirm: true, source: '/api/v1/emergency-contacts' },
+  CONTACT_CALL: { title: '联系紧急联系人', source: '/api/v1/emergency-contacts' },
   DEVICE_UPDATE: { title: '修改设备资料', refresh: true, source: '/api/v1/emergency-devices/mine' },
-  DEVICE_LOCATION: { title: '更新设备位置', confirm: true, locationRequired: true, source: '/api/v1/emergency-devices/mine' },
+  DEVICE_LOCATION: { title: '更新设备位置', refresh: true, locationRequired: true, source: '/api/v1/emergency-devices/mine' },
   DEVICE_NEARBY: { title: '查找附近AED', locationRequired: true },
   DEVICE_NAVIGATE: { title: '导航到设备', source: '/api/v1/emergency-devices' },
   DOCUMENT_AUTO: { title: '接收文件并办理', createsRecord: true },
@@ -67,13 +72,13 @@ export const TASK_DEFINITIONS: Record<string, TaskDefinition> = {
   WEARABLE_UNBIND: { title: '解绑穿戴设备', confirm: true },
   RESCUE_OFFERS: { title: '查看可接救援' },
   RESCUE_PROGRESS: { title: '查看救援进展', source: 'rescue-targets' },
-  RESCUE_ACCEPT: { title: '接受救援任务', confirm: true, source: 'rescue-targets', rescueAction: 'acceptance' },
-  RESCUE_AED_ARRIVAL: { title: '确认到达取用点', confirm: true, source: 'rescue-targets', rescueAction: 'aed-arrival' },
-  RESCUE_AED_PICKUP: { title: '确认取到AED', confirm: true, source: 'rescue-targets', rescueAction: 'aed-pickup' },
-  RESCUE_ARRIVAL: { title: '确认到达现场', confirm: true, source: 'rescue-targets', rescueAction: 'requester-arrival' },
-  RESCUE_START: { title: '开始施救', confirm: true, source: 'rescue-targets', rescueAction: 'rescue-start' },
-  RESCUE_COMPLETE: { title: '提交救援完成', confirm: true, source: 'rescue-targets', rescueAction: 'completion-submission' },
-  RESCUE_RETURN: { title: '确认归还AED', confirm: true, source: 'rescue-targets', rescueAction: 'aed-return' },
+  RESCUE_ACCEPT: { title: '接受救援任务', refresh: true, source: 'rescue-targets', rescueAction: 'acceptance' },
+  RESCUE_AED_ARRIVAL: { title: '确认到达取用点', refresh: true, source: 'rescue-targets', rescueAction: 'aed-arrival' },
+  RESCUE_AED_PICKUP: { title: '确认取到AED', refresh: true, source: 'rescue-targets', rescueAction: 'aed-pickup' },
+  RESCUE_ARRIVAL: { title: '确认到达现场', refresh: true, source: 'rescue-targets', rescueAction: 'requester-arrival' },
+  RESCUE_START: { title: '开始施救', refresh: true, source: 'rescue-targets', rescueAction: 'rescue-start' },
+  RESCUE_COMPLETE: { title: '提交救援完成', refresh: true, source: 'rescue-targets', rescueAction: 'completion-submission' },
+  RESCUE_RETURN: { title: '确认归还AED', refresh: true, source: 'rescue-targets', rescueAction: 'aed-return' },
   RESCUE_CONFIRM_COMPLETION: { title: '确认救援完成', confirm: true, source: 'rescue-targets', rescueAction: 'completion-confirmation' },
   RESCUE_REPLACE: { title: '更换故障AED', confirm: true, source: 'rescue-targets', rescueAction: 'aed-replacement' },
   RESCUE_RESOURCE_FAILURE: { title: '结束故障设备调度', confirm: true, source: 'rescue-targets', rescueAction: 'resource-failure' },
@@ -84,18 +89,19 @@ export const TASK_DEFINITIONS: Record<string, TaskDefinition> = {
   CONTACT_SAVE: { title: '保存紧急联系人', createsRecord: true, fields: [field('name', '姓名'), field('phone', '手机号'), field('relation', '关系')] },
   CONTACT_DELETE: { title: '删除联系人', confirm: true, source: '/api/v1/emergency-contacts' },
   DEVICE_LIST: { title: '查看我的设备', list: { path: '/api/v1/emergency-devices/mine', title: '我的设备', destination: '/pages/device/manage' } },
-  DEVICE_CREATE: { title: '登记急救设备', confirm: true, createsRecord: true, locationRequired: true, fields: [field('name', '设备名称'), field('address', '设备地址'), select('type', '设备类型', [{ value: 'FIXED', label: '固定设备' }, { value: 'MOBILE', label: '移动设备' }]), field('serviceTime', '服务时间')] },
-  DEVICE_ENABLE: { title: '恢复设备', confirm: true, source: '/api/v1/emergency-devices/mine' },
+  DEVICE_CREATE: { title: '登记急救设备', createsRecord: true, locationRequired: true, fields: [field('name', '设备名称'), field('address', '设备地址'), select('type', '设备类型', [{ value: 'FIXED', label: '固定设备' }, { value: 'MOBILE', label: '移动设备' }]), field('serviceTime', '服务时间')] },
+  DEVICE_ENABLE: { title: '恢复设备', refresh: true, source: '/api/v1/emergency-devices/mine' },
   DEVICE_DISABLE: { title: '停用设备', confirm: true, source: '/api/v1/emergency-devices/mine' },
-  DEVICE_FAULT: { title: '上报设备故障', confirm: true, source: '/api/v1/emergency-devices/mine' },
+  DEVICE_FAULT: { title: '上报设备故障', refresh: true, source: '/api/v1/emergency-devices/mine' },
   DEVICE_DELETE: { title: '删除设备', confirm: true, source: '/api/v1/emergency-devices/mine' },
-  DOCUMENT_UPLOAD: { title: '上传保存文档', createsRecord: true },
+  DOCUMENT_UPLOAD: { title: '保存文档', createsRecord: true },
+  DOCUMENT_ANALYZE: { title: '阅读文档', source: '/api/v1/assistant/documents' },
   DOCUMENT_LIST: { title: '查看我的文档', list: { path: '/api/v1/assistant/documents', title: '我的文档' } },
   DOCUMENT_DELETE: { title: '删除文档', confirm: true, source: '/api/v1/assistant/documents' },
   REPORT_IMPORT: { title: '整理体检报告', confirm: true, createsRecord: true, fields: [field('hospital', '检查机构'), field('checkupDate', '检查日期（YYYY-MM-DD）'), field('indicators', '指标（每行：名称 数值 单位）', 'textarea')] },
   REPORT_LIST: { title: '查看体检报告', list: { path: '/api/v1/health-reports', title: '体检报告', destination: '/pages/checkup/archive' } },
   REPORT_DELETE: { title: '删除报告', confirm: true, source: '/api/v1/health-reports' },
-  SCIENCE_SUBMIT: { title: '提交科普稿件', createsRecord: true, fields: [field('title', '稿件标题'), select('category', '稿件分类', [{ value: 'device', label: '设备知识' }, { value: 'emergency', label: '急救知识' }, { value: 'health', label: '健康知识' }, { value: 'exercise', label: '运动健康' }]), field('content', '稿件正文', 'textarea')] },
+  SCIENCE_SUBMIT: { title: '提交科普稿件', createsRecord: true, fields: [field('title', '稿件标题'), select('category', '稿件分类', scienceCategories.filter(category => category.key !== 'all').map(category => ({value:category.key,label:category.label}))), field('content', '稿件正文', 'textarea')] },
   SCIENCE_MINE: { title: '查看我的投稿', list: { path: '/api/v1/science-submissions', title: '我的投稿', destination: '/pages/science/submissions' } },
   SCIENCE_REVIEW_LIST: { title: '查看待审核稿件', list: { path: '/api/v1/science-submissions/reviews/pending', title: '待审核稿件' } },
   SCIENCE_REVIEW: { title: '审核科普稿件', confirm: true, source: '/api/v1/science-submissions/reviews/pending', fields: [select('approved', '审核结果', approvalOptions), field('reviewNote', '审核说明', 'textarea', true)] },
@@ -104,7 +110,7 @@ export const TASK_DEFINITIONS: Record<string, TaskDefinition> = {
   RESCUE_LIST: { title: '查看我的救援', list: { path: '/api/v1/rescue-calls', title: '我的救援', destination: '/pages/mine/records' } },
   RESCUE_REVIEW: { title: '生成救援复盘', source: '/api/v1/rescue-calls' },
   RESCUE_FEEDBACK: { title: '提交救援评价', createsRecord: true, source: '/api/v1/rescue-calls', fields: [field('rating', '评分（1–5）', 'number'), field('comment', '评价内容', 'textarea', true)] },
-  RESCUE_CREATE: { title: '发起呼救', confirm: true, createsRecord: true, fields: [field('address', '现场位置'), field('description', '现场情况', 'textarea', true)] },
+  RESCUE_CREATE: { title: '进入紧急呼救', navigation: true },
   RESCUE_CANCEL: { title: '取消呼救', confirm: true, source: '/api/v1/rescue-calls' },
   COORDINATION_LIST: { title: '查看资源协同', list: { path: '/api/v1/coordination-tasks/mine', title: '资源协同', destination: '/pages/agent/index' } },
   COORDINATION_RETRY: { title: '重试协同任务', refresh: true, source: '/api/v1/coordination-tasks/mine' },
@@ -115,6 +121,7 @@ export const TASK_DEFINITIONS: Record<string, TaskDefinition> = {
 }
 
 export function referenceKey(op: string): keyof AssistantContext | undefined {
+  if (op.startsWith('DOCUMENT_')) return 'documentId'
   if (['REMINDER_LIST','REMINDER_DISMISS'].includes(op)) return 'reminderId'
   if (op.startsWith('ADMIN_')) return 'accountId'
   if (op.startsWith('CONTACT_')) return 'contactId'

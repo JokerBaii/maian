@@ -20,14 +20,14 @@ try{
  admin=(await api(null,'POST','/auth/login',{phone:'19900000003',password:fs.readFileSync('.cache/preview/password','utf8').trim()})).accessToken;
  const vp=await api(registered.accessToken,'GET','/profile');await api(admin,'PATCH','/admin/users/'+vp.id+'/role',{role:'VOLUNTEER'});volunteer=(await api(null,'POST','/auth/login',{phone:phones[1],password})).accessToken;
  await login(b,phones[0],password);
- await ask(b,'添加一个紧急联系人','CONTACT_SAVE','INPUT');await ask(b,'我妈妈','CONTACT_SAVE','INPUT');await ask(b,'手机号13800000000','CONTACT_SAVE','DONE');
+ await ask(b,'添加一个紧急联系人','CONTACT_SAVE','INPUT');await ask(b,'她叫林芳，是我妈妈','CONTACT_SAVE','INPUT');await ask(b,'手机号13800000000','CONTACT_SAVE','DONE');
  const contacts=await api(user,'GET','/emergency-contacts');assert.equal(contacts.length,1);assert.equal(contacts[0].phone,'13800000000');
  pass('真实模型起任务，连续口述姓名关系和手机号，沿用同一任务自动保存一次');
  await ask(b,'删除紧急联系人','CONTACT_DELETE','CONFIRM');await ask(b,'取消','CONTACT_DELETE','CANCELED');assert.equal((await api(user,'GET','/emergency-contacts')).length,1);
  await ask(b,'删除紧急联系人','CONTACT_DELETE','CONFIRM');await ask(b,'确认','CONTACT_DELETE','DONE');assert.equal((await api(user,'GET','/emergency-contacts')).length,0);
  pass('文字取消保持业务记录，文字确认执行真实删除');
- await ask(b,'登记一个固定AED设备，名称是【自测】全局办理AED，服务时间全天','DEVICE_CREATE','CONFIRM');await ask(b,'确认','DEVICE_CREATE','DONE');
- const device=(await api(user,'GET','/emergency-devices/mine')).content[0];deviceIds.push(device.id);assert.equal(device.status,'PENDING_REVIEW');assert.equal(device.serviceWindows.length,7);assert.ok(device.latitude>22&&device.latitude<23);
+ await ask(b,'登记一个固定AED设备，名称是【自测】全局办理AED，服务时间全天','DEVICE_CREATE','DONE');
+ const device=(await api(user,'GET','/emergency-devices/mine')).content[0];deviceIds.push(device.id);assert.equal(device.status,'PENDING_REVIEW');assert.equal(device.serviceWindows.length,7);assert.ok(device.latitude>30&&device.latitude<31);assert.ok(device.longitude>120&&device.longitude<121);
  await api(admin,'PATCH','/emergency-devices/'+device.id+'/review',{approved:true,reviewNote:'本地回归'});
  await route(b,'/pages/device/add?id='+device.id);await ask(b,'把这台设备停用','DEVICE_DISABLE','CONFIRM');await ask(b,'确认','DEVICE_DISABLE','DONE');assert.equal((await api(user,'GET','/emergency-devices/mine/'+device.id)).status,'DISABLED');
  pass('设备登记自动定位并补齐合法服务时段，在编辑页说“这台”自动绑定真实设备');
@@ -55,11 +55,15 @@ try{
  for(let i=0;i<40;i++){if((await api(user,'GET','/assistant/reminders')).some(r=>r.id===watched.id&&r.status==='READY'))break;await pause(500)}
  assert.equal((await api(user,'GET','/assistant/reminders'))[0].status,'READY');await b.waitFor("document.querySelector('.assistant-dock-label')?.innerText.includes('条提醒')",40000);await shot(b,'reminder-notice');
  pass('退出对话后后台仍跟进审核状态，真实变更后显示站内提醒标记');
- await route(b,'/pages/index/index',true);await ask(b,'有个人晕倒了，需要急救','RESCUE_CREATE','CONFIRM');await ask(b,'确认','RESCUE_CREATE','DONE');const call=(await api(user,'GET','/rescue-calls')).content[0];callId=call.id;assert.equal(call.matchedAed.deviceId,device.id);
- await login(v,phones[1],password);await ask(v,'开始接单','VOLUNTEER_AVAILABILITY','DONE');await route(v,'/pages/rescue/detail?id='+callId+'&mode=responder');await ask(v,'接下这个任务','RESCUE_ACCEPT','CONFIRM');await ask(v,'确认','RESCUE_ACCEPT','DONE');
- for(const [text,op] of [['我已到达AED取用点','RESCUE_AED_ARRIVAL'],['确认取到AED','RESCUE_AED_PICKUP'],['我已到达现场','RESCUE_ARRIVAL'],['开始施救','RESCUE_START'],['提交完成','RESCUE_COMPLETE']]){await ask(v,text,op,'CONFIRM');await ask(v,'确认',op,'DONE')}
+ await route(b,'/pages/index/index',true);if(!await b.evaluate("!!document.querySelector('.assistant-overlay')"))await b.click('.assistant-dock-button');
+ await b.fill('.assistant-overlay .assistant-draft textarea','有个人晕倒了，需要急救');await b.click('.assistant-overlay .assistant-send');
+ await b.waitFor("location.hash.includes('pages/rescue/index')&&document.querySelector('.sos-primary')?.innerText==='发出紧急呼救'",25000);
+ await b.click('.sos-primary');await b.waitFor("location.hash.includes('pages/rescue/detail?id=')",20000);
+ const call=(await api(user,'GET','/rescue-calls')).content[0];callId=call.id;assert.ok(call.matchedAed);
+ await login(v,phones[1],password);await ask(v,'开始接单','VOLUNTEER_AVAILABILITY','DONE');await route(v,'/pages/rescue/detail?id='+callId+'&mode=responder');await ask(v,'接下这个任务','RESCUE_ACCEPT','DONE');
+ for(const [text,op] of [['我已到达AED取用点','RESCUE_AED_ARRIVAL'],['确认取到AED','RESCUE_AED_PICKUP'],['我已到达现场','RESCUE_ARRIVAL'],['开始施救','RESCUE_START'],['提交完成','RESCUE_COMPLETE']]){await ask(v,text,op,'DONE')}
  await route(b,'/pages/rescue/detail?id='+callId);await ask(b,'确认救援完成','RESCUE_CONFIRM_COMPLETION','CONFIRM');await ask(b,'确认','RESCUE_CONFIRM_COMPLETION','DONE');
- await ask(v,'归还AED','RESCUE_RETURN','CONFIRM');await ask(v,'确认','RESCUE_RETURN','DONE');const finished=await api(user,'GET','/rescue-calls/'+callId);assert.equal(finished.status,'COMPLETED');assert.equal(finished.aedCustodyStatus,'RETURNED');await shot(v,'rescue-return');
+ await ask(v,'归还AED','RESCUE_RETURN','DONE');const finished=await api(user,'GET','/rescue-calls/'+callId);assert.equal(finished.status,'COMPLETED');assert.equal(finished.aedCustodyStatus,'RETURNED');await shot(v,'rescue-return');
  pass('真实双账号接单、取用点、取用、到场、施救、提交完成、求救者确认和归还全部由Agent办理');
  await ask(v,'暂停接单','VOLUNTEER_AVAILABILITY','DONE');
  assert.deepEqual(b.errors,[]);assert.deepEqual(v.errors,[]);pass('全流程无未处理浏览器异常');

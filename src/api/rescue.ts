@@ -1,4 +1,4 @@
-import { request } from './http'
+import { request, type PageResponse } from './http'
 
 export type RescueUrgency = 'CRITICAL' | 'HIGH' | 'MEDIUM'
 export type RescueStatus =
@@ -109,16 +109,6 @@ export function attachRescueMedia(id: string, mediaId: string) {
   })
 }
 
-interface PageResponse<T> {
-  content: T[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
-  first: boolean
-  last: boolean
-}
-
 export function createRescueCall(payload: CreateRescueCallRequest) {
   return request<RescueCallResponse>('/api/v1/rescue-calls', {
     method: 'POST',
@@ -202,7 +192,6 @@ export function confirmRescueCompletion(id: string) {
     { method: 'POST' }
   )
 }
-
 
 export function cancelRescueCall(id: string) {
   return request<RescueCallResponse>(

@@ -1,5 +1,4 @@
-import { request } from './http'
-import type { PageResponse } from './devices'
+import { request, type PageResponse } from './http'
 
 export type AccountRole = 'USER' | 'VOLUNTEER' | 'ADMIN'
 

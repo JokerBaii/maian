@@ -5,7 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public interface HeartRateReadingRepository extends JpaRepository<HeartRateReading, Long> {
@@ -13,6 +12,4 @@ public interface HeartRateReadingRepository extends JpaRepository<HeartRateReadi
         UUID userId,
         Instant recordedAfter
     );
-
-    Optional<HeartRateReading> findFirstByUserIdOrderByRecordedAtDesc(UUID userId);
 }

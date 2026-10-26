@@ -96,7 +96,7 @@ class AssistantServiceTest {
         assertThat(reminders.tasks()).extracting(task -> task.operation())
             .containsExactly("REMINDER_CREATE", "SETTINGS_UPDATE");
         assertThat(reminders.tasks().getFirst().parameters().get("title")).contains("AED").doesNotContain("关闭科普更新");
-        var context = new AssistantContext("pages/rescue/detail", null, UUID.randomUUID().toString(), null, null, null, null, null, null, null);
+        var context = new AssistantContext("pages/rescue/detail", null, UUID.randomUUID().toString(), null, null, null, null, null, null, null, null);
         String rescue = "确认归还AED，然后生成救援复盘";
         assertThat(service.assist(rescue, true, context, null).tasks()).extracting(task -> task.operation())
             .containsExactly("RESCUE_RETURN", "RESCUE_REVIEW");
@@ -105,12 +105,69 @@ class AssistantServiceTest {
     }
 
     @Test
-    void singleActionCommandsStillBypassModelLatency() {
+    void singleActionCommandsReachTheModelBeforeLocalFallback() {
+        when(model.invoke(anyString(), anyString(), any(), any())).thenReturn("RULE_FALLBACK");
         assertThat(service.assist("开始接单", true).tasks()).singleElement()
             .satisfies(task -> assertThat(task.operation()).isEqualTo("VOLUNTEER_AVAILABILITY"));
         assertThat(service.assist("十分钟后提醒我归还AED", true).tasks()).singleElement()
             .satisfies(task -> assertThat(task.operation()).isEqualTo("REMINDER_CREATE"));
-        verifyNoInteractions(model, contents);
+        verify(model).invoke(anyString(), eq("开始接单"), any(), any());
+        verify(model).invoke(anyString(), eq("十分钟后提醒我归还AED"), any(), any());
+        verifyNoInteractions(contents);
+    }
+
+    @Test
+    void modelMayTreatEmergencyWordsAsAHypotheticalConversation() {
+        when(model.invoke(anyString(), anyString(), any(), any())).thenAnswer(invocation -> {
+            invocation.getArgument(3, java.util.function.Consumer.class).accept("可以，我来解释应用中的求助流程。");
+            return "SPRING_AI";
+        });
+        var result = service.assist("有人晕倒，我是在复述刚才的演练", true);
+        assertThat(result.tasks()).isEmpty();
+        assertThat(result.conversation()).isTrue();
+        assertThat(result.executionMode()).isEqualTo("SPRING_AI");
+        verify(model).invoke(anyString(), anyString(), any(), any());
+    }
+
+    @Test
+    void currentEmergencyIsPlannedByTheModelRatherThanAKeywordShortcut() {
+        when(model.invoke(anyString(), anyString(), any(), any())).thenAnswer(invocation -> {
+            invocation.getArgument(2, AssistantService.AssistantTools.class)
+                .planTask("RESCUE_CREATE", Map.of("description", "有人晕倒了"));
+            return "SPRING_AI";
+        });
+        var result = service.assist("有人晕倒了", true);
+        assertThat(result.executionMode()).isEqualTo("SPRING_AI");
+        assertThat(result.tasks()).singleElement().satisfies(task -> assertThat(task.operation()).isEqualTo("RESCUE_CREATE"));
+        verify(model).invoke(anyString(), eq("有人晕倒了"), any(), any());
+    }
+
+    @Test
+    void informsTheModelOfAResolvedReminderWithoutExposingItsIdentifier() {
+        String reminderId = UUID.randomUUID().toString();
+        var context = new AssistantContext("pages/science/detail", null, null, null, null, null, null, reminderId, null, null, null);
+        when(model.invoke(anyString(), anyString(), any(), any())).thenAnswer(invocation -> {
+            assertThat(invocation.getArgument(0, String.class)).contains("已选中对象=[提醒]").doesNotContain(reminderId);
+            invocation.getArgument(2, AssistantService.AssistantTools.class).planTask("REMINDER_DISMISS", Map.of());
+            return "SPRING_AI";
+        });
+        var result = service.assist("取消第一条提醒", true, context, null);
+        assertThat(result.tasks()).singleElement().satisfies(task -> assertThat(task.operation()).isEqualTo("REMINDER_DISMISS"));
+        verifyNoInteractions(contents);
+    }
+
+    @Test
+    void modelCanOpenARealPageWithoutReturningAnExtraClickCard() {
+        when(model.invoke(anyString(), anyString(), any(), any())).thenAnswer(invocation -> {
+            invocation.getArgument(2, AssistantService.AssistantTools.class).openAppPage("隐私设置");
+            return "SPRING_AI";
+        });
+        var result = service.assist("带我去管理数据共享的地方", true);
+        assertThat(result.tasks()).singleElement().satisfies(task -> {
+            assertThat(task.operation()).isEqualTo("OPEN_PAGE");
+            assertThat(task.parameters()).containsEntry("url", "/pages/mine/settings?section=privacy");
+        });
+        assertThat(result.actions()).isEmpty();
     }
 
     @Test

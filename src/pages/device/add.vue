@@ -325,65 +325,6 @@
       <view class="bottom-safe"></view>
     </view>
 
-    <!-- #ifdef H5 -->
-    <view v-if="showLocationPicker" class="location-picker-overlay">
-      <view class="lp-header">
-        <view class="lp-toolbar">
-          <view class="lp-cancel" @tap="cancelLocationPicker">取消</view>
-          <view class="lp-search-bar">
-            <app-icon class="lp-search-icon" name="search" :size="18" color="#56627A" />
-            <input
-              class="lp-search-input"
-              v-model="poiSearchText"
-              placeholder="搜索地点名称或关键字"
-              placeholder-class="lp-search-placeholder"
-              confirm-type="search"
-              @confirm="searchPOI"
-            />
-            <view v-if="poiSearchText" class="lp-search-clear" @tap="clearPOISearch">
-              <app-icon class="lp-clear-icon" name="closeempty" :size="16" color="#6E7A90" />
-            </view>
-          </view>
-          <view class="lp-confirm" @tap="confirmLocationPicker">完成</view>
-        </view>
-      </view>
-
-      <view v-if="poiResults.length > 0" class="poi-results">
-        <scroll-view scroll-y class="poi-list">
-          <view
-            v-for="(poi, idx) in poiResults"
-            :key="idx"
-            class="poi-item"
-            :class="{ 'poi-item-active': selectedPoiIdx === idx }"
-            @tap="selectPOI(poi, idx)"
-          >
-            <view class="poi-item-left">
-              <text class="poi-item-name">{{ poi.name }}</text>
-              <text class="poi-item-addr">{{ poi.address || poi.name }}</text>
-            </view>
-            <view v-if="selectedPoiIdx === idx" class="poi-item-check">
-              <app-icon class="poi-check-icon" name="checkmarkempty" :size="15" color="#FFFFFF" />
-            </view>
-          </view>
-        </scroll-view>
-      </view>
-
-      <view id="lp-map-container" class="lp-map-container"></view>
-
-      <view class="lp-center-marker">
-        <view class="lp-marker-pin"></view>
-        <view class="lp-marker-shadow"></view>
-      </view>
-
-      <view class="lp-bottom-info">
-        <view class="lp-info-content">
-          <text v-if="pickerAddress" class="lp-info-addr">{{ pickerAddress }}</text>
-          <text v-else class="lp-info-addr lp-info-placeholder">点击地图或搜索选取位置</text>
-          <text v-if="pickerLng" class="lp-info-coord">{{ pickerLng.toFixed(6) }}, {{ pickerLat.toFixed(6) }}</text>
-        </view>
-      </view>
-    </view>
-    <!-- #endif -->
     <assistant-companion context="devices" />
   </view>
 </template>
@@ -394,8 +335,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
-import { getCurrentGcj02Location, DEFAULT_MAP_CENTER } from '@/utils/location'
-import { loadAMap } from '@/common/amap'
+import { chooseGcj02Location, getCurrentGcj02Location } from '@/utils/location'
 import { uploadImage } from '@/api/files'
 import { resolveApiUrl } from '@/api/http'
 import { userFacingError } from '@/utils/presentation'
@@ -459,15 +399,6 @@ const editingId = ref('')
 
 const pickedAddress = ref('')
 
-const showLocationPicker = ref(false)
-let pickerMapInstance: any = null
-const pickerLng = ref(0)
-const pickerLat = ref(0)
-const pickerAddress = ref('')
-const poiSearchText = ref('')
-const poiResults = ref<any[]>([])
-const selectedPoiIdx = ref(-1)
-
 function triggerImageUpload(count: number, callback: (url: string) => void) {
   uni.chooseImage({
     count,
@@ -493,163 +424,21 @@ async function persistImagePaths(paths: string[], purpose: 'DEVICE_IMAGE' | 'VEH
   }))
 }
 
-function openLocationPicker() {
-  uni.setNavigationBarTitle({ title: '选取设备位置' })
-  showLocationPicker.value = true
-  poiResults.value = []
-  selectedPoiIdx.value = -1
-  poiSearchText.value = ''
-
-  setTimeout(() => {
-    initPickerMap()
-  }, 300)
-  uni.chooseLocation({
-    latitude: fixedForm.value.latitude || undefined,
-    longitude: fixedForm.value.longitude || undefined,
-    success: (location) => {
-      fixedForm.value.latitude = location.latitude
-      fixedForm.value.longitude = location.longitude
-      fixedForm.value.address = location.address || location.name || fixedForm.value.address
-      pickedAddress.value = fixedForm.value.address
-    }
-  })
-}
-
-function cancelLocationPicker() {
-  showLocationPicker.value = false
-  uni.setNavigationBarTitle({ title: editingId.value ? '编辑急救设备' : '添加急救设备' })
-  if (pickerMapInstance) {
-    pickerMapInstance.destroy()
-    pickerMapInstance = null
-  }
-  poiResults.value = []
-}
-
-function confirmLocationPicker() {
-  if (pickerLng.value) {
-    fixedForm.value.longitude = pickerLng.value
-    fixedForm.value.latitude = pickerLat.value
-    pickedAddress.value = pickerAddress.value
-    if (pickerAddress.value && !fixedForm.value.address) {
-      fixedForm.value.address = pickerAddress.value
-    }
-  }
-  cancelLocationPicker()
-}
-
-async function initPickerMap() {
-  const loaded = await loadAMap()
-  if (!loaded) {
-    const useLocation = (longitude: number, latitude: number) => {
-      fixedForm.value.longitude = longitude
-      fixedForm.value.latitude = latitude
-      pickedAddress.value = fixedForm.value.address || '当前位置'
-      uni.showToast({ title: '已使用当前位置', icon: 'none' })
-      cancelLocationPicker()
-    }
-    getCurrentGcj02Location()
-      .then((location) => useLocation(location.longitude, location.latitude))
-      .catch(() => uni.showToast({ title: '定位失败，请在地图上选择设备位置', icon: 'none' }))
-    return
-  }
-  const AMap = (window as any).AMap
-
-  const center = fixedForm.value.longitude
-    ? [fixedForm.value.longitude, fixedForm.value.latitude]
-    : [DEFAULT_MAP_CENTER.longitude, DEFAULT_MAP_CENTER.latitude]
-
-  pickerMapInstance = new AMap.Map('lp-map-container', {
-    zoom: 15,
-    center,
-    mapStyle: 'amap://styles/whitesmoke',
-    resizeEnable: true
-  })
-
-  pickerMapInstance.on('click', (e: any) => {
-    pickerLng.value = e.lnglat.getLng()
-    pickerLat.value = e.lnglat.getLat()
-    selectedPoiIdx.value = -1
-    reverseGeocode(pickerLng.value, pickerLat.value)
-  })
-
-  if (fixedForm.value.longitude) {
-    pickerLng.value = fixedForm.value.longitude
-    pickerLat.value = fixedForm.value.latitude
-    pickerAddress.value = pickedAddress.value || ''
-  }
-}
-
-async function reverseGeocode(lng: number, lat: number) {
-  const AMap = (window as any).AMap
+async function openLocationPicker() {
+  const existing = fixedForm.value
   try {
-    await new Promise((resolve) => {
-      AMap.plugin(['AMap.Geocoder'], () => resolve(true))
-    })
-    const geocoder = new AMap.Geocoder({ city: '杭州' })
-    geocoder.getAddress([lng, lat], (status: string, result: any) => {
-      if (status === 'complete' && result.info === 'OK') {
-        pickerAddress.value = result.regeocode.formattedAddress || ''
-      } else {
-        pickerAddress.value = `${lng.toFixed(4)}, ${lat.toFixed(4)}`
-      }
-    })
-  } catch (e) {
-    pickerAddress.value = `${lng.toFixed(4)}, ${lat.toFixed(4)}`
+    const location = await chooseGcj02Location(existing.longitude || existing.latitude ? {
+      longitude: existing.longitude, latitude: existing.latitude, address: pickedAddress.value || existing.address
+    } : undefined)
+    const form = fixedForm.value
+    form.longitude = location.longitude
+    form.latitude = location.latitude
+    pickedAddress.value = location.address || `${location.longitude.toFixed(5)}, ${location.latitude.toFixed(5)}`
+    if (location.address && !form.address) form.address = location.address
+  } catch (error) {
+    const message = userFacingError(error, '位置选择失败，请重试')
+    if (!/取消|cancel/i.test(message)) uni.showToast({ title: message, icon: 'none' })
   }
-}
-
-async function searchPOI() {
-  if (!poiSearchText.value) return
-  const AMap = (window as any).AMap
-
-  try {
-    await new Promise((resolve) => {
-      AMap.plugin(['AMap.PlaceSearch'], () => resolve(true))
-    })
-
-    const placeSearch = new AMap.PlaceSearch({
-      city: '杭州',
-      citylimit: true,
-      pageSize: 10,
-      extensions: 'all'
-    })
-
-    placeSearch.search(poiSearchText.value, (status: string, result: any) => {
-      if (status === 'complete' && result.poiList) {
-        poiResults.value = result.poiList.pois.map((poi: any) => ({
-          name: poi.name,
-          address: poi.address || poi.name,
-          longitude: poi.location.lng,
-          latitude: poi.location.lat
-        }))
-      } else {
-        poiResults.value = []
-        uni.showToast({ title: '未找到相关地点', icon: 'none' })
-      }
-    })
-  } catch (e) {
-    uni.showToast({ title: '搜索失败', icon: 'none' })
-  }
-}
-
-function selectPOI(poi: any, idx: number) {
-  selectedPoiIdx.value = idx
-  pickerLng.value = poi.longitude
-  pickerLat.value = poi.latitude
-  pickerAddress.value = poi.address || poi.name
-
-  if (pickerMapInstance) {
-    pickerMapInstance.setCenter([poi.longitude, poi.latitude])
-  }
-
-  poiResults.value = []
-  poiSearchText.value = ''
-}
-
-function clearPOISearch() {
-  poiSearchText.value = ''
-  poiResults.value = []
-  selectedPoiIdx.value = -1
 }
 
 function onExpireDateChange(e: any) {
@@ -686,10 +475,6 @@ function addVehicleImage() {
 
 function removeVehicleImage(idx: number) {
   mobileForm.value.vehicleImages.splice(idx, 1)
-}
-
-function getCurrentLocation() {
-  return getCurrentGcj02Location()
 }
 
 async function loadEditingDevice(id: string) {
@@ -762,7 +547,7 @@ async function handleSubmit() {
 
   try {
     const location = deviceType.value === 'mobile'
-      ? await getCurrentLocation()
+      ? await getCurrentGcj02Location()
       : { longitude: fixedForm.value.longitude, latitude: fixedForm.value.latitude }
     const [imageUrls, vehicleImageUrls] = deviceType.value === 'fixed'
       ? [await persistImagePaths(fixedForm.value.images, 'DEVICE_IMAGE'), []]
@@ -1201,223 +986,4 @@ async function handleSubmit() {
   font-weight: 500;
 }
 
-/* #ifdef H5 */
-.location-picker-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 9999;
-  background: #F3F7FA;
-  display: flex;
-  flex-direction: column;
-}
-.lp-header {
-  padding: 14rpx 18rpx;
-  border-bottom: 1rpx solid rgba(60, 60, 67, .12);
-  background: rgba(249, 249, 251, .94);
-  z-index: 10;
-  backdrop-filter: saturate(160%) blur(24rpx);
-  -webkit-backdrop-filter: saturate(160%) blur(24rpx);
-}
-.lp-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-}
-.lp-cancel,
-.lp-confirm {
-  flex: none;
-  padding: 12rpx 6rpx;
-  color: #007AFF;
-  font-size: 26rpx;
-  font-weight: 550;
-}
-.lp-search-bar {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: center;
-  height: 68rpx;
-  padding: 0 20rpx;
-  border-radius: 14rpx;
-  background: rgba(118, 118, 128, .12);
-}
-.lp-search-icon {
-  font-size: 28rpx;
-  margin-right: 12rpx;
-}
-.lp-search-input {
-  flex: 1;
-  height: 68rpx;
-  font-size: 28rpx;
-  color: #1C1C1E;
-}
-.lp-search-placeholder {
-  color: #8E8E93;
-  font-size: 28rpx;
-}
-.lp-search-clear {
-  width: 36rpx;
-  height: 36rpx;
-  border-radius: 50%;
-  background: rgba(118, 118, 128, .18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.lp-clear-icon {
-  font-size: 18rpx;
-  color: #636366;
-}
-
-.poi-results {
-  position: absolute;
-  top: 104rpx;
-  left: 0;
-  right: 0;
-  max-height: 400rpx;
-  z-index: 20;
-  background: #FFFFFF;
-  margin: 0 24rpx;
-  border-radius: 16rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-}
-.poi-list {
-  max-height: 400rpx;
-}
-.poi-item {
-  display: flex;
-  align-items: center;
-  padding: 20rpx 24rpx;
-  border-bottom: 1rpx solid #F2F3F5;
-}
-.poi-item:last-child {
-  border-bottom: none;
-}
-.poi-item-active {
-  background: rgba(43, 111, 240, 0.06);
-}
-.poi-item-left {
-  flex: 1;
-  min-width: 0;
-}
-.poi-item-name {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #20364D;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.poi-item-addr {
-  font-size: 22rpx;
-  color: #86909C;
-  margin-top: 4rpx;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.poi-item-check {
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  background: #2E6DD1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 16rpx;
-}
-.poi-check-icon {
-  font-size: 22rpx;
-  color: #FFFFFF;
-  font-weight: 700;
-}
-
-.lp-map-container {
-  flex: 1;
-  width: 100%;
-}
-
-.lp-center-marker {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -100%);
-  z-index: 15;
-  pointer-events: none;
-}
-.lp-marker-pin {
-  width: 32px;
-  height: 40px;
-  position: relative;
-}
-.lp-marker-pin::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 24px;
-  height: 24px;
-  border-radius: 50% 50% 50% 0;
-  background: #C93D46;
-  transform: translateX(-50%) rotate(-45deg);
-  box-shadow: 0 2px 6px rgba(245, 63, 63, 0.4);
-}
-.lp-marker-pin::after {
-  content: '';
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #FFFFFF;
-  z-index: 1;
-}
-.lp-marker-shadow {
-  width: 16px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.2);
-  margin: 4px auto 0;
-}
-
-.lp-bottom-info {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 15;
-  background: #FFFFFF;
-  border-radius: 24rpx 24rpx 0 0;
-  padding: 24rpx 32rpx 40rpx;
-  box-shadow: 0 -4rpx 24rpx rgba(0, 0, 0, 0.08);
-}
-.lp-info-content {
-  display: flex;
-  flex-direction: column;
-}
-.lp-info-addr {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #20364D;
-  line-height: 1.5;
-}
-.lp-info-placeholder {
-  color: #C9CDD4;
-  font-weight: 400;
-}
-.lp-info-coord {
-  font-size: 22rpx;
-  color: #86909C;
-  margin-top: 6rpx;
-}
-/* #endif */
 </style>

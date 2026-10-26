@@ -37,6 +37,7 @@
 </template>
 
 <script setup lang="ts">
+import { scienceCategoryLabel as categoryLabel } from '@/data/editorial'
 import { useAssistantRefresh } from '@/composables/useAssistantRefresh'
 import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref } from 'vue'
@@ -65,9 +66,6 @@ async function loadSubmissions() {
   }
 }
 
-function categoryLabel(category: string) {
-  return ({ device: '设备使用', emergency: '突发急症', health: '健康管理', exercise: '运动养生' } as Record<string, string>)[category] || category
-}
 
 function categoryIcon(category: string) {
   return ({ device: 'fixed-device', emergency: 'rescue-notice', health: 'health-alert', exercise: 'volunteer' } as Record<string, string>)[category] || 'science-update'

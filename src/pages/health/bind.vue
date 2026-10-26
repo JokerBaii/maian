@@ -7,14 +7,14 @@
             <view class="card-title-bar"></view>
             <text class="card-title">当前设备</text>
           </view>
-          <view class="connected-badge">
+          <view class="connected-badge" :class="{ 'disconnected-badge': !boundDevice.connected }">
             <view class="connected-dot"></view>
-            <text class="connected-text">已连接</text>
+            <text class="connected-text">{{ boundDevice.connected ? '已连接' : '未连接' }}</text>
           </view>
           </view>
           <view class="bound-info">
           <view class="bound-left">
-            <app-icon-tile name="wearable" tone="coral" status="online" />
+            <app-icon-tile name="wearable" tone="coral" :status="boundDevice.connected ? 'online' : 'offline'" />
             <view class="bound-detail">
               <text class="bound-name">{{ boundDevice.name }}</text>
               <view class="bound-meta">
@@ -136,6 +136,7 @@ import {
 } from '@/api/monitoring'
 import { bleHeartRateService } from '@/services/bleHeartRateService'
 import { parseHeartRateMeasurement } from '@/utils/heartRateMeasurement'
+import { getAccountAccessToken } from '@/utils/authSession'
 
 const { updateWearable } = useHealthMonitoring()
 
@@ -145,7 +146,6 @@ const boundDevice = ref<{
   connected: boolean
   battery: number | null
 } | null>(null)
-const connectedDeviceId = ref('')
 let scanTimer: ReturnType<typeof setTimeout> | null = null
 let lastReadingUploadAt = 0
 
@@ -156,8 +156,6 @@ const boundDeviceName = ref('')
 interface DiscoveredDevice {
   id: string
   name: string
-  icon: string
-  avatarBg: string
   signal: number
   binding: boolean
   bound: boolean
@@ -166,10 +164,11 @@ interface DiscoveredDevice {
 const discoveredDevices = reactive<DiscoveredDevice[]>([])
 
 onMounted(async () => {
+  const owner = getAccountAccessToken()
   try {
     const device = await getWearableDevice()
+    if (owner !== getAccountAccessToken()) return
     if (device.type !== 'none') {
-      connectedDeviceId.value = device.deviceIdentifier || ''
       boundDevice.value = {
         name: device.name,
         type: device.type,
@@ -189,13 +188,17 @@ function toggleScan() {
     return
   }
 
-  startBluetoothScan()
+  // #ifdef H5
   uni.showModal({
-    title: '请使用 iOS 客户端连接',
-    content: '网页端无法直接访问低功耗蓝牙。请在 iPhone 上打开脉安驰援并靠近手环完成连接。',
+    title: '请使用手机客户端连接',
+    content: '网页端暂不支持蓝牙连接。请在手机客户端打开脉安驰援并靠近手环完成连接。',
     confirmText: '我知道了',
     showCancel: false
   })
+  // #endif
+  // #ifndef H5
+  startBluetoothScan()
+  // #endif
 }
 
 function startBluetoothScan() {
@@ -235,8 +238,6 @@ function handleBluetoothDevicesFound(result: any) {
     discoveredDevices.push({
       id: rawDevice.deviceId,
       name,
-      icon: name.charAt(0).toUpperCase(),
-      avatarBg: '#007AFF',
       signal,
       binding: false,
       bound: false
@@ -264,9 +265,11 @@ function containsBluetoothUuid(value: string, shortUuid: string) {
 }
 
 function startHeartRateNotifications(deviceId: string) {
+  const owner = getAccountAccessToken()
   uni.getBLEDeviceServices({
     deviceId,
     success: (serviceResult: any) => {
+      if (owner !== getAccountAccessToken()) return
       const service = (serviceResult.services || []).find((item: any) => (
         containsBluetoothUuid(item.uuid || '', '180d')
       ))
@@ -275,6 +278,7 @@ function startHeartRateNotifications(deviceId: string) {
         deviceId,
         serviceId: service.uuid,
         success: (characteristicResult: any) => {
+          if (owner !== getAccountAccessToken()) return
           const characteristic = (characteristicResult.characteristics || []).find((item: any) => (
             containsBluetoothUuid(item.uuid || '', '2a37')
             && (item.properties?.notify || item.properties?.indicate)
@@ -338,6 +342,7 @@ function bindBtnLabel(device: DiscoveredDevice) {
 function handleBind(device: DiscoveredDevice) {
   if (device.bound || device.binding) return
   device.binding = true
+  const owner = getAccountAccessToken()
 
   stopScan()
   bleHeartRateService.markConnecting()
@@ -346,8 +351,11 @@ function handleBind(device: DiscoveredDevice) {
     timeout: 10000,
     success: async () => {
       device.binding = false
+      if (owner !== getAccountAccessToken()) {
+        uni.closeBLEConnection({ deviceId: device.id })
+        return
+      }
       device.bound = true
-      connectedDeviceId.value = device.id
       bleHeartRateService.markConnected(device.id)
       boundDeviceName.value = device.name
       boundDevice.value = {
@@ -370,6 +378,7 @@ function handleBind(device: DiscoveredDevice) {
           connected: true,
           battery: 0
         })
+        if (owner !== getAccountAccessToken()) return
         updateWearable(saved)
         startHeartRateNotifications(device.id)
       } catch {
@@ -385,8 +394,6 @@ function handleBind(device: DiscoveredDevice) {
       uni.showToast({ title: '连接失败，请靠近设备后重试', icon: 'none' })
     }
   })
-  device.binding = false
-  uni.showToast({ title: '请在 iOS App 中绑定设备', icon: 'none' })
 }
 
 function handleDisconnect() {
@@ -401,7 +408,6 @@ function handleDisconnect() {
             device.bound = false
             device.binding = false
           })
-          connectedDeviceId.value = ''
           boundDevice.value = null
           updateWearable({
             name: '未绑定设备',
@@ -415,12 +421,7 @@ function handleDisconnect() {
             uni.showToast({ title: '设备已断开，请稍后确认解绑状态', icon: 'none' })
           }
         }
-        if (connectedDeviceId.value) {
-          bleHeartRateService.disconnect(connectedDeviceId.value, clearDevice)
-        } else {
-          clearDevice()
-        }
-        clearDevice()
+        bleHeartRateService.disconnect(clearDevice)
       }
     }
   })
@@ -492,6 +493,11 @@ onUnmounted(() => {
   font-size: 22rpx;
   color: #23956A;
   font-weight: 600;
+}
+.disconnected-badge {
+  background: #F2F2F7;
+  .connected-dot { background: #8E8E93; box-shadow: none; }
+  .connected-text { color: #8E8E93; }
 }
 .bound-info {
   display: flex;

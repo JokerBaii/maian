@@ -25,13 +25,13 @@
         <view class="stage-status">
           <view class="readiness-chip" :class="{ locating: isLocating }">
             <view class="readiness-dot"></view>
-            <text>{{ isLocating ? '正在确认位置' : '位置已确认' }}</text>
+            <text>{{ isLocating ? '正在确认位置' : rescueCoordinates ? '位置已确认' : '需要确认位置' }}</text>
           </view>
         </view>
 
         <text class="sos-word">SOS</text>
         <text class="stage-title">需要紧急帮助</text>
-        <text class="stage-desc">向附近救援人员发送你的位置</text>
+        <text class="stage-desc">{{ description || '向附近救援人员发送你的位置' }}</text>
 
         <view class="location-chip" @tap="refreshLocation">
           <view class="location-main">
@@ -96,6 +96,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import AppIcon from '@/components/AppIcon.vue'
 import { uploadImage } from '@/api/files'
 import { attachRescueMedia, createRescueCall, type RescueUrgency } from '@/api/rescue'
@@ -171,6 +172,7 @@ function removePhoto(index: number) {
 
 async function triggerSOS() {
   if (isSubmitting.value || isLocating.value) return
+  if (!rescueCoordinates.value && !await refreshLocation()) return
   await submitRescue()
 }
 
@@ -223,6 +225,7 @@ function goBack() {
   uni.navigateBack()
 }
 
+onLoad(query => { if (typeof query?.description === 'string') description.value = query.description.slice(0,300) })
 onMounted(() => refreshLocation(false))
 </script>
 

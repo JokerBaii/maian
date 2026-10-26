@@ -9,6 +9,17 @@ function setup(ask=vi.fn(),request=vi.fn(),upload=vi.fn()) {
   return {session:createAssistantSession({ask,identity:()=> 'account'},runtime),request,ask,upload}
 }
 describe('assistant conversation workflow',()=>{
+  it('passes a reminder ordinal as the selected object and dismisses that actual reminder',async()=>{
+    const ask=vi.fn().mockResolvedValueOnce(result('REMINDER_LIST')).mockResolvedValueOnce(result('REMINDER_DISMISS'))
+    const request=vi.fn().mockImplementation(async(path,options)=>options.method==='GET'?[{id:'reminder-one',title:'归还AED'}]:undefined)
+    const {session}=setup(ask,request)
+    await session.submit('查看我的提醒')
+    await session.submit('取消第一条提醒',{page:'pages/science/detail',articleId:'old-article'})
+    expect(ask.mock.calls[1][2]).toEqual({page:'pages/science/detail',reminderId:'reminder-one'})
+    expect(request).toHaveBeenLastCalledWith('/api/v1/assistant/reminders/reminder-one',expect.objectContaining({method:'DELETE'}))
+    expect(session.entries.value.at(-1)!.tasks![0].phase).toBe('DONE')
+  })
+
   it('passes only recent ordinary dialogue to the model without leaking earlier task fields',async()=>{
     const ask=vi.fn().mockResolvedValueOnce(result('CONTACT_SAVE',{name:'私密姓名'}))
       .mockResolvedValue({reply:'你好，我是脉脉',executionMode:'SPRING_AI',actions:[],steps:[],conversation:true})
@@ -39,14 +50,14 @@ describe('assistant conversation workflow',()=>{
   })
   it('reuses the pending upload and retains its file during later supplementation',async()=>{
     const ask=vi.fn().mockResolvedValueOnce(result('REPORT_IMPORT')).mockResolvedValueOnce(result('REPORT_IMPORT',{hospital:'测试体检中心'},true))
-    const request=vi.fn().mockResolvedValue({id:'report'})
+    const request=vi.fn().mockResolvedValueOnce({kind:'REPORT',summary:'报告',report:{hospital:'',checkupDate:'2026-10-20',indicators:[{name:'血压',value:'120/80',unit:'mmHg',abnormal:false}]}}).mockResolvedValue({id:'report'})
     const upload=vi.fn().mockResolvedValue({id:'doc',name:'报告.txt',sizeBytes:100,text:'检查日期：2026-10-20\n血压 120/80 mmHg'})
     const {session}=setup(ask,request,upload)
     await session.submit('导入体检报告');const original=session.entries.value[0].tasks![0]
     await session.attachFile('DOCUMENT_AUTO',{path:'fixture',name:'报告.txt',size:100})
     expect(session.entries.value.at(-1)!.tasks![0]).toBe(original);expect(original.phase).toBe('INPUT')
     await session.submit('机构是测试体检中心');expect(original.phase).toBe('CONFIRM')
-    await session.submit('确认');expect(original.phase).toBe('DONE');expect(upload).toHaveBeenCalledOnce();expect(request).toHaveBeenCalledOnce()
+    await session.submit('确认');expect(original.phase).toBe('DONE');expect(upload).toHaveBeenCalledOnce();expect(request).toHaveBeenCalledTimes(2)
   })
   it('does not execute an older hidden confirmation after an unrelated query',async()=>{
     const ask=vi.fn().mockResolvedValueOnce(result('CONTACT_DELETE')).mockResolvedValue({reply:'找到入口',executionMode:'RULES',actions:[],steps:[]})
@@ -81,11 +92,11 @@ describe('assistant conversation workflow',()=>{
   it('passes the uploaded file to the next planned operation without another file selection',async()=>{
     const answer=result('DOCUMENT_UPLOAD');answer.tasks!.push({operation:'REPORT_IMPORT',parameters:{}})
     const upload=vi.fn().mockResolvedValue({id:'doc',name:'报告.txt',text:'测试体检中心\n检查日期：2026-10-20\n血压 120/80 mmHg',sizeBytes:100})
-    const {session,request}=setup(vi.fn().mockResolvedValue(answer),vi.fn().mockResolvedValue({id:'report'}),upload)
+    const {session,request}=setup(vi.fn().mockResolvedValue(answer),vi.fn().mockResolvedValueOnce({kind:'REPORT',summary:'报告',report:{hospital:'测试体检中心',checkupDate:'2026-10-20',indicators:[{name:'血压',value:'120/80',unit:'mmHg',abnormal:false}]}}).mockResolvedValue({id:'report'}),upload)
     await session.submit('上传并整理报告');await session.attachFile('DOCUMENT_AUTO',{path:'fixture',name:'报告.txt',size:100})
     const tasks=session.entries.value.at(-1)!.tasks!
     expect(tasks[0].phase).toBe('DONE');expect(tasks[1].phase).toBe('CONFIRM');expect(tasks[1].document?.id).toBe('doc')
-    await session.submit('确认');expect(upload).toHaveBeenCalledOnce();expect(request).toHaveBeenCalledOnce()
+    await session.submit('确认');expect(upload).toHaveBeenCalledOnce();expect(request).toHaveBeenCalledTimes(2)
   })
 
   it('follows the newly created record in a queued workflow instead of the old page object',async()=>{
@@ -98,7 +109,7 @@ describe('assistant conversation workflow',()=>{
     })
     const runtime=createAssistantTaskRuntime({request,identity:()=> 'account',upload:vi.fn(),uploadImage:vi.fn()},{current:vi.fn().mockResolvedValue({latitude:30,longitude:120,address:'现场'}),choose:vi.fn()})
     const session=createAssistantSession({ask:vi.fn().mockResolvedValue(answer),identity:()=> 'account'},runtime)
-    await session.submit('登记新设备并跟进它的审核',{page:'pages/device/add',deviceId:'old'});await session.submit('确认')
+    await session.submit('登记新设备并跟进它的审核',{page:'pages/device/add',deviceId:'old'})
     expect(session.entries.value.at(-1)!.tasks!.map(task=>task.phase)).toEqual(['DONE','DONE'])
   })
 

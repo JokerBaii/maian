@@ -1,9 +1,11 @@
-import type { AgentDocument, AgentFile } from '@/api/agentDocuments'
+import type { AgentDocument, AgentFile, DocumentAnalysis } from '@/api/agentDocuments'
+import { ApiRequestError } from '@/api/http'
 import { TASK_DEFINITIONS, type TaskEnvironment, type TaskRun } from './catalog'
 
 interface FileEnvironment extends Pick<TaskEnvironment, 'api'> {
   upload: (file: AgentFile) => Promise<AgentDocument>
   uploadImage: (path: string) => Promise<{ mediaId: string }>
+  authorizeReport: () => Promise<boolean>
 }
 
 /** Uploads are fenced by the runtime; extracted text never becomes an instruction. */
@@ -18,7 +20,7 @@ export async function prepareTaskFiles(run: TaskRun, env: FileEnvironment, file?
         const keys = op === 'REPORT_IMPORT' ? ['hospital', 'checkupDate', 'indicators'] : op === 'SCIENCE_SUBMIT' ? ['title', 'content'] : []
         for (const key of keys) delete p[key]
       }
-      run.document = undefined; run.mediaId = undefined
+      run.document = undefined; run.mediaId = undefined; run.analysis = undefined
       run.fileName = file.name; run.items = []; run.links = []
     }
     run.steps.push('开始上传你选择的文件')
@@ -32,24 +34,46 @@ export async function prepareTaskFiles(run: TaskRun, env: FileEnvironment, file?
       const uploaded = await env.upload(file)
       replaceAttachment(); run.document = uploaded
       run.steps.push('文件已保存，已读取可提取的文档文字')
-      const text = run.document.text || ''
-      if (op === 'DOCUMENT_AUTO') {
-        const extracted: Record<string,string> = {}; fillReport(extracted, text)
-        if (extracted.checkupDate && extracted.indicators) {
-          op = run.operation = 'REPORT_IMPORT'; run.title = TASK_DEFINITIONS[op].title; run.autoRouted = true
-          Object.assign(p, extracted); run.steps.push('识别到报告日期和指标，整理为报告核对任务；尚未写入健康档案')
-        } else { op = run.operation = 'DOCUMENT_UPLOAD'; run.title = TASK_DEFINITIONS[op].title }
-      }
     }
   }
   if (run.document) {
+    run.context = { ...run.context, documentId: run.document.id }
+    run.output = { ...run.output, documentId: run.document.id }
     if (op === 'SCIENCE_SUBMIT') { p.title ||= (file?.name || run.document.name).replace(/\.[^.]+$/, '').slice(0,50); p.content ||= run.document.text || '' }
-    if (op === 'REPORT_IMPORT') fillReport(p,run.document.text || '')
+    if ((op === 'DOCUMENT_AUTO' || (op === 'REPORT_IMPORT' && !p.indicators?.trim())) && !run.analysis) {
+      run.summary = '正在阅读文件，识别内容与用途…'
+      const analysis: DocumentAnalysis = await env.api('/api/v1/assistant/documents/' + encodeURIComponent(run.document.id) + '/analysis', 'POST', { instruction: p.instruction, useModel: run.useModel !== false })
+      run.analysis = analysis
+      run.steps.push(analysis.kind === 'REPORT' ? '根据文档内容识别为检查报告，已整理原始字段' : '已读取文档并生成阅读结果')
+      if (op === 'DOCUMENT_AUTO') {
+        op = run.operation = analysis.kind === 'REPORT' ? 'REPORT_IMPORT' : 'DOCUMENT_UPLOAD'
+        run.title = TASK_DEFINITIONS[op].title
+        run.autoRouted = true
+      }
+      const report = analysis.report
+      if (op === 'REPORT_IMPORT' && report) {
+        p.hospital ||= report.hospital || ''
+        p.checkupDate ||= report.checkupDate || ''
+        p.indicators ||= report.indicators.map(i => `${i.name} ${i.value} ${i.unit || '-'} ${i.referenceRange || '-'} ${i.abnormal ? '异常' : ''}`).join('\n')
+      }
+    }
   }
-  if (run.mediaId && !p.indicators) {
+  if (run.mediaId && !p.indicators?.trim()) {
     run.fields = TASK_DEFINITIONS.REPORT_IMPORT.fields!.map(f => ({ ...f }))
-    const recognized = await env.api('/api/v1/health-reports/recognition', 'POST', { mediaId: run.mediaId })
-    p.hospital = recognized.hospital; p.checkupDate = recognized.checkupDate
+    const recognize = () => env.api('/api/v1/health-reports/recognition', 'POST', { mediaId: run.mediaId })
+    let recognized
+    try { recognized = await recognize() }
+    catch (error) {
+      if (!(error instanceof ApiRequestError) || error.code !== 'FORBIDDEN' || error.statusCode !== 403) throw error
+      if (!await env.authorizeReport()) {
+        run.phase = 'INPUT'
+        run.summary = '尚未进行文字识别。可手动填写报告，或点击“识别这张图片”重新授权。'
+        return false
+      }
+      run.steps.push('已取得健康数据处理授权，继续识别已上传的图片')
+      recognized = await recognize()
+    }
+    p.hospital = recognized.hospital || ''; p.checkupDate = recognized.checkupDate || ''
     p.indicators = recognized.indicators.map((i: any) => `${i.name} ${i.value} ${i.unit || '-'} ${i.referenceRange || '-'} ${i.abnormal ? '异常' : ''}`).join('\n')
   }
   if (['DOCUMENT_UPLOAD', 'DOCUMENT_AUTO', 'SCIENCE_SUBMIT', 'REPORT_IMPORT'].includes(op) && !run.document && !run.mediaId && !p.content && !p.indicators) {
@@ -58,15 +82,6 @@ export async function prepareTaskFiles(run: TaskRun, env: FileEnvironment, file?
     return false
   }
   return true
-}
-
-function fillReport(parameters: Record<string, string>, text: string) {
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
-  const date = text.match(/(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})/)
-  if (date) parameters.checkupDate ||= `${date[1]}-${date[2].padStart(2, '0')}-${date[3].padStart(2, '0')}`
-  parameters.hospital ||= lines.find(l => /医院|体检中心|健康管理中心/.test(l)) || ''
-  // Extract literal values only. Reference ranges and abnormal flags are never invented.
-  parameters.indicators ||= lines.filter(l => /^(血压|空腹血糖|血糖|总胆固醇|低密度脂蛋白|高密度脂蛋白|甘油三酯|血红蛋白|静息心率|心率|体质指数|BMI)\s*[:：\s]\s*\d/.test(l)).map(l => l.replace(/[:：]/g, ' ').trim()).join('\n')
 }
 
 export function parseReportIndicators(indicators: string) {

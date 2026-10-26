@@ -1,4 +1,4 @@
-import { request } from './http'
+import { request, type PageResponse } from './http'
 import { issueMediaDownload } from './files'
 import {
   toServiceWindows,
@@ -37,16 +37,6 @@ export interface EmergencyDeviceResponse {
   reviewedAt?: string
   hasActiveReservation?: boolean
   createdAt: string
-}
-
-export interface PageResponse<T> {
-  content: T[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
-  first: boolean
-  last: boolean
 }
 
 type EmergencyDeviceWireResponse = Omit<EmergencyDeviceResponse, 'imageUrls' | 'vehicleImageUrls'>

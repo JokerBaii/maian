@@ -17,9 +17,12 @@ public final class AgentDocumentParser {
     private static final int LIMIT = 200_000;
     public record Parsed(byte[] bytes, String contentType, String extension, String text, String notice) {}
     public static Parsed validate(MultipartFile file) {
-        String name = (file.getOriginalFilename() == null ? "" : file.getOriginalFilename()).toLowerCase(Locale.ROOT);
+        try { return parse(file.getOriginalFilename(), file.getBytes()); }
+        catch (IOException e) { throw new IllegalArgumentException("无法读取文档", e); }
+    }
+    public static Parsed parse(String filename, byte[] bytes) {
+        String name = (filename == null ? "" : filename).toLowerCase(Locale.ROOT);
         try {
-            byte[] bytes = file.getBytes();
             if (bytes.length == 0 || bytes.length > 15 * 1024 * 1024) throw new IllegalArgumentException("文件需为1字节至15MB");
             String type, extension, text;
             if (name.endsWith(".pdf")) {

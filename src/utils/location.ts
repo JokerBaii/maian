@@ -18,6 +18,9 @@ export const DEFAULT_MAP_CENTER: AppLocation = {
 }
 
 export function getCurrentGcj02Location(): Promise<AppLocation> {
+  if (typeof __MAIAN_PREVIEW_LOCATION__ !== 'undefined' && __MAIAN_PREVIEW_LOCATION__) {
+    return Promise.resolve({ ...__MAIAN_PREVIEW_LOCATION__ })
+  }
   // #ifdef H5
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) { reject(new Error('当前浏览器不支持定位')); return }
@@ -61,7 +64,17 @@ export function wgs84ToGcj02(longitude: number, latitude: number): AppLocation {
   }
 }
 
-export function chooseGcj02Location(): Promise<AppLocation> {
+/** Great-circle distance in metres, shared by map sorting and live rescue tracking. */
+export function haversineMeters(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number) {
+  const radians = (degrees: number) => degrees * Math.PI / 180
+  const latitudeDelta = radians(toLatitude - fromLatitude)
+  const longitudeDelta = radians(toLongitude - fromLongitude)
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(fromLatitude)) * Math.cos(radians(toLatitude)) * Math.sin(longitudeDelta / 2) ** 2
+  return 6_371_000 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, haversine))))
+}
+
+export function chooseGcj02Location(initial?: AppLocation): Promise<AppLocation> {
   // #ifdef H5
   return new Promise((resolve, reject) => {
     const event = `maian:choose-location:${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -71,12 +84,19 @@ export function chooseGcj02Location(): Promise<AppLocation> {
       else reject(new Error('已取消选择位置'))
     }
     uni.$on(event, receive)
-    uni.navigateTo({ url: `/pages/location/pick?event=${encodeURIComponent(event)}`, fail: error => { uni.$off(event, receive); reject(error) } })
+    const query = new URLSearchParams({ event })
+    if (initial) {
+      query.set('longitude', String(initial.longitude))
+      query.set('latitude', String(initial.latitude))
+      if (initial.address) query.set('address', initial.address)
+    }
+    uni.navigateTo({ url: `/pages/location/pick?${query.toString()}`, fail: error => { uni.$off(event, receive); reject(error) } })
   })
   // #endif
   // #ifndef H5
   return new Promise((resolve, reject) => {
     uni.chooseLocation({
+      ...(initial && { longitude: initial.longitude, latitude: initial.latitude }),
       success: location => resolve({
         longitude: location.longitude,
         latitude: location.latitude,

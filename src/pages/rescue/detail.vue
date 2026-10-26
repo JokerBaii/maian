@@ -340,7 +340,7 @@ import {
 } from '@/api/rescue'
 import { issueMediaDownload } from '@/api/files'
 import { connectRescueEvents } from '@/utils/rescueEvents'
-import { getCurrentGcj02Location, openMapNavigation } from '@/utils/location'
+import { getCurrentGcj02Location, openMapNavigation, haversineMeters } from '@/utils/location'
 import { rescueStatusPresentation, userFacingError } from '@/utils/presentation'
 import { createRescueCoordinationPolling } from '@/utils/rescueCoordinationPolling'
 
@@ -962,18 +962,6 @@ function formatLiveEta(seconds: number) {
   if (seconds < 60) return `${seconds}秒`
   if (seconds < 180) return `${Math.floor(seconds / 60)}分${seconds % 60}秒`
   return `${Math.ceil(seconds / 60)}分钟`
-}
-
-function haversineMeters(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number) {
-  const radians = (degrees: number) => degrees * Math.PI / 180
-  const latitudeDelta = radians(toLatitude - fromLatitude)
-  const longitudeDelta = radians(toLongitude - fromLongitude)
-  const fromLat = radians(fromLatitude)
-  const toLat = radians(toLatitude)
-  const haversine = Math.sin(latitudeDelta / 2) ** 2
-    + Math.cos(fromLat) * Math.cos(toLat) * Math.sin(longitudeDelta / 2) ** 2
-  const clamped = Math.min(1, Math.max(0, haversine))
-  return 6_371_000 * 2 * Math.asin(Math.sqrt(clamped))
 }
 
 function formatDistance(meters: number) {

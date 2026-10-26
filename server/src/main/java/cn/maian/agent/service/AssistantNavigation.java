@@ -8,6 +8,12 @@ public final class AssistantNavigation {
     private AssistantNavigation() {}
     public static List<Action> find(String query) {
         String text = query.toLowerCase(Locale.ROOT);
+        if (contains(text, "紧急呼救", "发起求救", "急救界面")) return List.of(new Action("PAGE", "紧急呼救", "打开紧急呼救页面", "/pages/rescue/index"));
+        if (contains(text, "急救地图", "附近地图")) return List.of(new Action("PAGE", "急救地图", "查看附近急救设备", "/pages/map/index"));
+        if (contains(text, "健康档案", "体检报告")) return List.of(new Action("PAGE", "健康档案", "查看已保存的体检报告", "/pages/checkup/archive"));
+        if (contains(text, "救援记录", "救援历史")) return List.of(new Action("PAGE", "救援记录", "查看自己的救援记录", "/pages/mine/records"));
+        if (contains(text, "健康首页", "健康监测")) return List.of(new Action("PAGE", "健康监测", "查看健康监测记录", "/pages/health/index"));
+        if (contains(text, "科普中心", "科普首页")) return List.of(new Action("PAGE", "科普中心", "查看急救与健康知识", "/pages/science/index"));
         if (contains(text, "资源协同", "协同记录", "协同进展", "协同任务", "故障处理进度")) {
             return List.of(new Action("PAGE", "资源协同", "查看设备变化后的检查过程与处理结果", "/pages/agent/index"));
         }

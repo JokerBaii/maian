@@ -27,7 +27,7 @@ class AssistantConversationTest {
         assertThat(AssistantContinuation.local("标题改成急救分享",pending("SCIENCE_SUBMIT",List.of("title"),List.of("title")))).containsEntry("title","急救分享");
     }
     @Test void usesCurrentPageForReferencesButDoesNotInferNegatedPhysicalActions(){
-        var c=new AssistantContext("pages/rescue/detail",null,UUID.randomUUID().toString(),null,null,null,null,null,null,null);
+        var c=new AssistantContext("pages/rescue/detail",null,UUID.randomUUID().toString(),null,null,null,null,null,null,null, null);
         assertThat(AssistantOperations.local("我已到达现场",c).getFirst().operation()).isEqualTo("RESCUE_ARRIVAL");
         assertThat(AssistantOperations.local("确认救援完成",c).getFirst().operation()).isEqualTo("RESCUE_CONFIRM_COMPLETION");
         assertThat(AssistantOperations.local("我还没到达现场",c)).isEmpty();

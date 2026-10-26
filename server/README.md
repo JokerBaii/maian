@@ -43,6 +43,8 @@ export BAIDU_OCR_API_KEY='...'
 export BAIDU_OCR_SECRET_KEY='...'
 ```
 
+使用仓库根目录的 `npm run dev:preview` 时，也可将这三个变量放入本机 `.env`；预览脚本会仅向后端进程加载，修改后需重启。直接通过 Maven 启动服务时，仍需将变量导入启动进程的环境。
+
 当前调用百度“通用文字识别（标准版）” `general_basic`。百度的免费测试资源按月发放且可能调整，应以[OCR 控制台与官方免费资源说明](https://ai.baidu.com/ai-doc/OCR/fk3h7xu7h)为准，不把“有免费额度”当作无限永久免费。前端在首次识别前会明示说明数据发往百度并获取用户同意。
 
 未启用 OCR 时接口明确返回 `OCR_UNAVAILABLE`，前端继续支持人工录入。只有 `healthDataShare=true` 时才允许向 OCR 或 DeepSeek 发送健康数据。DeepSeek 通过 Spring AI 的 OpenAI 兼容接口接入，默认关闭：

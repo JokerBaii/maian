@@ -120,16 +120,23 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-java -Dh2.bindAddress=127.0.0.1 -cp "$runtime/classes:$runtime/lib/*:$h2" \
+(
+  # Load local backend credentials only into the server process.
+  if [[ -f "$root/.env" ]]; then
+    set -a
+    source "$root/.env"
+    set +a
+  fi
+  exec java -Dh2.bindAddress=127.0.0.1 -cp "$runtime/classes:$runtime/lib/*:$h2" \
   scripts/PreviewServer.java \
   "--app.preview.directory=$runtime" \
   "--spring.datasource.url=jdbc:h2:file:$runtime/preview;MODE=MySQL;AUTO_SERVER=TRUE" \
   --spring.datasource.driver-class-name=org.h2.Driver --spring.datasource.username=sa \
   --spring.datasource.password= --spring.flyway.enabled=false --spring.jpa.hibernate.ddl-auto=update \
   --server.address=127.0.0.1 --server.port=8080 --server.shutdown=immediate --debug=false --logging.level.root=INFO \
-  --logging.level.org.hibernate.SQL=WARN "--app.ai.enabled=$preview_ai" --app.ocr.enabled=false \
+  --logging.level.org.hibernate.SQL=WARN "--app.ai.enabled=$preview_ai" \
   --app.bootstrap-admin.phone= --app.bootstrap-admin.password= "--app.media.directory=$runtime/media" \
-  > "$runtime/logs/backend.log" 2>&1 &
+) > "$runtime/logs/backend.log" 2>&1 &
 backend_pid=$!
 
 for attempt in {1..60}; do

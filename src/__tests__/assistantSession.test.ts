@@ -9,6 +9,31 @@ function deferred() {
 }
 
 describe('assistant session', () => {
+  it('opens the emergency page from the model decision without preparing or submitting a rescue', async () => {
+    const description = '有人晕倒了，在东门 & 服务台旁'
+    const ask = vi.fn().mockResolvedValue({ ...answer, executionMode:'SPRING_AI', tasks:[{operation:'RESCUE_CREATE', parameters:{description, latitude:'1', longitude:'2'}}] })
+    const navigate = vi.fn().mockResolvedValue(undefined)
+    const runtime = (await import('../utils/assistantTasks')).createAssistantTaskRuntime({request:vi.fn(),identity:()=> 'a',upload:vi.fn(),uploadImage:vi.fn()},undefined,navigate)
+    const session = createAssistantSession({ask,identity:()=> 'a'},runtime)
+    await session.submit(description)
+    expect(ask).toHaveBeenCalledOnce()
+    expect(navigate).toHaveBeenCalledWith({url:'/pages/rescue/index?description='+encodeURIComponent(description)})
+    expect(session.entries.value[0].tasks![0].phase).toBe('DONE')
+  })
+  it('executes a model-selected page jump without presenting an extra confirmation', async () => {
+    const ask = vi.fn().mockResolvedValue({...answer,tasks:[{operation:'OPEN_PAGE',parameters:{url:'/pages/mine/settings?section=privacy',title:'隐私设置'}}]})
+    const navigate = vi.fn().mockResolvedValue(undefined)
+    const runtime = (await import('../utils/assistantTasks')).createAssistantTaskRuntime({request:vi.fn(),identity:()=> 'a',upload:vi.fn(),uploadImage:vi.fn()},undefined,navigate)
+    const session = createAssistantSession({ask,identity:()=> 'a'},runtime)
+    await session.submit('带我去管理数据共享的地方')
+    expect(navigate).toHaveBeenCalledOnce();expect(session.entries.value[0].tasks![0].phase).toBe('DONE')
+  })
+  it('does not infer an emergency from words when the model chooses to discuss the scenario', async () => {
+    const ask=vi.fn().mockResolvedValue({...answer,conversation:true}),navigate=vi.fn()
+    const session=createAssistantSession({ask,identity:()=> 'a'})
+    await session.submit('有人晕倒这一情境在演练里怎么展示')
+    expect(ask).toHaveBeenCalledOnce();expect(navigate).not.toHaveBeenCalled()
+  })
   it('prevents duplicate requests and respects the session model preference', async () => {
     const pending = deferred()
     const ask = vi.fn().mockReturnValueOnce(pending.promise).mockResolvedValue(answer)

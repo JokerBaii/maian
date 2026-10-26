@@ -5,6 +5,10 @@ export const scienceCategories = [
   { key: 'health', label: '健康管理' },
   { key: 'exercise', label: '运动养生' }
 ]
+
+export function scienceCategoryLabel(category?: string, fallback = category || '科普内容') {
+  return scienceCategories.find(item => item.key === category)?.label || fallback
+}
 export const scienceQuizQuestions = [
   {
     id: 'Q001', question: 'AED使用时，电极片应贴在患者的哪个部位？',

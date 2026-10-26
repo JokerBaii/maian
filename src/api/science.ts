@@ -1,4 +1,4 @@
-import { request } from './http'
+import { request, type PageResponse } from './http'
 import { issueMediaDownload } from './files'
 
 export interface ScienceSubmissionResponse {
@@ -80,15 +80,7 @@ export function updateScienceArticleInteraction(
 }
 
 type ScienceSubmissionWireResponse = Omit<ScienceSubmissionResponse, 'coverImageUrl'>
-type SciencePage = {
-  content: ScienceSubmissionWireResponse[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
-  first: boolean
-  last: boolean
-}
+type SciencePage = PageResponse<ScienceSubmissionWireResponse>
 
 async function normalizeSubmission(item: ScienceSubmissionWireResponse): Promise<ScienceSubmissionResponse> {
   const coverImageUrl = item.coverMediaId
@@ -117,28 +109,14 @@ export async function getScienceSubmissionCount() {
   return request<{ count: number }>('/api/v1/science-submissions/count')
 }
 
-
 export async function listScienceSubmissions() {
   return normalizePage(await request<SciencePage>(
     '/api/v1/science-submissions?page=0&size=100&sort=submittedAt,desc'
   ))
 }
 
-export async function getScienceSubmission(id: string) {
-  return normalizeSubmission(await request<ScienceSubmissionWireResponse>(
-    `/api/v1/science-submissions/${encodeURIComponent(id)}`
-  ))
-}
-
 export function deleteScienceSubmission(id: string) {
   return request<void>(`/api/v1/science-submissions/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
-
-
-export async function listApprovedScienceSubmissions() {
-  return normalizePage(await request<SciencePage>(
-    '/api/v1/science-submissions/approved?page=0&size=100&sort=submittedAt,desc'
-  ))
 }
 
 export async function listPendingScienceSubmissions() {

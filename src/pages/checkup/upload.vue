@@ -63,7 +63,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import AppIconTile from '@/components/AppIconTile.vue'
 import { uploadImage } from '@/api/files'
 import { createHealthReport, recognizeHealthReport } from '@/api/reports'
-import { getUserSettings, updateUserSettings } from '@/api/user'
+import { ensureHealthProcessingConsent } from '@/utils/healthProcessingConsent'
 import { userFacingError } from '@/utils/presentation'
 
 const imagePath = ref('')
@@ -94,9 +94,9 @@ async function generateReport() {
     return
   }
   submitting.value = true
-  uni.showLoading({ title: '正在识别…' })
   try {
-    if (!await ensureProcessingConsent()) return
+    if (!await ensureHealthProcessingConsent()) return
+    uni.showLoading({ title: '正在识别…' })
     if (!uploadedMediaId.value) {
       uploadedMediaId.value = (await uploadImage(imagePath.value, 'HEALTH_REPORT')).mediaId
     }
@@ -118,33 +118,6 @@ async function generateReport() {
   }
 }
 
-async function ensureProcessingConsent() {
-  const settings = await getUserSettings()
-  if (settings.healthDataShare) return true
-  uni.hideLoading()
-  const confirmed = await new Promise<boolean>(resolve => {
-    uni.showModal({
-      title: '授权处理体检报告',
-      content: '检查单将发送至受保护的文字识别与健康信息整理服务。是否同意本次及后续处理？',
-      confirmText: '同意并继续',
-      cancelText: '暂不处理',
-      success: result => resolve(Boolean(result.confirm)),
-      fail: () => resolve(false)
-    })
-  })
-  if (!confirmed) return false
-  await updateUserSettings({
-    rescuePush: settings.rescuePush,
-    healthAlert: settings.healthAlert,
-    scienceUpdate: settings.scienceUpdate,
-    locationShare: settings.locationShare,
-    healthDataShare: true,
-    maxHeartRate: settings.maxHeartRate,
-    minHeartRate: settings.minHeartRate
-  })
-  uni.showLoading({ title: '正在识别…' })
-  return true
-}
 </script>
 
 <style lang="scss" scoped>

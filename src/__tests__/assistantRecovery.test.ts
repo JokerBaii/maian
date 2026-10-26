@@ -78,12 +78,13 @@ describe('assistant recovery', () => {
     await restored.submit('确认')
     expect(queued.phase).toBe('QUEUED');expect(test.request).toHaveBeenCalledOnce()
   })
-  it('never restores an old incident location as a current GPS fix', () => {
-    const runtime=createAssistantTaskRuntime({request:vi.fn(),upload:vi.fn(),uploadImage:vi.fn(),identity:()=> 'a'},{current:vi.fn(),choose:vi.fn()})
+  it('migrates old rescue forms into page navigation without restoring their saved position', () => {
+    const runtime=createAssistantTaskRuntime({request:vi.fn(),upload:vi.fn(),uploadImage:vi.fn(),identity:()=> 'a'})
     const task=runtime.create({operation:'RESCUE_CREATE',parameters:{description:'需要帮助'}})
-    task.phase='CONFIRM';task.rescue={location:{latitude:22,longitude:113},locatedAt:Date.now()};task.parameters.latitude='22';task.parameters.longitude='113';task.parameters.address='旧位置'
-    const restored=runtime.restore(JSON.parse(JSON.stringify(task)))
-    expect(restored.phase).toBe('INPUT');expect(restored.rescue?.location).toBeUndefined();expect(restored.parameters.latitude).toBeUndefined();expect(restored.parameters.address).toBeUndefined()
+    const saved={...task,phase:'CONFIRM',rescue:{location:{latitude:22,longitude:113},locatedAt:Date.now()},parameters:{description:'需要帮助',latitude:'22',longitude:'113',address:'旧位置'}}
+    const restored=runtime.restore(JSON.parse(JSON.stringify(saved)))
+    expect(restored.phase).toBe('QUEUED');expect(restored).not.toHaveProperty('rescue')
+    expect(restored.parameters).toEqual({description:'需要帮助'})
   })
   it('clear and account switching remove history and checkpoints', async () => {
     const test=setup(),first=test.session();await first.submit('联系人');first.clear();expect(test.saved()).toBeUndefined()

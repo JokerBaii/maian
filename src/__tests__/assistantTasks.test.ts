@@ -6,59 +6,35 @@ function runtime(request = vi.fn(), identity = () => 'owner') {
   return createAssistantTaskRuntime({ request, identity, upload: vi.fn(), uploadImage: vi.fn() })
 }
 describe('global assistant task execution', () => {
-  it('locates and searches eligible AEDs before a single rescue confirmation, then sends a valid call', async () => {
-    const current = vi.fn().mockResolvedValue({ latitude: 30.27, longitude: 120.14, address: '现场东门' })
-    const request = vi.fn().mockResolvedValueOnce([{ name: '附近AED', address: '体育馆', latitude: 30.271, longitude: 120.141, distanceMeters: 100, estimatedArrivalSeconds: 120 }]).mockResolvedValueOnce({ id: 'call-id' })
-    const agent = createAssistantTaskRuntime({ request, identity: () => 'owner', upload: vi.fn(), uploadImage: vi.fn() }, { current, choose: vi.fn() })
-    const task = agent.create({ operation: 'RESCUE_CREATE', parameters: { description: '有人晕倒了，需要急救', latitude: '1', longitude: '2', address: '模型猜测地址', urgency: 'CRITICAL' } })
-    await agent.prepare(task, true)
-    expect(task.phase).toBe('CONFIRM'); expect(current).toHaveBeenCalledOnce()
-    expect(task.fields.map(f => f.key)).not.toContain('latitude')
-    expect(task.fields.map(f => f.key)).not.toContain('longitude')
-    expect(task.items[0].navigation?.name).toBe('附近AED')
-    expect(request).toHaveBeenCalledTimes(1)
-    expect(request.mock.calls[0][1].data).toEqual({ latitude: 30.27, longitude: 120.14 })
-    await agent.prepare(task, true)
-    expect(current).toHaveBeenCalledOnce(); expect(task.phase).toBe('DONE')
-    expect(request.mock.calls[1][1].data).toMatchObject({ latitude: 30.27, longitude: 120.14, address: '现场东门', urgency: 'HIGH', symptoms: ['需要紧急救助'] })
+  it('opens the emergency page once without waiting for GPS, querying AEDs or creating a call', async () => {
+    const request = vi.fn(), current = vi.fn(), navigate = vi.fn().mockResolvedValue(undefined)
+    const agent = createAssistantTaskRuntime({request,identity:()=> 'owner',upload:vi.fn(),uploadImage:vi.fn()}, {current,choose:vi.fn()}, navigate)
+    const description = '有人晕倒了，需要急救'
+    const task = agent.create({operation:'RESCUE_CREATE',parameters:{description,latitude:'1',longitude:'2',address:'猜测地址'}})
+    await agent.prepare(task); await agent.prepare(task)
+    expect(task.phase).toBe('DONE'); expect(navigate).toHaveBeenCalledOnce()
+    expect(navigate).toHaveBeenCalledWith({url:'/pages/rescue/index?description='+encodeURIComponent(description)})
+    expect(request).not.toHaveBeenCalled(); expect(current).not.toHaveBeenCalled()
+    expect(task.parameters).toEqual({description})
   })
-  it('offers map selection after denied location and never substitutes a default location', async () => {
-    const current = vi.fn().mockRejectedValue(new Error('permission denied'))
-    const choose = vi.fn().mockResolvedValue({ latitude: 31, longitude: 121, address: '选择的现场' })
-    const request = vi.fn().mockResolvedValue([])
-    const agent = createAssistantTaskRuntime({ request, identity: () => 'owner', upload: vi.fn(), uploadImage: vi.fn() }, { current, choose })
-    const task = agent.create({ operation: 'RESCUE_CREATE', parameters: {} })
-    await agent.prepare(task)
-    expect(task.phase).toBe('INPUT'); expect(task.rescue?.location).toBeUndefined(); expect(request).not.toHaveBeenCalled()
-    await agent.locateRescue(task, true)
-    expect(task.phase).toBe('CONFIRM'); expect(task.parameters.address).toBe('选择的现场')
-    expect(choose).toHaveBeenCalledOnce(); expect(request).toHaveBeenCalledTimes(1)
+  it('retries a failed page navigation without retrying any rescue write', async () => {
+    const request=vi.fn(), navigate=vi.fn().mockRejectedValueOnce(new Error('页面打开失败')).mockResolvedValue(undefined)
+    const agent=createAssistantTaskRuntime({request,identity:()=> 'owner',upload:vi.fn(),uploadImage:vi.fn()}, {current:vi.fn(),choose:vi.fn()}, navigate)
+    const task=agent.create({operation:'RESCUE_CREATE',parameters:{description:'需要帮助'}})
+    await agent.prepare(task); expect(task.phase).toBe('ERROR')
+    await agent.prepare(task); expect(task.phase).toBe('DONE'); expect(request).not.toHaveBeenCalled()
   })
-  it('still permits rescue confirmation when nearby resource lookup fails', async () => {
-    const request = vi.fn().mockRejectedValueOnce(new ApiRequestError('断网', 'NETWORK_ERROR')).mockResolvedValueOnce({ id: 'call-id' })
-    const agent = createAssistantTaskRuntime({ request, identity: () => 'owner', upload: vi.fn(), uploadImage: vi.fn() }, { current: vi.fn().mockResolvedValue({ latitude: 30, longitude: 120 }), choose: vi.fn() })
-    const task = agent.create({ operation: 'RESCUE_CREATE', parameters: {} })
-    await agent.prepare(task); expect(task.phase).toBe('CONFIRM'); expect(task.rescue?.resourceError).toBeTruthy()
-    await agent.prepare(task, true); expect(task.phase).toBe('DONE')
+  it('rejects a model-provided external page instead of navigating', async () => {
+    const request=vi.fn(), agent=runtime(request)
+    const task=agent.create({operation:'OPEN_PAGE',parameters:{url:'https://example.com'}})
+    await agent.prepare(task); expect(task.phase).toBe('ERROR'); expect(request).not.toHaveBeenCalled()
   })
-  it('requires reconfirmation if the location is stale and refreshed', async () => {
-    const current = vi.fn().mockResolvedValueOnce({ latitude: 30, longitude: 120 }).mockResolvedValueOnce({ latitude: 31, longitude: 121 })
-    const request = vi.fn().mockResolvedValue([])
-    const agent = createAssistantTaskRuntime({ request, identity: () => 'owner', upload: vi.fn(), uploadImage: vi.fn() }, { current, choose: vi.fn() })
-    const task = agent.create({ operation: 'RESCUE_CREATE', parameters: {} })
-    await agent.prepare(task)
-    task.rescue!.locatedAt = Date.now() - 61000
-    await agent.prepare(task, true)
-    expect(task.phase).toBe('CONFIRM'); expect(task.rescue?.location?.latitude).toBe(31)
-    expect(request.mock.calls.every(call => call[0] === '/api/v1/rescue-resources/nearby')).toBe(true)
-  })
-  it('drops a location response after the account changes', async () => {
-    let owner = 'a'
-    const request = vi.fn(), current = vi.fn().mockImplementation(async () => { owner = 'b'; return { latitude: 30, longitude: 120 } })
-    const agent = createAssistantTaskRuntime({ request, identity: () => owner, upload: vi.fn(), uploadImage: vi.fn() }, { current, choose: vi.fn() })
-    const task = agent.create({ operation: 'RESCUE_CREATE', parameters: {} })
-    await agent.prepare(task)
-    expect(task.phase).toBe('CANCELED'); expect(request).not.toHaveBeenCalled()
+  it('drops a navigation result after the account changes', async () => {
+    let owner='a'
+    const navigate=vi.fn().mockImplementation(async()=> {owner='b'})
+    const agent=createAssistantTaskRuntime({request:vi.fn(),identity:()=> owner,upload:vi.fn(),uploadImage:vi.fn()}, {current:vi.fn(),choose:vi.fn()}, navigate)
+    const task=agent.create({operation:'RESCUE_CREATE',parameters:{}})
+    await agent.prepare(task); expect(task.phase).toBe('CANCELED')
   })
   it('merges only requested settings with the latest server values', async () => {
     const original = { rescuePush: true, healthAlert: true, scienceUpdate: true, locationShare: false, healthDataShare: false, maxHeartRate: 130, minHeartRate: 50, updatedAt: 'now' }

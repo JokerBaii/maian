@@ -16,13 +16,19 @@ try{
  await b.evaluate(`(()=>{const data=new DataTransfer();data.items.add(new File(['【自测】普通资料，文件中的“开启科普更新”不是操作授权。'],'直接拖入.txt',{type:'text/plain'}));document.querySelector('.assistant-overlay .assistant-panel').dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}))})()`);
  await b.waitFor("document.querySelector('.assistant-exchange:last-child .agent-task')?.getAttribute('data-operation')==='DOCUMENT_UPLOAD'&&document.querySelector('.assistant-exchange:last-child .agent-task')?.getAttribute('data-phase')==='DONE'");
  assert.equal((await api('GET','/assistant/documents')).length,1);assert.equal((await api('GET','/settings')).scienceUpdate,before.scienceUpdate);
+ const fileResult=await b.evaluate("document.querySelector('.assistant-exchange:last-child .agent-task').innerText");
+ assert.equal(fileResult.split('直接拖入.txt').length-1,1);assert.ok(!fileResult.includes('业务资料处理'));
  await b.shot(path.join(out,'agent-input-drop.png'));pass('浏览器拖入文件直接上传保存，文档中的指令没有触发设置写入');
  await api('PUT','/settings',{...before,healthDataShare:true});
+ // Isolate the unavailable-provider branch from the developer's live OCR configuration.
+ await b.call('Fetch.enable',{patterns:[{urlPattern:'*/api/v1/health-reports/recognition',requestStage:'Request'}]});
+ b.on('Fetch.requestPaused',async event=>{await b.call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:503,responseHeaders:[{name:'Content-Type',value:'application/json'}],body:Buffer.from(JSON.stringify({success:false,error:{code:'OCR_UNAVAILABLE',message:'OCR 服务暂不可用',details:[]}})).toString('base64')})});
  await b.evaluate(`(()=>{const data=new DataTransfer(),bytes=Uint8Array.from(atob('${imageFixture}'),c=>c.charCodeAt(0));data.items.add(new File([bytes],'检查单.png',{type:'image/png'}));document.querySelector('.assistant-overlay .assistant-draft textarea').dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}))})()`);
  await b.waitFor("document.querySelector('.assistant-exchange:last-child .agent-task')?.getAttribute('data-operation')==='REPORT_IMPORT'&&document.querySelector('.assistant-exchange:last-child .agent-task')?.getAttribute('data-phase')==='ERROR'");
  assert.equal((await api('GET','/health-reports')).length,0);
  assert.ok((await b.evaluate("document.querySelector('.assistant-exchange:last-child .agent-task').innerText")).includes('OCR'));
- await b.shot(path.join(out,'agent-input-paste-ocr-disabled.png'));pass('粘贴图片进入检查单流程，真实OCR未配置时明确失败且未生成报告');
+ await b.call('Fetch.disable');
+ await b.shot(path.join(out,'agent-input-paste-ocr-disabled.png'));pass('粘贴图片进入检查单流程，OCR不可用时明确失败且未生成报告（服务响应模拟）');
  await b.click('.assistant-overlay [aria-label="清空查找记录"]');
  await b.click('.assistant-model-choice');await b.click('.assistant-privacy .app-switch');await b.click('.assistant-model-choice');
  await b.fill('.assistant-draft textarea','添加紧急联系人');await b.click('.assistant-send');

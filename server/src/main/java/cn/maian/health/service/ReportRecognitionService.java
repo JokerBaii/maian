@@ -42,15 +42,15 @@ public class ReportRecognitionService {
     private static final Pattern NUMBER_PATTERN = Pattern.compile("[0-9]+(?:\\.[0-9]+)?");
     private static final Pattern PRESSURE_PATTERN = Pattern.compile("(\\d{2,3})\\s*/\\s*(\\d{2,3})");
     private static final List<IndicatorSpec> INDICATORS = List.of(
-        new IndicatorSpec("血压", List.of("血压"), "mmHg"),
-        new IndicatorSpec("空腹血糖", List.of("空腹血糖", "GLU"), "mmol/L"),
-        new IndicatorSpec("总胆固醇", List.of("总胆固醇", "TC"), "mmol/L"),
-        new IndicatorSpec("低密度脂蛋白", List.of("低密度脂蛋白", "LDL-C", "LDL"), "mmol/L"),
-        new IndicatorSpec("高密度脂蛋白", List.of("高密度脂蛋白", "HDL-C", "HDL"), "mmol/L"),
-        new IndicatorSpec("甘油三酯", List.of("甘油三酯", "TG"), "mmol/L"),
-        new IndicatorSpec("血红蛋白", List.of("血红蛋白", "HGB"), "g/L"),
-        new IndicatorSpec("静息心率", List.of("静息心率", "心率"), "次/分"),
-        new IndicatorSpec("体质指数", List.of("体质指数", "BMI"), "kg/m²")
+        new IndicatorSpec("血压", List.of("血压")),
+        new IndicatorSpec("血糖", List.of("空腹血糖", "血糖", "GLU")),
+        new IndicatorSpec("总胆固醇", List.of("总胆固醇", "TC")),
+        new IndicatorSpec("低密度脂蛋白", List.of("低密度脂蛋白", "LDL-C", "LDL")),
+        new IndicatorSpec("高密度脂蛋白", List.of("高密度脂蛋白", "HDL-C", "HDL")),
+        new IndicatorSpec("甘油三酯", List.of("甘油三酯", "TG")),
+        new IndicatorSpec("血红蛋白", List.of("血红蛋白", "HGB")),
+        new IndicatorSpec("静息心率", List.of("静息心率", "心率")),
+        new IndicatorSpec("体质指数", List.of("体质指数", "BMI"))
     );
 
     private final OcrProperties properties;
@@ -90,19 +90,28 @@ public class ReportRecognitionService {
         requireConsentAndConfiguration();
         byte[] image = mediaStorageService.readOwned(mediaId, MediaPurpose.HEALTH_REPORT);
         List<String> lines = callBaidu(image);
-        ReportInterpretation interpretation = structureWithAi(lines);
+        var result = structure(lines, true);
+        if (result.indicators().isEmpty()) {
+            throw new ExternalRecognitionUnavailableException("检查单文字已读取，但没有找到可确认的检查结果，请重新拍摄完整报告");
+        }
+        return result;
+    }
+
+    /** Text documents and OCR share one extractor; local extraction never requires external consent. */
+    public ReportRecognitionResponse structureDocumentText(String text, boolean useModel) {
+        return structure(text.lines().map(String::trim).filter(line -> !line.isEmpty()).toList(),
+            useModel && userSettingsService.findOrCreate().isHealthDataShare());
+    }
+
+    private ReportRecognitionResponse structure(List<String> lines, boolean allowExternal) {
+        ReportInterpretation interpretation = allowExternal ? structureWithAi(lines) : null;
         List<HealthIndicator> indicators = interpretation == null
             ? parseIndicators(lines)
             : interpretation.indicators();
-        if (indicators.isEmpty()) {
-            throw new ExternalRecognitionUnavailableException(
-                "检查单文字已读取，但没有找到可确认的检查结果，请重新拍摄完整报告"
-            );
-        }
         return new ReportRecognitionResponse(
             ReportRecognitionResponse.REVIEW_NOTICE,
             interpretation == null ? findHospital(lines) : interpretation.hospital(),
-            interpretation == null ? findDate(lines) : interpretation.checkupDate(),
+            findDate(lines),
             indicators,
             lines
         );
@@ -223,7 +232,8 @@ public class ReportRecognitionService {
                 String range = rangeMatcher.find() ? rangeMatcher.group(1).replaceAll("\\s+", "") : null;
                 boolean abnormal = line.contains("↑") || line.contains("↓") || line.contains("异常")
                     || line.matches(".*(?:\\sH|\\sL|\\*).*?");
-                result.add(new HealthIndicator(spec.name(), value, spec.unit(), range, abnormal));
+                var unit = Pattern.compile("(?i)(mmol/L|mg/dL|g/L|U/L|mmHg|%|kg/m[²2]|bpm|次/分)").matcher(tail);
+                result.add(new HealthIndicator("空腹血糖".equals(alias) ? alias : spec.name(), value, unit.find() ? unit.group() : null, range, abnormal));
                 break;
             }
         }
@@ -244,7 +254,7 @@ public class ReportRecognitionService {
         return lines.stream()
             .filter(line -> line.contains("医院") || line.contains("体检中心") || line.contains("健康管理中心"))
             .findFirst()
-            .orElse("待手动核对");
+            .orElse("");
     }
 
     private LocalDate findDate(List<String> lines) {
@@ -261,7 +271,7 @@ public class ReportRecognitionService {
                 }
             }
         }
-        return LocalDate.now(clock);
+        return null;
     }
 
     private boolean blank(String value) {
@@ -272,7 +282,7 @@ public class ReportRecognitionService {
         return blank(value) ? null : value.trim();
     }
 
-    private record IndicatorSpec(String name, List<String> aliases, String unit) {
+    private record IndicatorSpec(String name, List<String> aliases) {
     }
 
     private record AccessToken(String value, Instant expiresAt) {

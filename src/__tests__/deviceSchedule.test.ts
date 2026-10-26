@@ -18,4 +18,15 @@ describe('device service schedule conversion', () => {
   it('rejects unparseable free text instead of dispatching by mistake', () => {
     expect(() => toServiceWindows('大概白天')).toThrow('服务时段格式无效')
   })
+
+  it('supports the weekend option shown by device registration and timed weekend service', () => {
+    expect(toServiceWindows('周末')).toEqual([
+      { dayOfWeek: 'SATURDAY', opensAt: '00:00', closesAt: '00:00' },
+      { dayOfWeek: 'SUNDAY', opensAt: '00:00', closesAt: '00:00' }
+    ])
+    expect(toServiceWindows('周末 9:00-17:00')).toEqual([
+      { dayOfWeek: 'SATURDAY', opensAt: '09:00', closesAt: '17:00' },
+      { dayOfWeek: 'SUNDAY', opensAt: '09:00', closesAt: '17:00' }
+    ])
+  })
 })

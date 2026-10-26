@@ -7,6 +7,7 @@ import { openMapNavigation } from '@/utils/location'
 
 const page = (title: string, url: string): AssistantAction => ({ kind: 'PAGE', title, description: '查看实际业务记录', url })
 const content = (data: any): any[] => Array.isArray(data) ? data : data?.content || []
+const documentSize = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`
 const stateLabel = (value: string) => ({ USER: '普通用户', VOLUNTEER: '志愿者', ADMIN: '管理员', PENDING_REVIEW: '待审核', APPROVED: '已通过', REJECTED: '未通过', AVAILABLE: '可用', RESERVED: '救援占用', DISABLED: '暂停使用', COMPLETED: '已完成', RUNNING: '处理中', PENDING: '待处理', FAILED: '失败', ATTENTION: '需关注', USER_CANCELLED: '已取消', normal: '正常', high: '偏高', low: '偏低' } as Record<string,string>)[value] || value
 const editableFieldLabels: Record<string, string> = { newName: '名称', phone: '手机号', relation: '关系', address: '设备地址', serviceTime: '服务时间' }
 
@@ -63,7 +64,7 @@ export async function executeTask(run: TaskRun, env: TaskEnvironment) {
   if (definition.list) {
     const { path, title, destination } = definition.list
     const records = content(await api(path + (path.includes('?') ? '&' : '?') + 'size=100'))
-    run.items = records.slice(0, 30).map((i: any) => ({ title: i.name || i.title || i.hospital || i.deviceName || i.nickname || i.address || '记录', detail: [i.phone, i.relation, i.status ? stateLabel(i.status) : '', i.summary, i.checkupDate, i.role ? stateLabel(i.role) : ''].filter(Boolean).join(' · '), documentId: op === 'DOCUMENT_LIST' ? i.id : undefined, reference: referenceFor(op, i.id) }))
+    run.items = records.slice(0, 30).map((i: any) => ({ title: i.name || i.title || i.hospital || i.deviceName || i.nickname || i.address || '记录', detail: op === 'DOCUMENT_LIST' ? `${documentSize(i.sizeBytes)} · 仅本人可访问` : [i.phone, i.relation, i.status ? stateLabel(i.status) : '', i.summary, i.checkupDate, i.role ? stateLabel(i.role) : ''].filter(Boolean).join(' · '), documentId: op === 'DOCUMENT_LIST' ? i.id : undefined, reference: referenceFor(op, i.id) }))
     run.summary = `${title}：找到 ${records.length} 条记录${records.length > 30 ? '，这里显示前30条' : ''}。`
     if (destination) run.links = [page('打开完整记录', destination)]
     return
@@ -76,6 +77,13 @@ export async function executeTask(run: TaskRun, env: TaskEnvironment) {
     return
   }
   switch (op) {
+    case 'OPEN_PAGE': case 'RESCUE_CREATE': {
+      const emergency = op === 'RESCUE_CREATE'
+      const url = emergency ? '/pages/rescue/index?description=' + encodeURIComponent((p.description || '').slice(0,300)) : p.url
+      await env.navigate({ url })
+      run.summary = emergency ? '已进入紧急呼救页，现场情况已带入；尚未发出呼救。' : `已打开${p.title || '所需页面'}。`
+      break
+    }
     case 'SETTINGS_READ': {
       const value = await api('/api/v1/settings')
       run.items = Object.entries(SETTINGS).map(([key, title]) => ({ title, detail: typeof value[key] === 'boolean' ? value[key] ? '已开启' : '已关闭' : `${value[key]} BPM` })); run.summary = '这是你当前的设置。'; break
@@ -102,7 +110,12 @@ export async function executeTask(run: TaskRun, env: TaskEnvironment) {
       const suffix = { DEVICE_ENABLE: '/enable', DEVICE_DISABLE: '/disable', DEVICE_FAULT: '/fault', DEVICE_DELETE: '' }[op]
       await api(`/api/v1/emergency-devices/${id}${suffix}`, op === 'DEVICE_DELETE' ? 'DELETE' : 'POST'); run.summary = `${run.title}已完成。`; run.links = [page('查看设备与协同结果', '/pages/device/manage')]; break
     }
-    case 'DOCUMENT_UPLOAD': run.summary = `${run.document?.name || '文档'} 已上传保存。${run.document?.notice || ''}`; run.items = [{ title: run.document!.name, detail: `${run.document!.sizeBytes} 字节 · 仅本人可访问`, documentId: run.document!.id }]; break
+    case 'DOCUMENT_ANALYZE':
+      run.analysis = await api(`/api/v1/assistant/documents/${id}/analysis`, 'POST', { instruction: p.instruction, useModel: run.useModel !== false })
+      run.summary = ''
+      run.items = [{ title: run.target.name, detail: `${documentSize(run.target.sizeBytes)} · 仅本人可访问`, documentId: p.id }]
+      break
+    case 'DOCUMENT_UPLOAD': run.summary = run.analysis ? '' : run.document?.text?.trim() ? '文件已保存，文字已读取。' : '文件已保存，暂未提取到可读文字。'; run.items = [{ title: run.document!.name, detail: `${documentSize(run.document!.sizeBytes)} · 仅本人可访问`, documentId: run.document!.id }]; break
     case 'DOCUMENT_DELETE': await api(`/api/v1/assistant/documents/${id}`, 'DELETE'); run.summary = '所选文档已删除。'; break
     case 'REPORT_DELETE': await api(`/api/v1/health-reports/${id}`, 'DELETE'); run.summary = '所选体检报告已删除。'; break
     case 'REPORT_IMPORT': {
@@ -121,13 +134,6 @@ export async function executeTask(run: TaskRun, env: TaskEnvironment) {
     case 'RESCUE_REVIEW': await api(`/api/v1/rescue-reviews/${id}`, 'POST', { useModel: false }); run.summary = '复盘任务已提交，后台正在整理真实救援记录。'; run.links = [page('查看复盘进展', '/pages/rescue/detail?id=' + id)]; break
     case 'RESCUE_FEEDBACK': await api(`/api/v1/rescue-calls/${id}/feedback`, 'POST', { rating: numeric(p.rating), comment: p.comment }); run.summary = '救援评价已提交。'; break
     case 'RESCUE_CANCEL': await api(`/api/v1/rescue-calls/${id}/cancellation`, 'POST'); run.summary = '所选呼救已取消。'; break
-    case 'RESCUE_CREATE': {
-      const position = run.rescue?.location
-      if (!position) throw new Error('请先定位或在地图上选择现场位置')
-      const call = await api('/api/v1/rescue-calls', 'POST', { address: p.address, latitude: position.latitude, longitude: position.longitude, urgency: 'HIGH', description: p.description, symptoms: ['需要紧急救助'], clientRequestId: `assistant-${Date.now()}-${Math.random().toString(16).slice(2)}` })
-      run.output = {rescueId:call.id}; run.context = {...run.context,...run.output}
-      run.items = []; run.summary = '呼救已创建，系统正在匹配资源。'; run.links = [page('查看呼救进展', '/pages/rescue/detail?id=' + encodeURIComponent(call.id))]; break
-    }
     case 'COORDINATION_RETRY': await api(`/api/v1/coordination-tasks/${id}/retry`, 'POST'); run.summary = '协同重试已提交。'; break
     case 'HEALTH_STATUS': { const value = await api('/api/v1/health-monitoring'); run.summary = `当前记录心率 ${value.current} BPM，今日均值 ${value.avg} BPM。`; run.items = [{ title: '记录状态', detail: stateLabel(value.status) }, { title: '今日预警', detail: `${value.alerts.length} 条` }]; break }
     case 'PROFILE_READ': { const value = await api('/api/v1/profile'); run.summary = `${value.nickname} · ${value.phone}`; run.items = [{ title: '角色', detail: stateLabel(value.role) }, { title: '身份状态', detail: value.verified ? '已校验' : '未校验' }]; break }

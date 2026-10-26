@@ -117,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { scienceCategories } from '@/data/editorial'
 import AssistantCompanion from '@/components/AssistantCompanion.vue'
 import { ref, computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
@@ -125,12 +126,7 @@ import { createScienceSubmission } from '@/api/science'
 import { uploadImage } from '@/api/files'
 import { userFacingError } from '@/utils/presentation'
 
-const categories = [
-  { key: 'device', label: '设备使用' },
-  { key: 'emergency', label: '突发急症' },
-  { key: 'health', label: '健康管理' },
-  { key: 'exercise', label: '运动养生' }
-]
+const categories = scienceCategories.filter(category => category.key !== 'all')
 
 const formData = ref({
   title: '',

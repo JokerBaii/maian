@@ -6,6 +6,7 @@ import { userFacingError } from '@/utils/presentation'
 import { createAssistantTaskRuntime, type TaskRun } from '@/utils/assistantTasks'
 import type { AgentFile } from '@/api/agentDocuments'
 import { assistantPersistence, type AssistantPersistence } from '@/utils/assistantPersistence'
+import { TASK_DEFINITIONS } from '@/utils/assistant/catalog'
 
 export interface AssistantEntry { id: number; question: string; result?: AssistantResult; error?: string; tasks?: TaskRun[] }
 
@@ -63,7 +64,9 @@ export function createAssistantSession(dependencies = { ask: askAssistant, ident
     }
   }
   function conversationContext(scene: AssistantContext, text: string) {
-    const context = { ...scene }
+    const documentTask = [...entries.value].reverse().flatMap(entry => entry.tasks || []).find(task => (task.document || task.context?.documentId) && task.phase !== 'CANCELED')
+    const documentId = documentTask?.document?.id || documentTask?.context?.documentId
+    const context: AssistantContext = { ...(documentId ? { documentId } : {}), ...scene }
     const ordinal = ordinalIndex(text)
     if (ordinal === undefined && Object.entries(scene).some(([key,value]) => key !== 'page' && !!value)) return context
     if (ordinal !== undefined || /这|刚才|它|再打开|再关闭/.test(text)) {
@@ -112,7 +115,8 @@ export function createAssistantSession(dependencies = { ask: askAssistant, ident
       if (pending && /^(确认|确认执行|确认呼救|确认删除|保存|继续|继续刚才|继续刚才的任务|确定|可以|好)[。！!\s]*$/.test(text)) {
         entry.result = { reply: '继续办理当前任务。', executionMode: 'DIRECT', actions: [], steps: ['已收到你对当前任务的明确指令'] }
         movePending(pending, entry)
-        await runtime.prepare(pending.task, pending.task.phase === 'CONFIRM'); await advance(entry); return
+        await runtime.prepare(pending.task, pending.task.phase === 'CONFIRM')
+        await advance(entry); return
       }
       if (pending) {
         const field = pending.task.fields.find(f => f.key === 'id')
@@ -137,13 +141,19 @@ export function createAssistantSession(dependencies = { ask: askAssistant, ident
           if (!pending || result.tasks?.length !== 1 || result.tasks[0].operation !== pending.task.operation) throw new Error('补充信息未能对应当前任务，请重新说明')
           runtime.patch(pending.task, result.tasks[0].parameters); movePending(pending, entry)
         } else {
-          entry.tasks = (result.tasks || []).map(task => runtime.create(task.operation === 'RESCUE_CREATE' ? { ...task, parameters: { ...task.parameters, description: task.parameters.description || text } } : task, context))
-          if (/刚才|刚上传|这份|这个文件|上个文件/.test(text) && !/另一|重新上传/.test(text)) {
+          entry.tasks = (result.tasks || []).map(task => {
+            if (task.operation === 'RESCUE_CREATE') task = { ...task, parameters: { ...task.parameters, description: task.parameters.description || text } }
+            if (['DOCUMENT_AUTO','DOCUMENT_ANALYZE'].includes(task.operation)) task = { ...task, parameters: { ...task.parameters, instruction: text } }
+            return runtime.create(task, context)
+          })
+          const emergency = entry.tasks.find(task => task.operation === 'RESCUE_CREATE')
+          if (emergency) entry.tasks = [emergency, ...entry.tasks.filter(task => task !== emergency)]
+          if (/刚才|刚上传|这份|这个文件|上个文件|文档|文件/.test(text) && !/另一|重新上传/.test(text)) {
             const previous = [...entries.value].reverse().flatMap(item => item === entry ? [] : item.tasks || []).find(task => task.document && task.phase !== 'CANCELED')
             if (previous) for (const task of entry.tasks) runtime.reuseDocument(previous,task)
           }
         }
-        if (result.continuation) await runtime.prepare(entry.tasks![0])
+        if (result.continuation) { entry.tasks![0].useModel = useModel.value; await runtime.prepare(entry.tasks![0]) }
         await advance(entry)
       }
     } catch (error) {
@@ -166,9 +176,10 @@ export function createAssistantSession(dependencies = { ask: askAssistant, ident
       if (task.phase === 'DONE') continue
       if (task.phase === 'QUEUED') {
         inheritCompleted(entry, task)
+        task.useModel = useModel.value
         await runtime.prepare(task)
       }
-      if ((task.phase as TaskRun['phase']) !== 'DONE') break
+      if ((task.phase as TaskRun['phase']) !== 'DONE' || TASK_DEFINITIONS[task.operation]?.navigation) break
     }
   }
   async function continueTask(entry: AssistantEntry, task: TaskRun, confirmed = false, file?: AgentFile, image = false) {
@@ -179,7 +190,9 @@ export function createAssistantSession(dependencies = { ask: askAssistant, ident
     busy.value = true
     try {
       if (task.phase === 'QUEUED') inheritCompleted(entry, task)
-      await runtime.prepare(task, confirmed, file, image); if (run === generation) await advance(entry)
+      task.useModel = useModel.value
+      await runtime.prepare(task, confirmed, file, image)
+      if (run === generation) await advance(entry)
     }
     finally { if (run === generation) busy.value = false }
   }
@@ -193,12 +206,12 @@ export function createAssistantSession(dependencies = { ask: askAssistant, ident
     await continueTask(entry, entry.tasks![0], false, file, image)
   }
   async function locateTask(entry: AssistantEntry, task: TaskRun, manual = false) {
-    if (!syncAccount() || busy.value || !entries.value.includes(entry) || !entry.tasks?.includes(task) || (!task.locationRequired && task.operation !== 'RESCUE_CREATE')) return
+    if (!syncAccount() || busy.value || !entries.value.includes(entry) || !entry.tasks?.includes(task) || !task.locationRequired) return
     recoveryNotice.value = ''
     const run = generation
     busy.value = true
     locationPicking.value = manual
-    try { await runtime.locateRescue(task, manual) }
+    try { await runtime.locate(task, manual) }
     finally { if (run === generation) { locationPicking.value = false; busy.value = false } }
   }
   function cancelTask(entry: AssistantEntry, task: TaskRun, fromInstruction = false) {

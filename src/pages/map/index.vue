@@ -103,7 +103,7 @@
         <view class="popup-info-row">
           <view class="popup-status" :class="'popup-status-' + deviceStatusClass(selectedDevice)">
             <view class="popup-status-dot"></view>
-            <text class="popup-status-text">{{ deviceStatusLabel(selectedDevice) }}</text>
+            <text class="popup-status-text">{{ selectedDevice.statusLabel }}</text>
           </view>
           <text class="popup-distance">{{ selectedDevice._distance || '--' }}</text>
         </view>
@@ -200,7 +200,7 @@
             <view class="device-card-bottom">
               <view class="status-chip" :class="'chip-' + deviceStatusClass(device)">
                 <view class="card-status-dot"></view>
-                <text class="card-status-text">{{ deviceStatusLabel(device) }}</text>
+                <text class="card-status-text">{{ device.statusLabel }}</text>
               </view>
               <text class="device-card-kind">{{ device.category }} / {{ device.type === 'fixed' ? '固定设备' : '移动设备' }}</text>
             </view>
@@ -235,9 +235,10 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import 'leaflet/dist/leaflet.css'
 import AppIcon from '@/components/AppIcon.vue'
-import { getCurrentGcj02Location, DEFAULT_MAP_CENTER, openMapNavigation } from '@/utils/location'
+import { getCurrentGcj02Location, DEFAULT_MAP_CENTER, openMapNavigation, haversineMeters } from '@/utils/location'
 import { loadAMap } from '@/common/amap'
 import { addBaseTileLayer } from '@/common/mapTiles'
+import { deviceStatusLabel as presentDeviceStatus } from '@/utils/presentation'
 import { listEmergencyDevices, type EmergencyDeviceResponse } from '@/api/devices'
 
 const statusBarHeight = ref(0)
@@ -271,6 +272,8 @@ let markerMap: Record<string, {
 let deviceById: Record<string, any> = {}
 
 let selfMarker: any = null
+let disposed = false
+let mapRenderTimer: ReturnType<typeof setTimeout> | null = null
 
 const SELF_MARKER_HTML =
   '<span style="position:relative;display:block;width:28px;height:28px;border-radius:50%;'
@@ -284,13 +287,7 @@ const remoteDevices = ref<any[] | null>(null)
 function calculateDistance(longitude: number, latitude: number) {
   if (!myLocation.value) return Number.POSITIVE_INFINITY
   const [myLongitude, myLatitude] = myLocation.value
-  const toRadians = (value: number) => value * Math.PI / 180
-  const latDelta = toRadians(latitude - myLatitude)
-  const lngDelta = toRadians(longitude - myLongitude)
-  const a = Math.sin(latDelta / 2) ** 2
-    + Math.cos(toRadians(myLatitude)) * Math.cos(toRadians(latitude))
-    * Math.sin(lngDelta / 2) ** 2
-  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return haversineMeters(myLatitude, myLongitude, latitude, longitude) / 1000
 }
 
 function formatDistance(distance: number) {
@@ -300,11 +297,12 @@ function formatDistance(distance: number) {
 
 function mapRemoteDevice(device: EmergencyDeviceResponse) {
   const type = device.type.toLowerCase()
-  const online = device.status === 'AVAILABLE'
+  const online = device.status === 'AVAILABLE' && (device.type !== 'MOBILE' || device.mobilePresenceStatus === 'ONLINE')
   return {
     ...device,
     type,
-    status: type === 'mobile' ? (online ? 'online' : 'offline') : device.status.toLowerCase(),
+    status: device.status.toLowerCase(),
+    statusLabel: presentDeviceStatus(device),
     online
   }
 }
@@ -380,7 +378,6 @@ function markerAsset(device: any, _png = false) {
   const filename = `marker-${type}${state}.${extension}`
   const baseUrl = ((import.meta as any).env?.BASE_URL || '/').replace(/\/?$/, '/')
   return `${baseUrl}static/map/${filename}`
-  return `/static/map/${filename}`
 }
 
 function preloadMarkerAssets() {
@@ -417,42 +414,72 @@ function deviceStatusClass(device: any) {
   return device.online ? 'online' : 'offline'
 }
 
-function deviceStatusLabel(device: any) {
-  if (device.status === 'reserved') return '救援占用中'
-  if (device.type === 'fixed') {
-    return device.status === 'available' ? '可用' : '维护中'
-  }
-  return device.online ? '在线' : '离线'
-}
+
 
 async function initMap() {
   // #ifdef H5
-  const loaded = await loadAMap()
-  if (!loaded) {
-    await initLeafletMap()
-    return
+  try {
+    const loaded = await loadAMap()
+    if (disposed) return
+    if (!loaded) {
+      await initLeafletMap()
+      return
+    }
+    mapUnavailable.value = false
+    mapProvider = 'amap'
+    const AMap = (window as any).AMap
+    const center = myLocation.value || [DEFAULT_MAP_CENTER.longitude, DEFAULT_MAP_CENTER.latitude]
+
+    mapInstance = new AMap.Map('map-container', {
+      zoom: 14,
+      center: [...center],
+      mapStyle: 'amap://styles/whitesmoke',
+      resizeEnable: true
+    })
+    // A loaded SDK does not guarantee that this browser can render its map.
+    mapRenderTimer = setTimeout(() => { void useFallbackMap() }, 8000)
+    mapInstance.on('complete', () => {
+      if (mapRenderTimer) clearTimeout(mapRenderTimer)
+      mapRenderTimer = null
+    })
+
+    updateSelfMarker()
+    addMarkers()
+  } catch {
+    await useFallbackMap()
   }
-  mapUnavailable.value = false
-  mapProvider = 'amap'
-  const AMap = (window as any).AMap
-  const center = myLocation.value || [DEFAULT_MAP_CENTER.longitude, DEFAULT_MAP_CENTER.latitude]
-
-  mapInstance = new AMap.Map('map-container', {
-    zoom: 14,
-    center: [...center],
-    mapStyle: 'amap://styles/whitesmoke',
-    resizeEnable: true
-  })
-
-  updateSelfMarker()
-  addMarkers()
   // #endif
+}
+
+async function useFallbackMap() {
+  if (disposed || mapProvider === 'leaflet') return
+  releaseMap()
+  document.getElementById('map-container')?.replaceChildren()
+  await initLeafletMap()
+}
+
+function releaseMap() {
+  if (mapRenderTimer) clearTimeout(mapRenderTimer)
+  mapRenderTimer = null
+  try {
+    if (mapProvider === 'leaflet') mapInstance?.remove()
+    else mapInstance?.destroy()
+  } catch {
+    // A failed WebGL renderer can also fail during teardown; still allow the fallback to start.
+  } finally {
+    mapInstance = null
+    mapProvider = null
+    markerMap = {}
+    deviceById = {}
+    selfMarker = null
+  }
 }
 
 async function initLeafletMap() {
   // #ifdef H5
   try {
     const module = await import('leaflet')
+    if (disposed) return
     leafletApi = module.default || module
     mapProvider = 'leaflet'
     mapUnavailable.value = false
@@ -678,6 +705,7 @@ function handleSearch() {
 
 async function locateMe(showResult = true) {
   const applyLocation = (longitude: number, latitude: number) => {
+    if (disposed) return
     myLocation.value = [longitude, latitude]
     updateSelfMarker()
     if (mapInstance) {
@@ -688,7 +716,9 @@ async function locateMe(showResult = true) {
         mapInstance.setZoom(14)
       }
     }
+    // #ifndef H5
     uni.createMapContext('native-rescue-map').moveToLocation({ longitude, latitude })
+    // #endif
     if (showResult) uni.showToast({ title: '定位已更新', icon: 'success' })
   }
 
@@ -742,15 +772,10 @@ function toggleDrawer() {
 onMounted(() => {
   nextTick(async () => {
     preloadMarkerAssets()
-    try {
-      await locateMe(false)
-    } catch {
-    }
-    const devicesPromise = loadDevices()
-    const mapPromise = initMap()
-    await devicesPromise
-    await mapPromise
-    initializedRef = true
+    // Location permission and GPS may remain pending; neither should block the map or devices.
+    void locateMe(false).catch(() => {})
+    await Promise.all([loadDevices(), initMap()])
+    if (!disposed) initializedRef = true
   })
 })
 
@@ -775,17 +800,12 @@ function scheduleMarkerUpdate() {
 watch([activeFilter, searchText, remoteDevices, myLocation], scheduleMarkerUpdate)
 
 onUnmounted(() => {
+  disposed = true
   if (markerUpdateTimer) {
     clearTimeout(markerUpdateTimer)
     markerUpdateTimer = null
   }
-  if (mapProvider === 'leaflet' && mapInstance) {
-    mapInstance.remove()
-    mapInstance = null
-  }
-  markerMap = {}
-  deviceById = {}
-  selfMarker = null
+  releaseMap()
 })
 </script>
 

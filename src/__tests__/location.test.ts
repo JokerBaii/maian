@@ -1,9 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildAmapNavigationUrl, getCurrentGcj02Location, wgs84ToGcj02 } from '../utils/location'
+import { buildAmapNavigationUrl, chooseGcj02Location, getCurrentGcj02Location, haversineMeters, wgs84ToGcj02, type AppLocation } from '../utils/location'
 
 afterEach(() => vi.unstubAllGlobals())
 
 describe('browser incident location', () => {
+  it('uses the configured local preview point without requesting browser GPS', async () => {
+    const location = { longitude: 120.1505, latitude: 30.2805, accuracy: 15, address: '杭州市' }
+    const getCurrentPosition = vi.fn()
+    vi.stubGlobal('__MAIAN_PREVIEW_LOCATION__', location)
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } })
+    expect(await getCurrentGcj02Location()).toEqual(location)
+    expect(getCurrentPosition).not.toHaveBeenCalled()
+  })
   it('converts a GPS reference point to the coordinate system used by devices', () => {
     const point = wgs84ToGcj02(116.397128, 39.916527)
     expect(point.longitude).toBeCloseTo(116.403372494, 7)
@@ -23,6 +31,39 @@ describe('browser incident location', () => {
 })
 
 describe('map navigation', () => {
+  it('measures distance consistently for map sorting and rescue tracking, including antipodal points', () => {
+    expect(haversineMeters(0, 0, 0, 0)).toBe(0)
+    expect(haversineMeters(0, 0, 0, 1)).toBeCloseTo(111194.927, 2)
+    expect(haversineMeters(90, 0, -90, 180)).toBeCloseTo(Math.PI * 6371000)
+  })
+
+  it('passes the existing device location to the shared picker and only applies a confirmed selection', async () => {
+    const events = new Map<string, (location?: AppLocation) => void>()
+    const navigateTo = vi.fn()
+    const off = vi.fn((event: string) => events.delete(event))
+    vi.stubGlobal('uni', { $on: (event: string, handler: (location?: AppLocation) => void) => events.set(event, handler), $off: off, navigateTo })
+    const initial = { longitude: 120.15, latitude: 30.28, address: '北门 & 服务台' }
+    const pending = chooseGcj02Location(initial)
+    const query = new URL(navigateTo.mock.calls[0][0].url, 'https://app.local').searchParams
+    expect(query.get('address')).toBe(initial.address)
+    expect(query.get('longitude')).toBe('120.15')
+    const selected = { longitude: 120.16, latitude: 30.29, address: '南门' }
+    events.get(query.get('event')!)!(selected)
+    expect(await pending).toEqual(selected)
+    expect(initial.address).toBe('北门 & 服务台')
+    expect(events.size).toBe(0)
+  })
+
+  it('cancels the shared picker without leaking its callback or inventing coordinates', async () => {
+    let receive!: () => void
+    const off = vi.fn()
+    vi.stubGlobal('uni', { $on: (_event: string, handler: () => void) => { receive = handler }, $off: off, navigateTo: vi.fn() })
+    const pending = chooseGcj02Location()
+    receive()
+    await expect(pending).rejects.toThrow('已取消选择位置')
+    expect(off).toHaveBeenCalledOnce()
+  })
+
   it('builds an encoded AMap route using GCJ-02 coordinates', () => {
     const url = new URL(buildAmapNavigationUrl({
       longitude: 120.1442,

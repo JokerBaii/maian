@@ -3,6 +3,13 @@ import { ApiRequestError, ensureAccessToken, resolveApiUrl } from './http'
 
 export interface AgentDocument { id: string; name: string; sizeBytes: number; contentType: string; text?: string; notice?: string; createdAt: string }
 export interface AgentFile { path: string; name: string; size: number }
+export interface DocumentAnalysis {
+  kind: 'DOCUMENT' | 'REPORT' | 'UNREADABLE'
+  summary: string
+  executionMode: string
+  truncated: boolean
+  report?: { hospital?: string; checkupDate?: string; indicators: { name: string; value: string; unit?: string; referenceRange?: string; abnormal: boolean }[] } | null
+}
 
 export async function uploadAgentDocument(file: AgentFile): Promise<AgentDocument> {
   const token = await ensureAccessToken()

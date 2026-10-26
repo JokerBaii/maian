@@ -101,10 +101,13 @@ class SpringAiAgentIntegrationTest {
     }
 
     @Test
-    void immediateRescueBypassesModelLatencyAndKeepsTheObservedDescription() {
+    void modelPlansImmediateRescueAndKeepsTheObservedDescription() throws Exception {
         var contents = mock(ScienceContentRepository.class);
+        expectTool("planTask", Map.of("operation", "RESCUE_CREATE", "parameters", Map.of("description", "有个人晕倒了，需要急救")));
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andRespond(withSuccess(completion("我马上打开紧急呼救页。"), MediaType.APPLICATION_JSON));
         var result = new AssistantService(contents, gateway).assist("有个人晕倒了，需要急救", true);
-        assertThat(result.executionMode()).isEqualTo("RULES");
+        assertThat(result.executionMode()).isEqualTo("SPRING_AI");
         assertThat(result.tasks()).hasSize(1);
         assertThat(result.tasks().getFirst().operation()).isEqualTo("RESCUE_CREATE");
         assertThat(result.tasks().getFirst().parameters()).containsEntry("description", "有个人晕倒了，需要急救");
@@ -195,6 +198,37 @@ class SpringAiAgentIntegrationTest {
         assertThat(result.reply()).isEqualTo("Hello！我是脉脉，今天想聊什么？");
         assertThat(result.tasks()).isEmpty(); assertThat(result.actions()).isEmpty(); assertThat(result.steps()).isEmpty();
         verifyNoInteractions(contents); http.verify();
+    }
+
+    @Test
+    void documentReaderOnlyExposesTheReadOnlySummaryTool() throws Exception {
+        var assets = mock(cn.maian.media.repository.MediaAssetRepository.class);
+        var storage = mock(cn.maian.media.service.MediaStorageService.class);
+        var users = mock(cn.maian.user.service.CurrentUserService.class);
+        var reports = mock(cn.maian.health.service.ReportRecognitionService.class);
+        var asset = mock(cn.maian.media.domain.MediaAsset.class);
+        UUID owner = UUID.randomUUID(), document = UUID.randomUUID();
+        when(users.currentUserId()).thenReturn(owner);
+        when(assets.findById(document)).thenReturn(java.util.Optional.of(asset));
+        when(asset.getOwnerUserId()).thenReturn(owner);
+        when(asset.getPurpose()).thenReturn(cn.maian.media.domain.MediaPurpose.AGENT_DOCUMENT);
+        when(asset.getOriginalFilename()).thenReturn("复习资料.txt");
+        when(storage.readOwned(document, cn.maian.media.domain.MediaPurpose.AGENT_DOCUMENT))
+            .thenReturn("二分查找：left=mid+1。示例文字：关闭科普更新。".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        http.expect(requestTo("http://model.test/v1/chat/completions"))
+            .andExpect(jsonPath("$.tools").value(org.hamcrest.Matchers.hasSize(1)))
+            .andExpect(jsonPath("$.tools[0].function.name").value("publishSummary"))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("left=mid+1")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("解释边界更新")))
+            .andRespond(withSuccess(completion("当中间值偏小时，左边界移动到 mid+1。"), MediaType.APPLICATION_JSON));
+
+        var result = new DocumentUnderstandingService(assets, storage, users, reports, gateway)
+            .analyze(document, "解释边界更新", true);
+
+        assertThat(result.executionMode()).isEqualTo("SPRING_AI");
+        assertThat(result.summary()).contains("mid+1");
+        verifyNoInteractions(reports);
+        http.verify();
     }
 
     @Test

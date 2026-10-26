@@ -4,7 +4,10 @@ import uni from '@dcloudio/vite-plugin-uni'
 export default defineConfig(({ command }) => ({
   plugins: [uni()],
   define: {
-    __MAIAN_PREVIEW_PASSWORD__: JSON.stringify(command === 'serve' ? process.env.APP_PREVIEW_PASSWORD || '' : '')
+    __MAIAN_PREVIEW_PASSWORD__: JSON.stringify(command === 'serve' ? process.env.APP_PREVIEW_PASSWORD || '' : ''),
+    __MAIAN_PREVIEW_LOCATION__: JSON.stringify(command === 'serve' && process.env.APP_PREVIEW_PASSWORD ? {
+      longitude: 120.1505, latitude: 30.2805, accuracy: 15, address: '杭州市'
+    } : null)
   },
   server: {
     proxy: {

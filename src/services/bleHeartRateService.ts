@@ -1,3 +1,5 @@
+import { onAccountSessionChange } from '@/utils/authSession'
+
 export type BleLifecycleState =
   | 'IDLE' | 'ADAPTER_OPEN' | 'SCANNING' | 'CONNECTING' | 'CONNECTED' | 'NOTIFYING'
 
@@ -15,8 +17,11 @@ class BleHeartRateService {
 
   registerDiscovery(handler: (result: any) => void) {
     this.unregisterDiscovery()
-    this.discoveredHandler = handler
-    uni.onBluetoothDeviceFound(handler)
+    const activeHandler = (result: any) => {
+      if (this.discoveredHandler === activeHandler) handler(result)
+    }
+    this.discoveredHandler = activeHandler
+    uni.onBluetoothDeviceFound(activeHandler)
   }
 
   markAdapterOpen() { this.stateValue = 'ADAPTER_OPEN' }
@@ -34,18 +39,25 @@ class BleHeartRateService {
   ) {
     this.unregisterHeartRateListener()
     this.notificationTarget = target
-    this.valueHandler = handler
-    uni.onBLECharacteristicValueChange(handler)
+    const activeHandler = (result: any) => {
+      if (this.valueHandler === activeHandler) handler(result)
+    }
+    this.valueHandler = activeHandler
+    uni.onBLECharacteristicValueChange(activeHandler)
     this.stateValue = 'NOTIFYING'
   }
 
   stopDiscovery() {
-    ;(uni as any).stopBluetoothDevicesDiscovery?.({ complete: () => undefined })
+    if (this.stateValue === 'SCANNING') {
+      ;(uni as any).stopBluetoothDevicesDiscovery?.({ complete: () => undefined })
+    }
     this.unregisterDiscovery()
     if (this.stateValue === 'SCANNING') this.stateValue = 'ADAPTER_OPEN'
   }
 
-  disconnect(deviceId = this.connectedDeviceId, complete?: () => void) {
+  disconnect(complete?: () => void) {
+    const deviceId = this.connectedDeviceId
+    const adapterWasOpen = this.stateValue !== 'IDLE'
     this.stopDiscovery()
     const target = this.notificationTarget
     if (target) {
@@ -59,7 +71,7 @@ class BleHeartRateService {
     this.notificationTarget = null
     const finish = () => {
       this.connectedDeviceId = ''
-      this.stateValue = 'ADAPTER_OPEN'
+      this.stateValue = adapterWasOpen ? 'ADAPTER_OPEN' : 'IDLE'
       complete?.()
     }
     if (deviceId) {
@@ -71,7 +83,7 @@ class BleHeartRateService {
 
 
   dispose() {
-    this.disconnect(this.connectedDeviceId, () => {
+    this.disconnect(() => {
       ;(uni as any).closeBluetoothAdapter?.({ complete: () => undefined })
       this.stateValue = 'IDLE'
     })
@@ -91,3 +103,6 @@ class BleHeartRateService {
 }
 
 export const bleHeartRateService = new BleHeartRateService()
+onAccountSessionChange(() => {
+  if (bleHeartRateService.state !== 'IDLE') bleHeartRateService.dispose()
+})
