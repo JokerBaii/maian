@@ -66,7 +66,7 @@ const demoAccounts = [
   { role: '普通用户', phone: '19900000001', icon: 'user-filled', tone: 'blue' as const },
   { role: '急救志愿者', phone: '19900000002', icon: 'volunteer', tone: 'green' as const },
   { role: '管理员', phone: '19900000003', icon: 'auth-filled', tone: 'slate' as const }
-]
+].filter(account => !__MAIAN_PUBLIC_DEMO__ || account.phone !== '19900000003')
 
 async function fillDemoAccount(account: typeof demoAccounts[number]) {
   if (submitting.value || registerMode.value || !previewPassword) return
